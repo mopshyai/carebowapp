@@ -1,0 +1,68 @@
+/* CareBow Mobile Utilities */
+
+/* Safe Area Variables */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-height: 80px;
+  --bottom-safe-spacing: calc(var(--bottom-nav-height) + var(--safe-area-bottom));
+}
+
+/* Consistent Spacing Scale */
+.spacing-8 { padding: 8px; }
+.spacing-12 { padding: 12px; }
+.spacing-16 { padding: 16px; }
+.spacing-24 { padding: 24px; }
+
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.gap-24 { gap: 24px; }
+
+/* Bottom Padding for Scroll Areas */
+.pb-nav-safe {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Responsive Grid Utilities */
+@media (max-width: 375px) {
+  .grid-cols-3-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Hide Scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch Target Minimum */
+.min-touch {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.min-touch-small {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent Text Truncation */
+.text-wrap-balance {
+  text-wrap: balance;
+}
+
+/* Carousel Peek Effect */
+.carousel-peek {
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 24px;
+}
+
+.carousel-peek > * {
+  scroll-snap-align: start;
+}
