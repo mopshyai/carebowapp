@@ -1,4 +1,9 @@
-import { useState } from 'react';
+/**
+ * Ask CareBow Tab Screen
+ * Entry point for the AI Health Assistant with Trial System
+ */
+
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,8 +15,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors } from '@/constants/Colors';
-import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
+import { colors, spacing, radius, typography, shadows } from '@/theme';
+import {
+  useAskCarebowStore,
+  useIsTrialActive,
+  useTrialDaysRemaining,
+  useTrialState,
+  useCanAccessPremiumFeatures,
+} from '@/store/askCarebowStore';
+import { TrialSignupCard, TrialBanner } from '@/components/askCarebow/TrialSignupCard';
+import { VoiceInput } from '@/components/askCarebow/VoiceInput';
 
 const relationships = [
   { value: '', label: 'Select relationship...' },
@@ -31,9 +44,26 @@ export default function AskCareBowScreen() {
   const [familyAge, setFamilyAge] = useState('');
   const [symptomInput, setSymptomInput] = useState('');
   const [showRelationshipPicker, setShowRelationshipPicker] = useState(false);
+  const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+
+  // Get subscription and trial status from store
+  const { hasSubscription, clearCurrentSession } = useAskCarebowStore();
+  const isTrialActive = useIsTrialActive();
+  const trialDaysRemaining = useTrialDaysRemaining();
+  const trialState = useTrialState();
+  const canAccessPremium = useCanAccessPremiumFeatures();
+
+  // Handle voice transcription completion
+  const handleTranscriptionComplete = (text: string) => {
+    setSymptomInput(text);
+    setInputMode('text'); // Switch back to text mode to show the transcript
+  };
 
   const handleStart = () => {
     if (!symptomInput.trim()) return;
+
+    // Clear any existing session before starting a new one
+    clearCurrentSession();
 
     router.push({
       pathname: '/conversation',
@@ -42,6 +72,7 @@ export default function AskCareBowScreen() {
         context: contextType,
         relation: familyRelation,
         age: familyAge,
+        memberName: contextType === 'family' ? familyRelation : 'Me',
       },
     });
   };
@@ -56,7 +87,7 @@ export default function AskCareBowScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 48, paddingBottom: 96 + insets.bottom },
+          { paddingTop: insets.top + spacing.xl, paddingBottom: 96 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -64,15 +95,36 @@ export default function AskCareBowScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="heart" size={28} color={Colors.white} />
+            <Ionicons name="heart" size={28} color={colors.textInverse} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Ask CareBow</Text>
+            <Text style={styles.headerBadge}>AI Health Assistant</Text>
           </View>
         </View>
         <Text style={styles.headerSubtitle}>
-          I'll use your health info to guide you safely.
+          I'll help you understand your symptoms and guide you to the right care.
         </Text>
+
+        {/* Trial Banner - shown during active trial */}
+        {isTrialActive && (
+          <TrialBanner />
+        )}
+
+        {/* Trial Signup Card - shown if trial not started */}
+        {!hasSubscription && !trialState.hasUsedTrial && (
+          <View style={styles.trialSection}>
+            <TrialSignupCard compact />
+          </View>
+        )}
+
+        {/* Premium Badge - shown for subscribers */}
+        {hasSubscription && (
+          <View style={styles.premiumBadge}>
+            <Ionicons name="diamond" size={16} color={colors.accent} />
+            <Text style={styles.premiumBadgeText}>Premium Member</Text>
+          </View>
+        )}
 
         {/* Context Selector */}
         <View style={styles.section}>
@@ -84,12 +136,16 @@ export default function AskCareBowScreen() {
               style={[styles.contextCard, contextType === 'me' && styles.contextCardActive]}
               onPress={() => setContextType('me')}
             >
-              <Ionicons
-                name="person"
-                size={28}
-                color={contextType === 'me' ? Colors.purple[600] : Colors.gray[400]}
-              />
-              <Text style={[styles.contextCardText, contextType === 'me' && styles.contextCardTextActive]}>
+              <View style={[styles.contextIcon, contextType === 'me' && styles.contextIconActive]}>
+                <Ionicons
+                  name="person"
+                  size={24}
+                  color={contextType === 'me' ? colors.accent : colors.textTertiary}
+                />
+              </View>
+              <Text
+                style={[styles.contextCardText, contextType === 'me' && styles.contextCardTextActive]}
+              >
                 For me
               </Text>
             </TouchableOpacity>
@@ -97,13 +153,20 @@ export default function AskCareBowScreen() {
               style={[styles.contextCard, contextType === 'family' && styles.contextCardActive]}
               onPress={() => setContextType('family')}
             >
-              <Ionicons
-                name="people"
-                size={28}
-                color={contextType === 'family' ? Colors.purple[600] : Colors.gray[400]}
-              />
-              <Text style={[styles.contextCardText, contextType === 'family' && styles.contextCardTextActive]}>
-                For a family member
+              <View style={[styles.contextIcon, contextType === 'family' && styles.contextIconActive]}>
+                <Ionicons
+                  name="people"
+                  size={24}
+                  color={contextType === 'family' ? colors.accent : colors.textTertiary}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.contextCardText,
+                  contextType === 'family' && styles.contextCardTextActive,
+                ]}
+              >
+                For family
               </Text>
             </TouchableOpacity>
           </View>
@@ -120,25 +183,38 @@ export default function AskCareBowScreen() {
                 style={styles.selectButton}
                 onPress={() => setShowRelationshipPicker(!showRelationshipPicker)}
               >
-                <Text style={[styles.selectButtonText, !familyRelation && styles.selectButtonPlaceholder]}>
+                <Text
+                  style={[
+                    styles.selectButtonText,
+                    !familyRelation && styles.selectButtonPlaceholder,
+                  ]}
+                >
                   {familyRelation
                     ? relationships.find((r) => r.value === familyRelation)?.label
                     : 'Select relationship...'}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color={Colors.gray[400]} />
+                <Ionicons name="chevron-down" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
               {showRelationshipPicker && (
                 <View style={styles.pickerDropdown}>
                   {relationships.slice(1).map((rel) => (
                     <TouchableOpacity
                       key={rel.value}
-                      style={[styles.pickerOption, familyRelation === rel.value && styles.pickerOptionActive]}
+                      style={[
+                        styles.pickerOption,
+                        familyRelation === rel.value && styles.pickerOptionActive,
+                      ]}
                       onPress={() => {
                         setFamilyRelation(rel.value);
                         setShowRelationshipPicker(false);
                       }}
                     >
-                      <Text style={[styles.pickerOptionText, familyRelation === rel.value && styles.pickerOptionTextActive]}>
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          familyRelation === rel.value && styles.pickerOptionTextActive,
+                        ]}
+                      >
                         {rel.label}
                       </Text>
                     </TouchableOpacity>
@@ -154,7 +230,7 @@ export default function AskCareBowScreen() {
               <TextInput
                 style={styles.ageInput}
                 placeholder="Enter their age"
-                placeholderTextColor={Colors.gray[400]}
+                placeholderTextColor={colors.textTertiary}
                 value={familyAge}
                 onChangeText={setFamilyAge}
                 keyboardType="numeric"
@@ -163,7 +239,7 @@ export default function AskCareBowScreen() {
             </View>
 
             <View style={styles.infoBox}>
-              <Ionicons name="information-circle" size={16} color={Colors.purple[600]} />
+              <Ionicons name="information-circle" size={16} color={colors.accent} />
               <Text style={styles.infoText}>
                 Age helps me provide safer guidance, especially for children and older adults.
               </Text>
@@ -173,31 +249,85 @@ export default function AskCareBowScreen() {
 
         {/* Symptom Input */}
         <View style={styles.section}>
-          <Text style={styles.label}>
-            What's going on? <Text style={styles.required}>*</Text>
-          </Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder={
-                contextType === 'me'
-                  ? "Describe what you're experiencing..."
-                  : "Describe what they're experiencing..."
-              }
-              placeholderTextColor={Colors.gray[400]}
-              value={symptomInput}
-              onChangeText={setSymptomInput}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic" size={20} color={Colors.gray[400]} />
-            </TouchableOpacity>
+          <View style={styles.labelRow}>
+            <Text style={styles.labelNoMargin}>
+              What's going on? <Text style={styles.required}>*</Text>
+            </Text>
+            {/* Input Mode Toggle */}
+            <View style={styles.inputModeToggle}>
+              <TouchableOpacity
+                style={[styles.modeButton, inputMode === 'text' && styles.modeButtonActive]}
+                onPress={() => setInputMode('text')}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color={inputMode === 'text' ? colors.accent : colors.textTertiary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeButton, inputMode === 'voice' && styles.modeButtonActive]}
+                onPress={() => setInputMode('voice')}
+              >
+                <Ionicons
+                  name="mic-outline"
+                  size={16}
+                  color={inputMode === 'voice' ? colors.accent : colors.textTertiary}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.inputHint}>
-            Be as specific as possible. Include when it started, how severe it is, and anything you've tried.
-          </Text>
+
+          {inputMode === 'text' ? (
+            <>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={
+                    contextType === 'me'
+                      ? "Describe what you're experiencing..."
+                      : "Describe what they're experiencing..."
+                  }
+                  placeholderTextColor={colors.textTertiary}
+                  value={symptomInput}
+                  onChangeText={setSymptomInput}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                />
+              </View>
+              <Text style={styles.inputHint}>
+                Be as specific as possible. Include when it started, how severe it is, and anything
+                you've tried.
+              </Text>
+            </>
+          ) : (
+            <VoiceInput
+              onTranscriptionComplete={handleTranscriptionComplete}
+              useMock={true} // Set to false and provide apiKey for real transcription
+            />
+          )}
+        </View>
+
+        {/* Example Prompts */}
+        <View style={styles.examplesSection}>
+          <Text style={styles.examplesTitle}>Try something like:</Text>
+          <View style={styles.examplesList}>
+            {[
+              "I've had a headache for 2 days",
+              'Stomach pain after eating',
+              'Feeling tired all the time',
+              'Skin rash on my arm',
+            ].map((example, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.exampleChip}
+                onPress={() => setSymptomInput(example)}
+              >
+                <Text style={styles.exampleChipText}>{example}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* CTA Button */}
@@ -206,15 +336,22 @@ export default function AskCareBowScreen() {
           onPress={handleStart}
           disabled={!canStart}
         >
+          <Ionicons
+            name="chatbubbles"
+            size={20}
+            color={canStart ? colors.textInverse : colors.textTertiary}
+          />
           <Text style={[styles.ctaButtonText, !canStart && styles.ctaButtonTextDisabled]}>
-            Start care conversation
+            Start Conversation
           </Text>
         </TouchableOpacity>
 
         {/* Disclaimer */}
         <View style={styles.disclaimer}>
+          <Ionicons name="warning" size={16} color={colors.warning} />
           <Text style={styles.disclaimerText}>
-            For emergencies, call <Text style={styles.disclaimerBold}>911</Text> immediately. CareBow is not a substitute for emergency services.
+            For emergencies, call <Text style={styles.disclaimerBold}>911</Text> immediately.
+            CareBow is not a substitute for emergency services or professional medical advice.
           </Text>
         </View>
       </ScrollView>
@@ -225,231 +362,309 @@ export default function AskCareBowScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.purple[50],
+    backgroundColor: colors.surface2,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing[6],
+    paddingHorizontal: spacing.lg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[3],
-    marginBottom: Spacing[3],
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   headerIcon: {
     width: 56,
     height: 56,
-    borderRadius: BorderRadius['2xl'],
-    backgroundColor: Colors.purple[600],
+    borderRadius: radius.lg,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadow.lg,
+    ...shadows.button,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: Colors.gray[900],
+    ...typography.h1,
+    color: colors.textPrimary,
+  },
+  headerBadge: {
+    ...typography.caption,
+    color: colors.accent,
+    marginTop: spacing.xxs,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: Colors.gray[600],
-    lineHeight: 22,
-    marginBottom: Spacing[6],
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  trialSection: {
+    marginBottom: spacing.lg,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.accentMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  premiumBadgeText: {
+    ...typography.labelSmall,
+    color: colors.accent,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  inputModeToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 2,
+  },
+  modeButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+  },
+  modeButtonActive: {
+    backgroundColor: colors.accentMuted,
   },
   section: {
-    marginBottom: Spacing[6],
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[700],
-    marginBottom: Spacing[3],
+    ...typography.label,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  labelNoMargin: {
+    ...typography.label,
+    color: colors.textPrimary,
   },
   required: {
-    color: Colors.red[500],
+    color: colors.error,
   },
   contextGrid: {
     flexDirection: 'row',
-    gap: Spacing[3],
+    gap: spacing.sm,
   },
   contextCard: {
     flex: 1,
     borderWidth: 2,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     alignItems: 'center',
-    gap: Spacing[3],
-    backgroundColor: Colors.white,
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
   },
   contextCardActive: {
-    borderColor: Colors.purple[600],
-    backgroundColor: Colors.purple[50],
-    ...Shadow.md,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+    ...shadows.card,
+  },
+  contextIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contextIconActive: {
+    backgroundColor: colors.accentSoft,
   },
   contextCardText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[700],
+    ...typography.label,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   contextCardTextActive: {
-    color: Colors.purple[900],
+    color: colors.accent,
   },
   familySection: {
-    backgroundColor: Colors.purple[50],
-    borderWidth: 2,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
-    marginBottom: Spacing[6],
-    gap: Spacing[4],
+    backgroundColor: colors.accentMuted,
+    borderWidth: 1,
+    borderColor: colors.accentSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
   fieldContainer: {
-    gap: Spacing[2],
+    gap: spacing.xs,
   },
   fieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.purple[900],
+    ...typography.label,
+    color: colors.textPrimary,
   },
   selectButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[3],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   selectButtonText: {
-    fontSize: 14,
-    color: Colors.gray[900],
+    ...typography.body,
+    color: colors.textPrimary,
   },
   selectButtonPlaceholder: {
-    color: Colors.gray[400],
+    color: colors.textTertiary,
   },
   pickerDropdown: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing[1],
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    marginTop: spacing.xxs,
     overflow: 'hidden',
+    ...shadows.cardElevated,
   },
   pickerOption: {
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[3],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
+    borderBottomColor: colors.borderLight,
   },
   pickerOptionActive: {
-    backgroundColor: Colors.purple[50],
+    backgroundColor: colors.accentMuted,
   },
   pickerOptionText: {
-    fontSize: 14,
-    color: Colors.gray[700],
+    ...typography.body,
+    color: colors.textSecondary,
   },
   pickerOptionTextActive: {
-    color: Colors.purple[700],
+    color: colors.accent,
     fontWeight: '500',
   },
   ageInput: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[3],
-    fontSize: 14,
-    color: Colors.gray[900],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...typography.body,
+    color: colors.textPrimary,
   },
   infoBox: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius.xl,
-    padding: Spacing[3],
+    borderColor: colors.accentSoft,
+    borderRadius: radius.md,
+    padding: spacing.sm,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing[2],
+    gap: spacing.xs,
   },
   infoText: {
     flex: 1,
-    fontSize: 12,
-    color: Colors.purple[800],
-    lineHeight: 18,
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   inputContainer: {
     position: 'relative',
-    marginBottom: Spacing[2],
+    marginBottom: spacing.xs,
   },
   textInput: {
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    paddingHorizontal: Spacing[4],
-    paddingTop: Spacing[4],
-    paddingBottom: Spacing[4],
-    paddingRight: Spacing[14],
-    fontSize: 14,
-    color: Colors.gray[900],
-    minHeight: 160,
-  },
-  micButton: {
-    position: 'absolute',
-    bottom: Spacing[4],
-    right: Spacing[4],
-    padding: Spacing[3],
-    backgroundColor: Colors.gray[50],
-    borderRadius: BorderRadius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    ...typography.body,
+    color: colors.textPrimary,
+    minHeight: 140,
   },
   inputHint: {
-    fontSize: 12,
-    color: Colors.gray[500],
-    lineHeight: 18,
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  examplesSection: {
+    marginBottom: spacing.lg,
+  },
+  examplesTitle: {
+    ...typography.labelSmall,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+  },
+  examplesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  exampleChip: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  exampleChipText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   ctaButton: {
-    backgroundColor: Colors.purple[600],
-    borderRadius: BorderRadius['2xl'],
-    paddingVertical: Spacing[4],
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing[4],
-    ...Shadow.lg,
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+    ...shadows.button,
   },
   ctaButtonDisabled: {
-    backgroundColor: Colors.gray[100],
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowOpacity: 0,
     elevation: 0,
   },
   ctaButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.white,
+    ...typography.labelLarge,
+    color: colors.textInverse,
   },
   ctaButtonTextDisabled: {
-    color: Colors.gray[400],
+    color: colors.textTertiary,
   },
   disclaimer: {
-    backgroundColor: Colors.blue[50],
+    backgroundColor: colors.warningSoft,
     borderWidth: 1,
-    borderColor: Colors.blue[200],
-    borderRadius: BorderRadius.xl,
-    padding: Spacing[4],
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
   },
   disclaimerText: {
-    fontSize: 12,
-    color: Colors.blue[800],
+    flex: 1,
+    ...typography.caption,
+    color: colors.textSecondary,
     lineHeight: 18,
-    textAlign: 'center',
   },
   disclaimerBold: {
     fontWeight: '700',
+    color: colors.textPrimary,
   },
 });
