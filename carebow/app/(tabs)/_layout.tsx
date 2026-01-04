@@ -1,8 +1,13 @@
+/**
+ * Tab Layout
+ * Bottom navigation with Home, Ask AI, and Messages tabs
+ */
+
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors } from '@/constants/Colors';
+import { colors, radius, shadows } from '@/theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -11,68 +16,59 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.purple[600],
-        tabBarInactiveTintColor: Colors.gray[400],
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: Colors.white,
-          borderTopWidth: 1,
-          borderTopColor: Colors.gray[200],
-          height: 80 + insets.bottom,
+          backgroundColor: colors.background,
+          borderTopWidth: 0,
+          height: 72 + insets.bottom,
           paddingTop: 8,
           paddingBottom: insets.bottom + 8,
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 8,
-            },
-          }),
+          paddingHorizontal: 8,
+          ...(Platform.OS === 'ios' ? shadows.tabBar : {}),
+          elevation: Platform.OS === 'android' ? 12 : 0,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '500',
-          marginTop: 4,
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={24}
-              color={color}
-            />
+            <View style={focused ? styles.activeIconWrap : undefined}>
+              <Ionicons
+                name={focused ? 'home' : 'home-outline'}
+                size={22}
+                color={color}
+              />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="ask"
         options={{
-          title: 'Ask CareBow',
-          tabBarIcon: ({ color, focused }) => (
+          title: 'Ask AI',
+          tabBarIcon: ({ focused }) => (
             <View style={styles.askTabIconContainer}>
               <View style={[styles.askTabIcon, focused && styles.askTabIconActive]}>
                 <Ionicons
-                  name="heart"
-                  size={24}
-                  color={Colors.white}
+                  name="sparkles"
+                  size={22}
+                  color={colors.white}
                 />
               </View>
             </View>
           ),
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '600',
-            color: Colors.purple[600],
-            marginTop: 4,
-          },
+          tabBarLabel: () => null,
         }}
       />
       <Tabs.Screen
@@ -80,18 +76,20 @@ export default function TabLayout() {
         options={{
           title: 'Messages',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
-              size={24}
-              color={color}
-            />
+            <View style={focused ? styles.activeIconWrap : undefined}>
+              <Ionicons
+                name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
+                size={22}
+                color={color}
+              />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Hide from tab bar
+          href: null,
         }}
       />
     </Tabs>
@@ -99,25 +97,26 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  activeIconWrap: {
+    backgroundColor: colors.accentMuted,
+    borderRadius: radius.sm,
+    padding: 6,
+  },
   askTabIconContainer: {
     position: 'relative',
-    top: -8,
+    top: -16,
   },
   askTabIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: Colors.purple[600],
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.purple[600],
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...shadows.button,
   },
   askTabIconActive: {
-    backgroundColor: Colors.purple[700],
+    backgroundColor: colors.accentDark,
     transform: [{ scale: 1.05 }],
   },
 });

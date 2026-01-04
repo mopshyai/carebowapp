@@ -1,57 +1,318 @@
-import { useState } from 'react';
+/**
+ * Today Screen
+ * Main dashboard with quick picks, devices, packages, and appointments
+ */
+
+import React from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Colors } from '@/constants/Colors';
-import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
-import { SubscriptionPlanCard } from '@/components/ui/SubscriptionPlanCard';
-import { subscriptionPlans } from '@/data/services';
 
-const quickPicks = [
-  { id: 'doctor-visit', icon: 'medkit', iconBg: Colors.blue[50], iconColor: Colors.blue[600], title: 'Doctor visit', benefit: 'Available today', tag: 'Fast' },
-  { id: 'lab-testing', icon: 'flask', iconBg: Colors.purple[50], iconColor: Colors.purple[600], title: 'Lab testing', benefit: 'Home collection', tag: 'Popular' },
-  { id: 'nurse-home', icon: 'heart', iconBg: Colors.pink[50], iconColor: Colors.pink[600], title: 'Nurse at home', benefit: 'Professional care', tag: 'Verified' },
-];
+import { colors, spacing, radius, typography, shadows, layout } from '@/theme';
+import {
+  quickPickItems,
+  deviceItems,
+  carePackageItems,
+  mockUpcomingAppointment,
+  formatPrice,
+  getTagStyle,
+  getBadgeStyle,
+  QuickPickItem,
+  DeviceItem,
+  CarePackageItem,
+} from '@/data/catalog';
+import { subscriptionPlans, SubscriptionPlan } from '@/data/subscriptions';
 
-const devices = [
-  { id: 'd1', icon: 'pulse', name: 'Oxygen Concentrator', tags: ['Rental', 'Setup included'] },
-  { id: 'd2', icon: 'pulse', name: 'BiPAP Machine', tags: ['Rental', 'Setup included'] },
-  { id: 'd3', icon: 'pulse', name: 'CPAP Machine', tags: ['Rental', 'Setup included'] },
-  { id: 'd4', icon: 'cube', name: 'Medical Bed', tags: ['Rental', 'Setup included'] },
-];
+// =============================================================================
+// SECTION HEADER COMPONENT
+// =============================================================================
 
-const packages = [
-  { id: 'p1', name: 'Cardiac Package', subtitle: 'Includes tests + consult', colors: [Colors.red[50], Colors.pink[50]] },
-  { id: 'p2', name: 'Oncology Package', subtitle: 'Includes tests + consult', colors: [Colors.purple[50], Colors.blue[50]] },
-  { id: 'p3', name: 'Neuro Package', subtitle: 'Includes tests + consult', colors: [Colors.blue[50], Colors.cyan[50]] },
-  { id: 'p4', name: 'Ortho Package', subtitle: 'Includes tests + consult', colors: [Colors.green[50], Colors.green[100]] },
-];
+function SectionHeader({
+  title,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {actionLabel && onAction && (
+        <TouchableOpacity style={styles.sectionAction} onPress={onAction}>
+          <Text style={styles.sectionActionText}>{actionLabel}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.accent} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
 
+// =============================================================================
+// QUICK PICK CARD COMPONENT
+// =============================================================================
+
+function QuickPickCard({ item, onPress }: { item: QuickPickItem; onPress: () => void }) {
+  const tagStyle = getTagStyle(item.tag);
+
+  return (
+    <TouchableOpacity style={styles.quickPickCard} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.quickPickIcon, { backgroundColor: item.iconBgColor }]}>
+        <Ionicons name={item.icon as any} size={22} color={item.iconColor} />
+      </View>
+
+      <Text style={styles.quickPickTitle}>{item.title}</Text>
+      <Text style={styles.quickPickSubtitle}>{item.subtitle}</Text>
+
+      <View style={styles.quickPickFooter}>
+        <View style={[styles.quickPickTag, { backgroundColor: tagStyle.bg }]}>
+          <Text style={[styles.quickPickTagText, { color: tagStyle.text }]}>{item.tag}</Text>
+        </View>
+        {item.priceHint && (
+          <Text style={styles.quickPickPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {item.priceHint}
+          </Text>
+        )}
+      </View>
+
+      {item.nextSlot && (
+        <View style={styles.quickPickSlot}>
+          <Ionicons name="time-outline" size={12} color={colors.success} />
+          <Text style={styles.quickPickSlotText}>Next: {item.nextSlot}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// =============================================================================
+// DEVICE CARD COMPONENT
+// =============================================================================
+
+function DeviceCard({ item, onPress }: { item: DeviceItem; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.deviceCard} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.deviceIconWrap}>
+        <Ionicons name={item.icon as any} size={28} color={colors.textTertiary} />
+      </View>
+
+      <Text style={styles.deviceTitle}>{item.title}</Text>
+
+      <View style={styles.deviceBadges}>
+        {item.badges.slice(0, 2).map((badge, idx) => {
+          const badgeStyle = getBadgeStyle(badge.type);
+          return (
+            <View key={idx} style={[styles.deviceBadge, { backgroundColor: badgeStyle.bg }]}>
+              <Text style={[styles.deviceBadgeText, { color: badgeStyle.text }]}>
+                {badge.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.devicePriceRow}>
+        <Text style={styles.devicePrice}>
+          From {formatPrice(item.pricePerUnit)}
+        </Text>
+        <Text style={styles.devicePriceUnit}>{item.priceUnit}</Text>
+      </View>
+
+      <View style={styles.deviceDelivery}>
+        <Ionicons name="car-outline" size={12} color={colors.success} />
+        <Text style={styles.deviceDeliveryText}>{item.deliveryTime}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// =============================================================================
+// CARE PACKAGE CARD COMPONENT
+// =============================================================================
+
+function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.packageCard} onPress={onPress} activeOpacity={0.7}>
+      {item.popular && (
+        <View style={styles.packagePopularBadge}>
+          <Text style={styles.packagePopularText}>Popular</Text>
+        </View>
+      )}
+
+      <View style={[styles.packageIcon, { backgroundColor: item.iconBgColor }]}>
+        <Ionicons name={item.icon as any} size={20} color={item.iconColor} />
+      </View>
+
+      <Text style={styles.packageTitle}>{item.title}</Text>
+      <Text style={styles.packageSubtitle}>{item.includedCount} tests + consult</Text>
+
+      <View style={styles.packageIncludes}>
+        {item.included.slice(0, 2).map((inc, idx) => (
+          <View key={idx} style={styles.packageIncludeRow}>
+            <Ionicons name="checkmark" size={12} color={colors.success} />
+            <Text style={styles.packageIncludeText}>{inc.name}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text style={styles.packagePrice}>From {formatPrice(item.startingPrice)}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// =============================================================================
+// SUBSCRIPTION CARD COMPONENT
+// =============================================================================
+
+function SubscriptionCard({
+  plan,
+  onPress,
+}: {
+  plan: SubscriptionPlan;
+  onPress: () => void;
+}) {
+  const getPriceLabel = () => {
+    switch (plan.billingPeriod) {
+      case 'monthly':
+        return '/month';
+      case 'half_yearly':
+        return '/6 mo';
+      case 'yearly':
+        return '/year';
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <TouchableOpacity style={styles.subscriptionCard} onPress={onPress} activeOpacity={0.7}>
+      {plan.badge && (
+        <View style={[styles.subscriptionBadge, plan.highlight && styles.subscriptionBadgeHighlight]}>
+          <Text style={styles.subscriptionBadgeText}>{plan.badge}</Text>
+        </View>
+      )}
+
+      <View style={[styles.subscriptionIconWrap, { backgroundColor: plan.iconBgColor }]}>
+        <Ionicons name={plan.iconName as any} size={18} color={plan.iconColor} />
+      </View>
+
+      <Text style={styles.subscriptionPeriod}>{plan.periodLabel}</Text>
+      <Text style={styles.subscriptionTitle}>{plan.title}</Text>
+
+      <View style={styles.subscriptionPriceRow}>
+        <Text style={styles.subscriptionPrice}>${plan.price}</Text>
+        <Text style={styles.subscriptionPriceUnit}>{getPriceLabel()}</Text>
+      </View>
+
+      <View style={styles.subscriptionBenefits}>
+        {plan.benefits.slice(0, 2).map((benefit, idx) => (
+          <View key={idx} style={styles.subscriptionBenefitRow}>
+            <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+            <Text style={styles.subscriptionBenefitText}>{benefit}</Text>
+          </View>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.subscriptionCta}>
+        <Text style={styles.subscriptionCtaText}>{plan.ctaLabel}</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+// =============================================================================
+// APPOINTMENT CARD COMPONENT
+// =============================================================================
+
+function AppointmentCard() {
+  const apt = mockUpcomingAppointment;
+  const router = useRouter();
+
+  return (
+    <View style={styles.appointmentCard}>
+      <View style={styles.appointmentLeft}>
+        <View style={styles.appointmentAvatar}>
+          <Text style={styles.appointmentAvatarText}>{apt.doctorInitials}</Text>
+        </View>
+        <View style={styles.appointmentInfo}>
+          <Text style={styles.appointmentDoctor}>{apt.doctorName}</Text>
+          <Text style={styles.appointmentSpecialty}>{apt.specialty}</Text>
+          <View style={styles.appointmentMeta}>
+            <Ionicons name="calendar-outline" size={13} color={colors.textTertiary} />
+            <Text style={styles.appointmentMetaText}>{apt.date}, {apt.time}</Text>
+            <View style={styles.appointmentDot} />
+            <Ionicons name="videocam-outline" size={13} color={colors.textTertiary} />
+            <Text style={styles.appointmentMetaText}>{apt.typeLabel}</Text>
+          </View>
+        </View>
+      </View>
+      {apt.canJoin && (
+        <TouchableOpacity style={styles.joinButton}>
+          <Text style={styles.joinButtonText}>Join</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// =============================================================================
+// QUICK ACTIONS COMPONENT
+// =============================================================================
+
+function QuickActions() {
+  const router = useRouter();
+
+  const actions = [
+    { icon: 'receipt-outline', label: 'Orders', route: '/orders' },
+    { icon: 'document-text-outline', label: 'Requests', route: '/requests' },
+    { icon: 'folder-outline', label: 'Records', route: '/records' },
+    { icon: 'help-circle-outline', label: 'Support', route: '/support' },
+  ];
+
+  return (
+    <View style={styles.quickActions}>
+      {actions.map((action, idx) => (
+        <TouchableOpacity
+          key={idx}
+          style={styles.quickActionItem}
+          onPress={() => router.push(action.route as any)}
+        >
+          <View style={styles.quickActionIcon}>
+            <Ionicons name={action.icon as any} size={22} color={colors.accent} />
+          </View>
+          <Text style={styles.quickActionLabel}>{action.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [contextType, setContextType] = useState<'me' | 'family'>('me');
-  const [symptomInput, setSymptomInput] = useState('');
-  const [followUpResponse, setFollowUpResponse] = useState<'better' | 'same' | 'worse' | null>(null);
 
-  const handleStartCare = () => {
-    if (!symptomInput.trim()) {
-      router.push('/ask');
-      return;
-    }
-    router.push({
-      pathname: '/conversation',
-      params: { symptom: symptomInput, context: contextType },
-    });
+  const handleQuickPickPress = (item: QuickPickItem) => {
+    router.push(item.route as any);
+  };
+
+  const handleDevicePress = (item: DeviceItem) => {
+    router.push(item.route as any);
+  };
+
+  const handlePackagePress = (item: CarePackageItem) => {
+    router.push(item.route as any);
   };
 
   return (
@@ -60,15 +321,15 @@ export default function TodayScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 48, paddingBottom: 96 + insets.bottom },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerTitle}>Today</Text>
-            <Text style={styles.headerSubtitle}>Care starts here.</Text>
+            <Text style={styles.greeting}>Good morning</Text>
+            <Text style={styles.userName}>Sandeep</Text>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -78,173 +339,136 @@ export default function TodayScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Ask CareBow Hero Card */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroHeader}>
-            <View style={styles.heroIconContainer}>
-              <Ionicons name="heart" size={20} color={Colors.white} />
+        {/* AI Assistant Card */}
+        <TouchableOpacity
+          style={styles.aiCard}
+          activeOpacity={0.95}
+          onPress={() => router.push('/ask')}
+        >
+          <View style={styles.aiCardContent}>
+            <View style={styles.aiCardIconWrap}>
+              <Ionicons name="sparkles" size={20} color={colors.white} />
             </View>
-            <Text style={styles.heroTitle}>Ask CareBow</Text>
-          </View>
-
-          <Text style={styles.heroDescription}>
-            Describe what's going on. I'll guide your next step safely.
-          </Text>
-          <Text style={styles.heroDisclaimer}>
-            Not a diagnosis. If this feels urgent, seek emergency care.
-          </Text>
-
-          {/* Context Selector */}
-          <View style={styles.contextSelector}>
-            <TouchableOpacity
-              style={[styles.contextButton, contextType === 'me' && styles.contextButtonActive]}
-              onPress={() => setContextType('me')}
-            >
-              <Ionicons name="person" size={16} color={contextType === 'me' ? Colors.purple[900] : Colors.gray[700]} />
-              <Text style={[styles.contextButtonText, contextType === 'me' && styles.contextButtonTextActive]}>
-                For me
+            <View style={styles.aiCardTextWrap}>
+              <Text style={styles.aiCardTitle}>AI Health Assistant</Text>
+              <Text style={styles.aiCardSubtitle}>
+                Describe symptoms for instant guidance
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.contextButton, contextType === 'family' && styles.contextButtonActive]}
-              onPress={() => setContextType('family')}
-            >
-              <Ionicons name="people" size={16} color={contextType === 'family' ? Colors.purple[900] : Colors.gray[700]} />
-              <Text style={[styles.contextButtonText, contextType === 'family' && styles.contextButtonTextActive]}>
-                For family
+            </View>
+          </View>
+          <View style={styles.aiCardArrow}>
+            <Ionicons name="arrow-forward" size={18} color={colors.white} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Safety Card */}
+        <TouchableOpacity
+          style={styles.safetyCard}
+          activeOpacity={0.95}
+          onPress={() => router.push('/safety' as any)}
+        >
+          <View style={styles.safetyCardContent}>
+            <View style={styles.safetyCardIconWrap}>
+              <Ionicons name="shield-checkmark" size={20} color={colors.white} />
+            </View>
+            <View style={styles.safetyCardTextWrap}>
+              <Text style={styles.safetyCardTitle}>Emergency & Safety</Text>
+              <Text style={styles.safetyCardSubtitle}>
+                SOS alerts, check-ins & emergency contacts
               </Text>
-            </TouchableOpacity>
+            </View>
           </View>
-
-          {/* Symptom Input */}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Describe symptoms or concerns…"
-              placeholderTextColor={Colors.gray[400]}
-              value={symptomInput}
-              onChangeText={setSymptomInput}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic" size={16} color={Colors.gray[400]} />
-            </TouchableOpacity>
+          <View style={styles.safetyCardArrow}>
+            <Ionicons name="chevron-forward" size={18} color={colors.error} />
           </View>
-          <Text style={styles.inputHint}>Type a few words to begin.</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity style={styles.startButton} onPress={handleStartCare}>
-            <Text style={styles.startButtonText}>Start</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Picks Section */}
+        {/* Quick Services */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick picks</Text>
-            <TouchableOpacity style={styles.seeAllButton} onPress={() => router.push('/services')}>
-              <Text style={styles.seeAllText}>See all services</Text>
-              <Ionicons name="arrow-forward" size={14} color={Colors.purple[600]} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.quickPicksGrid}>
-            {quickPicks.map((pick) => (
-              <TouchableOpacity key={pick.id} style={styles.quickPickCard}>
-                <View style={[styles.quickPickIcon, { backgroundColor: pick.iconBg }]}>
-                  <Ionicons name={pick.icon as any} size={20} color={pick.iconColor} />
-                </View>
-                <Text style={styles.quickPickTitle}>{pick.title}</Text>
-                <View style={styles.quickPickBenefit}>
-                  <Ionicons name="flash" size={12} color={Colors.purple[600]} />
-                  <Text style={styles.quickPickBenefitText}>{pick.benefit}</Text>
-                </View>
-                <View style={styles.quickPickTag}>
-                  <Text style={styles.quickPickTagText}>{pick.tag}</Text>
-                </View>
-              </TouchableOpacity>
+          <SectionHeader
+            title="Quick Services"
+            actionLabel="See all"
+            onAction={() => router.push('/services')}
+          />
+          <View style={styles.quickPicksRow}>
+            {quickPickItems.map((item) => (
+              <QuickPickCard
+                key={item.id}
+                item={item}
+                onPress={() => handleQuickPickPress(item)}
+              />
             ))}
           </View>
         </View>
 
-        {/* Devices Section */}
+        {/* Medical Equipment */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Devices at home</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>See all devices</Text>
-              <Ionicons name="arrow-forward" size={14} color={Colors.purple[600]} />
-            </TouchableOpacity>
-          </View>
+          <SectionHeader
+            title="Medical Equipment"
+            actionLabel="View all"
+            onAction={() => router.push('/services')}
+          />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
+            contentContainerStyle={styles.horizontalScroll}
           >
-            {devices.map((item) => (
-              <TouchableOpacity key={item.id} style={styles.deviceCard}>
-                <View style={styles.deviceIconContainer}>
-                  <Ionicons name={item.icon as any} size={32} color={Colors.gray[600]} />
-                </View>
-                <Text style={styles.deviceName}>{item.name}</Text>
-                <View style={styles.deviceTags}>
-                  {item.tags.map((tag, idx) => (
-                    <View key={idx} style={styles.deviceTag}>
-                      <Text style={styles.deviceTagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.rentButton}>
-                  <Ionicons name="cube-outline" size={12} color={Colors.purple[600]} />
-                  <Text style={styles.rentButtonText}>Rent now</Text>
-                </View>
-              </TouchableOpacity>
+            {deviceItems.map((item) => (
+              <DeviceCard
+                key={item.id}
+                item={item}
+                onPress={() => handleDevicePress(item)}
+              />
             ))}
           </ScrollView>
         </View>
 
-        {/* Care Packages Section */}
+        {/* Care Packages */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Care packages</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>See all packages</Text>
-              <Ionicons name="arrow-forward" size={14} color={Colors.purple[600]} />
-            </TouchableOpacity>
-          </View>
+          <SectionHeader
+            title="Health Packages"
+            actionLabel="Explore"
+            onAction={() => router.push('/services')}
+          />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
+            contentContainerStyle={styles.horizontalScroll}
           >
-            {packages.map((item) => (
-              <TouchableOpacity key={item.id} style={[styles.packageCard, { backgroundColor: item.colors[0] }]}>
-                <View style={styles.packageIcon}>
-                  <Ionicons name="heart" size={20} color={Colors.purple[600]} />
-                </View>
-                <Text style={styles.packageName}>{item.name}</Text>
-                <Text style={styles.packageSubtitle}>{item.subtitle}</Text>
-              </TouchableOpacity>
+            {carePackageItems.map((item) => (
+              <PackageCard
+                key={item.id}
+                item={item}
+                onPress={() => handlePackagePress(item)}
+              />
             ))}
           </ScrollView>
         </View>
 
-        {/* Subscription Plans Section */}
+        {/* Upcoming Appointment */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Subscription Plans</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>Compare plans</Text>
-              <Ionicons name="arrow-forward" size={14} color={Colors.purple[600]} />
-            </TouchableOpacity>
-          </View>
+          <SectionHeader
+            title="Upcoming"
+            actionLabel="View schedule"
+            onAction={() => router.push('/schedule')}
+          />
+          <AppointmentCard />
+        </View>
+
+        {/* Subscription Plans */}
+        <View style={styles.section}>
+          <SectionHeader
+            title="Care Plans"
+            actionLabel="Compare"
+            onAction={() => router.push('/services')}
+          />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
+            contentContainerStyle={styles.horizontalScroll}
           >
             {subscriptionPlans.map((plan) => (
-              <SubscriptionPlanCard
+              <SubscriptionCard
                 key={plan.id}
                 plan={plan}
                 onPress={() => router.push({ pathname: '/plan-details/[id]', params: { id: plan.id } })}
@@ -253,539 +477,554 @@ export default function TodayScreen() {
           </ScrollView>
         </View>
 
-        {/* Next Appointment Section */}
+        {/* Quick Actions */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitleSmall}>Next appointment</Text>
-            <TouchableOpacity onPress={() => router.push('/schedule')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.appointmentCard}>
-            <View style={styles.appointmentHeader}>
-              <View style={styles.doctorAvatar}>
-                <Text style={styles.doctorEmoji}>👩‍⚕️</Text>
-              </View>
-              <View style={styles.doctorInfo}>
-                <Text style={styles.doctorName}>Dr. Sarah Chen</Text>
-                <Text style={styles.doctorRole}>General Practitioner</Text>
-              </View>
-            </View>
-            <View style={styles.appointmentDetails}>
-              <View style={styles.appointmentDetail}>
-                <Ionicons name="calendar" size={14} color={Colors.purple[600]} />
-                <Text style={styles.appointmentDetailText}>Jan 5, 2026</Text>
-              </View>
-              <View style={styles.appointmentDetail}>
-                <Ionicons name="time" size={14} color={Colors.purple[600]} />
-                <Text style={styles.appointmentDetailText}>2:00 PM</Text>
-              </View>
-            </View>
-            <View style={styles.appointmentFooter}>
-              <View style={styles.appointmentType}>
-                <Ionicons name="videocam" size={16} color={Colors.purple[600]} />
-                <Text style={styles.appointmentTypeText}>Video consult</Text>
-              </View>
-              <TouchableOpacity>
-                <Text style={styles.detailsLink}>Details</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Follow-up Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitleSmall}>Follow-up</Text>
-          <View style={styles.followUpCard}>
-            <Text style={styles.followUpTitle}>How are you feeling today?</Text>
-            <Text style={styles.followUpSubtitle}>Your answer helps CareBow guide you safely.</Text>
-            <View style={styles.followUpButtons}>
-              <TouchableOpacity
-                style={[styles.followUpButton, followUpResponse === 'better' && styles.followUpButtonBetter]}
-                onPress={() => setFollowUpResponse('better')}
-              >
-                <Text style={[styles.followUpButtonText, followUpResponse === 'better' && styles.followUpButtonTextBetter]}>
-                  Better
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.followUpButton, followUpResponse === 'same' && styles.followUpButtonSame]}
-                onPress={() => setFollowUpResponse('same')}
-              >
-                <Text style={[styles.followUpButtonText, followUpResponse === 'same' && styles.followUpButtonTextSame]}>
-                  Same
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.followUpButton, followUpResponse === 'worse' && styles.followUpButtonWorse]}
-                onPress={() => setFollowUpResponse('worse')}
-              >
-                <Text style={[styles.followUpButtonText, followUpResponse === 'worse' && styles.followUpButtonTextWorse]}>
-                  Worse
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {followUpResponse === 'worse' && (
-              <TouchableOpacity style={styles.askNowButton} onPress={() => router.push('/ask')}>
-                <Text style={styles.askNowButtonText}>Ask CareBow now</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <SectionHeader title="Quick Actions" />
+          <QuickActions />
         </View>
       </ScrollView>
     </View>
   );
 }
 
+// =============================================================================
+// STYLES
+// =============================================================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.purple[50],
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing[6],
+    paddingHorizontal: layout.screenPadding,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing[4],
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[1],
+  greeting: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: Colors.gray[500],
+  userName: {
+    ...typography.h1,
+    marginTop: spacing.xxs,
   },
   profileButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.purple[600],
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
+    ...shadows.button,
   },
   profileInitial: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.white,
+    ...typography.labelLarge,
+    color: colors.white,
   },
-  heroCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[6],
-    borderWidth: 2,
-    borderColor: Colors.purple[200],
-    marginBottom: Spacing[6],
-    ...Shadow.sm,
-  },
-  heroHeader: {
+
+  // AI Card
+  aiCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[2],
-    marginBottom: Spacing[3],
+    justifyContent: 'space-between',
+    backgroundColor: colors.accent,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.xxl,
+    ...shadows.button,
   },
-  heroIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.purple[600],
+  aiCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  aiCardIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  aiCardTextWrap: {
+    flex: 1,
+  },
+  aiCardTitle: {
+    ...typography.labelLarge,
+    color: colors.white,
+  },
+  aiCardSubtitle: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  aiCardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heroTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.gray[900],
-  },
-  heroDescription: {
-    fontSize: 12,
-    color: Colors.gray[600],
-    marginBottom: Spacing[2],
-    lineHeight: 18,
-  },
-  heroDisclaimer: {
-    fontSize: 12,
-    color: Colors.gray[500],
-    marginBottom: Spacing[4],
-    lineHeight: 18,
-  },
-  contextSelector: {
-    flexDirection: 'row',
-    gap: Spacing[2],
-    marginBottom: Spacing[4],
-  },
-  contextButton: {
+
+  // Safety Card
+  safetyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[2],
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[2.5],
-    borderRadius: BorderRadius.xl,
-    borderWidth: 2,
-    borderColor: Colors.gray[200],
-    backgroundColor: Colors.white,
-  },
-  contextButtonActive: {
-    borderColor: Colors.purple[600],
-    backgroundColor: Colors.purple[50],
-  },
-  contextButtonText: {
-    fontSize: 14,
-    color: Colors.gray[700],
-  },
-  contextButtonTextActive: {
-    color: Colors.purple[900],
-  },
-  inputContainer: {
-    position: 'relative',
-    marginBottom: Spacing[2],
-  },
-  textInput: {
-    backgroundColor: Colors.gray[50],
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.xxl,
     borderWidth: 1,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing[4],
-    paddingTop: Spacing[3],
-    paddingBottom: Spacing[3],
-    paddingRight: Spacing[12],
-    fontSize: 14,
-    color: Colors.gray[900],
-    minHeight: 80,
+    borderColor: colors.error,
+    ...shadows.card,
   },
-  micButton: {
-    position: 'absolute',
-    bottom: Spacing[3],
-    right: Spacing[3],
-    padding: Spacing[2],
-  },
-  inputHint: {
-    fontSize: 12,
-    color: Colors.gray[500],
-    marginBottom: Spacing[4],
-  },
-  startButton: {
-    backgroundColor: Colors.purple[600],
-    borderRadius: BorderRadius.xl,
-    paddingVertical: Spacing[3],
+  safetyCardContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    ...Shadow.md,
+    flex: 1,
   },
-  startButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.white,
+  safetyCardIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
   },
+  safetyCardTextWrap: {
+    flex: 1,
+  },
+  safetyCardTitle: {
+    ...typography.labelLarge,
+    color: colors.textPrimary,
+  },
+  safetyCardSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  safetyCardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.errorSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Section
   section: {
-    marginBottom: Spacing[6],
+    marginBottom: spacing.xxl,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing[4],
-    paddingHorizontal: Spacing[1],
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.gray[900],
+    ...typography.h3,
   },
-  sectionTitleSmall: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[3],
-    paddingHorizontal: Spacing[1],
-  },
-  seeAllButton: {
+  sectionAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[1],
+    gap: 2,
   },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.purple[600],
+  sectionActionText: {
+    ...typography.label,
+    color: colors.accent,
   },
-  quickPicksGrid: {
+
+  // Quick Picks
+  quickPicksRow: {
     flexDirection: 'row',
-    gap: Spacing[3],
+    gap: spacing.sm,
   },
   quickPickCard: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[4],
-    alignItems: 'center',
+    borderColor: colors.border,
+    ...shadows.card,
   },
   quickPickIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.xl,
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing[3],
+    marginBottom: spacing.sm,
   },
   quickPickTitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[1],
-    textAlign: 'center',
+    ...typography.label,
+    marginBottom: 2,
   },
-  quickPickBenefit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[1],
-    marginBottom: Spacing[2],
+  quickPickSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
-  quickPickBenefitText: {
-    fontSize: 12,
-    color: Colors.purple[600],
-  },
-  quickPickTag: {
-    backgroundColor: Colors.purple[50],
-    paddingHorizontal: Spacing[2],
-    paddingVertical: Spacing[0.5],
-    borderRadius: BorderRadius.full,
-  },
-  quickPickTagText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.purple[700],
-  },
-  horizontalList: {
-    gap: Spacing[3],
-  },
-  deviceCard: {
-    width: 160,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[4],
-  },
-  deviceIconContainer: {
-    width: '100%',
-    height: 80,
-    backgroundColor: Colors.gray[50],
-    borderRadius: BorderRadius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing[3],
-  },
-  deviceName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[2],
-  },
-  deviceTags: {
+  quickPickFooter: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing[1],
-    marginBottom: Spacing[3],
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    rowGap: spacing.xxs,
+    columnGap: spacing.xs,
   },
-  deviceTag: {
-    backgroundColor: Colors.purple[50],
-    paddingHorizontal: Spacing[2],
-    paddingVertical: Spacing[0.5],
-    borderRadius: BorderRadius.full,
+  quickPickTag: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
+    borderRadius: radius.xs,
   },
-  deviceTagText: {
-    fontSize: 12,
-    color: Colors.purple[700],
+  quickPickTagText: {
+    ...typography.tiny,
   },
-  rentButton: {
+  quickPickPrice: {
+    ...typography.tiny,
+    color: colors.accent,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  quickPickSlot: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[1],
+    gap: 4,
+    marginTop: spacing.xs,
   },
-  rentButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.purple[600],
+  quickPickSlotText: {
+    ...typography.tiny,
+    color: colors.success,
   },
-  packageCard: {
-    width: 176,
+
+  // Horizontal Scroll
+  horizontalScroll: {
+    paddingRight: layout.screenPadding,
+    gap: spacing.sm,
+  },
+
+  // Device Card
+  deviceCard: {
+    minWidth: 150,
+    maxWidth: 180,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[4],
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  deviceIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  deviceTitle: {
+    ...typography.label,
+    marginBottom: spacing.xs,
+  },
+  deviceBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: spacing.sm,
+  },
+  deviceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+  },
+  deviceBadgeText: {
+    ...typography.tiny,
+  },
+  devicePriceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
+  devicePrice: {
+    ...typography.labelSmall,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
+  devicePriceUnit: {
+    ...typography.tiny,
+    color: colors.textTertiary,
+    flexShrink: 0,
+  },
+  deviceDelivery: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deviceDeliveryText: {
+    ...typography.tiny,
+    color: colors.success,
+  },
+
+  // Package Card
+  packageCard: {
+    minWidth: 145,
+    maxWidth: 175,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  packagePopularBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+  },
+  packagePopularText: {
+    ...typography.tiny,
+    color: colors.white,
   },
   packageIcon: {
     width: 40,
     height: 40,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
+    borderRadius: radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing[3],
+    marginBottom: spacing.sm,
   },
-  packageName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[1],
+  packageTitle: {
+    ...typography.label,
+    marginBottom: 2,
   },
   packageSubtitle: {
-    fontSize: 12,
-    color: Colors.purple[700],
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
-  appointmentCard: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
+  packageIncludes: {
+    gap: 4,
+    marginBottom: spacing.sm,
   },
-  appointmentHeader: {
+  packageIncludeRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing[4],
-    marginBottom: Spacing[4],
+    alignItems: 'center',
+    gap: 4,
   },
-  doctorAvatar: {
+  packageIncludeText: {
+    ...typography.tiny,
+    color: colors.textSecondary,
+  },
+  packagePrice: {
+    ...typography.labelSmall,
+    color: colors.accent,
+  },
+
+  // Subscription Card
+  subscriptionCard: {
+    minWidth: 150,
+    maxWidth: 180,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  subscriptionBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.info,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+  },
+  subscriptionBadgeHighlight: {
+    backgroundColor: colors.secondary,
+  },
+  subscriptionBadgeText: {
+    ...typography.tiny,
+    color: colors.white,
+  },
+  subscriptionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  subscriptionPeriod: {
+    ...typography.tiny,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  subscriptionTitle: {
+    ...typography.label,
+    marginBottom: spacing.xxs,
+  },
+  subscriptionPriceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
+  subscriptionPrice: {
+    ...typography.h2,
+    color: colors.accent,
+  },
+  subscriptionPriceUnit: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginLeft: 2,
+  },
+  subscriptionCustom: {
+    ...typography.labelSmall,
+    color: colors.accent,
+    marginBottom: spacing.sm,
+  },
+  subscriptionBenefits: {
+    gap: 4,
+  },
+  subscriptionBenefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  subscriptionBenefitText: {
+    ...typography.tiny,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  subscriptionCta: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.accentMuted,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  subscriptionCtaText: {
+    ...typography.labelSmall,
+    color: colors.accent,
+  },
+
+  // Appointment Card
+  appointmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  appointmentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  appointmentAvatar: {
     width: 48,
     height: 48,
-    backgroundColor: Colors.purple[100],
-    borderRadius: BorderRadius.xl,
+    borderRadius: 24,
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  appointmentAvatarText: {
+    ...typography.label,
+    color: colors.accent,
+  },
+  appointmentInfo: {
+    flex: 1,
+  },
+  appointmentDoctor: {
+    ...typography.label,
+  },
+  appointmentSpecialty: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  appointmentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  appointmentMetaText: {
+    ...typography.tiny,
+    color: colors.textTertiary,
+  },
+  appointmentDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.textTertiary,
+    marginHorizontal: 4,
+  },
+  joinButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    ...shadows.subtle,
+  },
+  joinButtonText: {
+    ...typography.label,
+    color: colors.white,
+  },
+
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  quickActionItem: {
+    flex: 1,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentMuted,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  doctorEmoji: {
-    fontSize: 24,
-  },
-  doctorInfo: {
-    flex: 1,
-  },
-  doctorName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[0.5],
-  },
-  doctorRole: {
-    fontSize: 12,
-    color: Colors.gray[600],
-  },
-  appointmentDetails: {
-    flexDirection: 'row',
-    gap: Spacing[4],
-    marginBottom: Spacing[4],
-  },
-  appointmentDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[1.5],
-  },
-  appointmentDetailText: {
-    fontSize: 12,
-    color: Colors.gray[700],
-  },
-  appointmentFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: Spacing[4],
-    borderTopWidth: 1,
-    borderTopColor: Colors.gray[100],
-  },
-  appointmentType: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[2],
-  },
-  appointmentTypeText: {
-    fontSize: 12,
-    color: Colors.purple[700],
-  },
-  detailsLink: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.purple[600],
-  },
-  followUpCard: {
-    backgroundColor: Colors.purple[50],
-    borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
-  },
-  followUpTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[1],
-  },
-  followUpSubtitle: {
-    fontSize: 12,
-    color: Colors.gray[600],
-    marginBottom: Spacing[4],
-  },
-  followUpButtons: {
-    flexDirection: 'row',
-    gap: Spacing[2],
-    marginBottom: Spacing[4],
-  },
-  followUpButton: {
-    flex: 1,
-    paddingVertical: Spacing[2.5],
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    alignItems: 'center',
-  },
-  followUpButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: Colors.gray[700],
-  },
-  followUpButtonBetter: {
-    backgroundColor: Colors.green[50],
-    borderWidth: 2,
-    borderColor: Colors.green[500],
-  },
-  followUpButtonTextBetter: {
-    color: Colors.green[700],
-  },
-  followUpButtonSame: {
-    backgroundColor: Colors.yellow[50],
-    borderWidth: 2,
-    borderColor: Colors.yellow[500],
-  },
-  followUpButtonTextSame: {
-    color: Colors.yellow[700],
-  },
-  followUpButtonWorse: {
-    backgroundColor: Colors.red[50],
-    borderWidth: 2,
-    borderColor: Colors.red[500],
-  },
-  followUpButtonTextWorse: {
-    color: Colors.red[700],
-  },
-  askNowButton: {
-    backgroundColor: Colors.purple[600],
-    borderRadius: BorderRadius.xl,
-    paddingVertical: Spacing[3],
-    alignItems: 'center',
-  },
-  askNowButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.white,
+  quickActionLabel: {
+    ...typography.tiny,
+    color: colors.textSecondary,
   },
 });
