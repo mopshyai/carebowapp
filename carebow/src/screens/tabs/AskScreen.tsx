@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import {
@@ -38,7 +39,7 @@ const relationships = [
 
 export default function AskCareBowScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const [contextType, setContextType] = useState<'me' | 'family'>('me');
   const [familyRelation, setFamilyRelation] = useState('');
   const [familyAge, setFamilyAge] = useState('');

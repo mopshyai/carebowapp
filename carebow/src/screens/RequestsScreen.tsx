@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAllRequests, useRequestsStore } from '../store/requestsStore';
 import { ServiceRequest, formatMoney } from '../types/booking';
@@ -124,12 +125,12 @@ function RequestCard({ request, onPress }: { request: ServiceRequest; onPress: (
 
 export default function RequestsScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const requests = useAllRequests();
   const clearRequests = useRequestsStore((state) => state.clearRequests);
 
   const handleRequestPress = (requestId: string) => {
-    navigation.navigate('RequestDetails' as never, { id: requestId });
+    navigation.navigate('RequestDetails', { id: requestId });
   };
 
   return (

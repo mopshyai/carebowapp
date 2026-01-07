@@ -91,7 +91,7 @@ export function GuidanceCard({ guidance, urgencyLevel = 'monitor' }: GuidanceCar
 
 interface GuidanceSectionProps {
   title: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   iconColor: string;
   items: string[];
   isExpanded: boolean;

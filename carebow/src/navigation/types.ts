@@ -10,16 +10,16 @@ import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigat
 // Root Stack Navigator
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  Conversation: undefined;
+  Conversation: { symptom: string; context: 'family' | 'me'; relation: string; age: string; memberName: string } | undefined;
   Assessment: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
   Schedule: undefined;
   Thread: { id: string };
-  Services: undefined;
-  ServiceDetails: { id: string };
+  Services: { category?: string } | undefined;
+  ServiceDetails: { id: string; serviceId?: string };
   PlanDetails: { id: string };
-  Checkout: undefined;
-  OrderSuccess: undefined;
+  Checkout: { serviceId?: string } | undefined;
+  OrderSuccess: { orderId?: string } | undefined;
   Orders: undefined;
   OrderDetails: { id: string };
   Requests: undefined;
@@ -88,3 +88,10 @@ declare global {
     interface RootParamList extends RootStackParamList {}
   }
 }
+
+// Helper type for dynamic navigation
+export type AppNavigationProp = {
+  navigate: (screen: string, params?: Record<string, unknown>) => void;
+  goBack: () => void;
+  reset: (state: { index: number; routes: { name: string; params?: Record<string, unknown> }[] }) => void;
+};

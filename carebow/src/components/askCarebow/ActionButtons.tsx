@@ -14,7 +14,7 @@ interface ActionButtonsProps {
   onActionPress: (action: SuggestedAction) => void;
 }
 
-const actionIcons: Record<ActionType, keyof typeof Ionicons.glyphMap> = {
+const actionIcons: Record<ActionType, string> = {
   book_doctor: 'medical',
   request_nurse: 'person',
   rent_equipment: 'hardware-chip',

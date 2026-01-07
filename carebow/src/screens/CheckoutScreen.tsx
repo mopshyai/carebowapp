@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getServiceById, formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
@@ -28,7 +29,7 @@ import { formatPrice } from '../data/catalog';
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute();
   const { serviceId } = (route.params as { serviceId: string }) || {};
 

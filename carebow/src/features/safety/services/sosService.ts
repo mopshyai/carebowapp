@@ -27,7 +27,7 @@ export type SOSResult = {
 export async function triggerSOSHaptic(): Promise<void> {
   try {
     // Strong haptic feedback for SOS
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    ReactNativeHapticFeedback.trigger('notificationWarning');
   } catch (error) {
     // Haptics may not be available on all devices
     console.log('Haptics not available');
@@ -36,7 +36,7 @@ export async function triggerSOSHaptic(): Promise<void> {
 
 export async function triggerSuccessHaptic(): Promise<void> {
   try {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    ReactNativeHapticFeedback.trigger('notificationSuccess');
   } catch (error) {
     console.log('Haptics not available');
   }

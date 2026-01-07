@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore, useCareReadiness, useSelectedMember } from '../../store/useProfileStore';
@@ -49,7 +50,7 @@ const menuSections = [
 
 export default function ProfileIndexScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
 
   const user = useProfileStore((state) => state.user);
   const members = useProfileStore((state) => state.members);

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { CategorySection } from '../components/ui/CategorySection';
 import { serviceCategories } from '../data/services';
@@ -21,10 +22,10 @@ import { colors, spacing, radius, typography, shadows } from '../theme';
 
 export default function ServicesScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
 
   const handleServicePress = (serviceId: string) => {
-    navigation.navigate('ServiceDetails' as never, { id: serviceId });
+    navigation.navigate('ServiceDetails', { id: serviceId });
   };
 
   return (

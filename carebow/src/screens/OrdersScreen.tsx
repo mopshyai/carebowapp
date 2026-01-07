@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAllOrders, useOrdersStore } from '../store/ordersStore';
 import { Order, formatMoney } from '../types/booking';
@@ -112,12 +113,12 @@ function OrderCard({ order, onPress }: { order: Order; onPress: () => void }) {
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const orders = useAllOrders();
   const clearOrders = useOrdersStore((state) => state.clearOrders);
 
   const handleOrderPress = (orderId: string) => {
-    navigation.navigate('OrderDetails' as never, { id: orderId });
+    navigation.navigate('OrderDetails', { id: orderId });
   };
 
   return (

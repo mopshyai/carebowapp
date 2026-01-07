@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { AppNavigationProp } from '../../navigation/types';
 
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../../components/icons';
@@ -451,7 +452,7 @@ function SubscriptionCard({ plan, onPress }: { plan: SubscriptionPlan; onPress: 
 // =============================================================================
 
 function QuickActions() {
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
 
   const actions: { icon: IconName; label: string; screen: string; nested: boolean; color: string; bgColor: string }[] = [
     { icon: 'receipt', label: 'Orders', screen: 'Orders', nested: false, color: '#3B82F6', bgColor: '#EFF6FF' },
@@ -462,9 +463,9 @@ function QuickActions() {
 
   const handleActionPress = (action: typeof actions[0]) => {
     if (action.nested) {
-      navigation.navigate('Profile' as never, { screen: action.screen });
+      navigation.navigate('Profile', { screen: action.screen });
     } else {
-      navigation.navigate(action.screen as never);
+      navigation.navigate(action.screen);
     }
   };
 
@@ -492,18 +493,18 @@ function QuickActions() {
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
 
   const handleQuickPickPress = (item: QuickPickItem) => {
-    navigation.navigate(item.screen as never, item.params);
+    navigation.navigate(item.screen, item.params);
   };
 
   const handleDevicePress = (item: DeviceItem) => {
-    navigation.navigate(item.screen as never, item.params);
+    navigation.navigate(item.screen, item.params);
   };
 
   const handlePackagePress = (item: CarePackageItem) => {
-    navigation.navigate(item.screen as never, item.params);
+    navigation.navigate(item.screen, item.params);
   };
 
   return (

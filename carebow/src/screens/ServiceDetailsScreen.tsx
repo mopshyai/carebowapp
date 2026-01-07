@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import type { AppNavigationProp } from '../navigation/types';
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
 import { formatPrice, defaultTimeSlots } from '../data/catalog';
 import { StarRating } from '../components/ui/StarRating';
@@ -63,7 +64,7 @@ const getServiceIcon = (imageKey: string): IconName => {
 
 export default function ServiceDetailsScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute();
   const { id } = (route.params as { id: string }) || {};
 

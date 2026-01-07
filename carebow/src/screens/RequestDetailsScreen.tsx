@@ -21,7 +21,7 @@ import { formatMoney, RequestStatus, ServiceRequest } from '../types/booking';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 
 // Status timeline config
-const STATUS_TIMELINE: { status: RequestStatus; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+const STATUS_TIMELINE: { status: RequestStatus; label: string; icon: string }[] = [
   { status: 'submitted', label: 'Submitted', icon: 'send' },
   { status: 'in_review', label: 'In Review', icon: 'eye' },
   { status: 'quoted', label: 'Quote Ready', icon: 'pricetag' },

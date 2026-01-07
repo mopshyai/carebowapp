@@ -14,7 +14,7 @@ interface ServiceRecommendationCardProps {
   onBook: () => void;
 }
 
-const serviceIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+const serviceIcons: Record<string, string> = {
   emergency: 'warning',
   urgent_care: 'medical',
   video_consult: 'videocam',

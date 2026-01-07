@@ -59,7 +59,7 @@ export function SubscriptionGate({
 }
 
 interface FeatureItemProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   text: string;
 }
 
