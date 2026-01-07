@@ -616,6 +616,458 @@ const barberService: Service = {
 };
 
 // ============================================
+// TRANSACTIONAL CARE SERVICE
+// ============================================
+
+const transactionalCareService: Service = {
+  id: 'transactional_care',
+  title: 'Transactional Care',
+  categoryId: 'health_care',
+  rating: 5.0,
+  reviewCount: 18,
+  image: 'transactional_care',
+  shortTagline: 'On-demand medical assistance',
+  description: 'Quick, one-time medical care services for immediate needs. Our trained professionals provide essential care support when you need it most.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.backgroundVerified,
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'trans_basic', label: 'Basic Visit', price: 25, durationMinutes: 60 },
+      { id: 'trans_extended', label: 'Extended Care', price: 45, durationMinutes: 120 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: defaultTimeSlots,
+    leadTimeHours: 2,
+    maxDaysAhead: 7,
+  },
+};
+
+// ============================================
+// SPECIAL PACKAGES
+// ============================================
+
+const cardiacPackageService: Service = {
+  id: 'cardiac_package',
+  title: 'Cardiac Package',
+  categoryId: 'special_packages',
+  rating: 5.0,
+  reviewCount: 24,
+  image: 'cardiac_package',
+  shortTagline: 'Comprehensive cardiac care package',
+  description: 'Complete cardiac health monitoring and care package including ECG, heart health checkup, medication management, and regular follow-ups.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 199, originalPrice: 249 },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00'],
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const oncologyPackageService: Service = {
+  id: 'oncology_package',
+  title: 'Oncology Package',
+  categoryId: 'special_packages',
+  rating: 4.5,
+  reviewCount: 12,
+  image: 'oncology_package',
+  shortTagline: 'Specialized oncology support care',
+  description: 'Comprehensive oncology care package with specialized nursing, medication management, pain management support, and emotional care.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 299, originalPrice: 349 },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00'],
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const neuroPackageService: Service = {
+  id: 'neuro_package',
+  title: 'Neuro Package',
+  categoryId: 'special_packages',
+  rating: 4.5,
+  reviewCount: 15,
+  image: 'neuro_package',
+  shortTagline: 'Neurological care and rehabilitation',
+  description: 'Specialized neurological care package including cognitive assessments, rehabilitation exercises, and ongoing monitoring.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 249, originalPrice: 299 },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00'],
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const cardiacBasicService: Service = {
+  id: 'cardiac_basic',
+  title: 'Cardiac Basic',
+  categoryId: 'special_packages',
+  rating: 4.5,
+  reviewCount: 32,
+  image: 'cardiac_basic',
+  shortTagline: 'Essential cardiac monitoring',
+  description: 'Basic cardiac health monitoring package with ECG and vital signs tracking.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.atHome,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 79, originalPrice: 99 },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
+    leadTimeHours: 12,
+    maxDaysAhead: 14,
+  },
+};
+
+const orthoPackageService: Service = {
+  id: 'ortho_package',
+  title: 'Ortho Package',
+  categoryId: 'special_packages',
+  rating: 4.5,
+  reviewCount: 19,
+  image: 'ortho_package',
+  shortTagline: 'Orthopedic care and support',
+  description: 'Complete orthopedic care package including mobility assessment, physiotherapy, and pain management.',
+  benefits: [
+    commonBenefits.certifiedCare,
+    commonBenefits.atHome,
+    commonBenefits.flexibleScheduling,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 179, originalPrice: 219 },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
+    timeMode: 'start_only',
+    availableTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00'],
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+// ============================================
+// MEDICAL DEVICES AT HOME
+// ============================================
+
+const oxygenConcentratorService: Service = {
+  id: 'oxygen_concentrator',
+  title: 'Oxygen Concentrator',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 28,
+  image: 'oxygen_concentrator',
+  shortTagline: 'Medical-grade oxygen therapy at home',
+  description: 'Rent medical-grade oxygen concentrators for home use with setup assistance and 24/7 technical support.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+    { title: 'Installation Included', description: 'Professional setup and training included.' },
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'oxy_week', label: 'Weekly Rental', price: 50, durationMinutes: 10080 },
+      { id: 'oxy_month', label: 'Monthly Rental', price: 150, originalPrice: 200, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const bpapService: Service = {
+  id: 'bpap',
+  title: 'BPAP',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 16,
+  image: 'bpap',
+  shortTagline: 'Bilevel positive airway pressure device',
+  description: 'BPAP machine rental for respiratory support with professional setup and monitoring.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'bpap_week', label: 'Weekly Rental', price: 75, durationMinutes: 10080 },
+      { id: 'bpap_month', label: 'Monthly Rental', price: 200, originalPrice: 300, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const cpapService: Service = {
+  id: 'cpap',
+  title: 'CPAP',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 22,
+  image: 'cpap',
+  shortTagline: 'Continuous positive airway pressure device',
+  description: 'CPAP machine rental for sleep apnea treatment with professional setup and support.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'cpap_week', label: 'Weekly Rental', price: 60, durationMinutes: 10080 },
+      { id: 'cpap_month', label: 'Monthly Rental', price: 180, originalPrice: 240, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const medicalCotSingleService: Service = {
+  id: 'medical_cot_single',
+  title: 'Medical Cot Single Function',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 14,
+  image: 'medical_cot_single',
+  shortTagline: 'Single-function hospital bed rental',
+  description: 'Single-function medical cot for home care with adjustable head position.',
+  benefits: [
+    commonBenefits.atHome,
+    { title: 'Delivery & Setup', description: 'Free delivery and professional setup included.' },
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'cot1_week', label: 'Weekly Rental', price: 40, durationMinutes: 10080 },
+      { id: 'cot1_month', label: 'Monthly Rental', price: 120, originalPrice: 160, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 48,
+    maxDaysAhead: 30,
+  },
+};
+
+const medicalCotTwoService: Service = {
+  id: 'medical_cot_two',
+  title: 'Medical Cot Two Function',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 11,
+  image: 'medical_cot_two',
+  shortTagline: 'Two-function hospital bed rental',
+  description: 'Two-function medical cot with adjustable head and leg positions for enhanced comfort.',
+  benefits: [
+    commonBenefits.atHome,
+    { title: 'Delivery & Setup', description: 'Free delivery and professional setup included.' },
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'cot2_week', label: 'Weekly Rental', price: 55, durationMinutes: 10080 },
+      { id: 'cot2_month', label: 'Monthly Rental', price: 160, originalPrice: 220, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 48,
+    maxDaysAhead: 30,
+  },
+};
+
+const alfaBedService: Service = {
+  id: 'alfa_bed',
+  title: 'Alfa Bed',
+  categoryId: 'medical_devices',
+  rating: 5.0,
+  reviewCount: 9,
+  image: 'alfa_bed',
+  shortTagline: 'Premium multi-function hospital bed',
+  description: 'Premium Alfa bed with multiple adjustable positions, side rails, and IV pole attachment.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+    { title: 'Premium Quality', description: 'Hospital-grade equipment for maximum comfort.' },
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'alfa_week', label: 'Weekly Rental', price: 80, durationMinutes: 10080 },
+      { id: 'alfa_month', label: 'Monthly Rental', price: 250, originalPrice: 320, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 48,
+    maxDaysAhead: 30,
+  },
+};
+
+const cardiacMonitorService: Service = {
+  id: 'cardiac_monitor',
+  title: 'Cardiac Monitor',
+  categoryId: 'medical_devices',
+  rating: 5.0,
+  reviewCount: 17,
+  image: 'cardiac_monitor',
+  shortTagline: 'Continuous cardiac monitoring device',
+  description: 'Portable cardiac monitor for continuous heart rhythm monitoring at home.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'cm_week', label: 'Weekly Rental', price: 45, durationMinutes: 10080 },
+      { id: 'cm_month', label: 'Monthly Rental', price: 130, originalPrice: 180, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const syringePumpService: Service = {
+  id: 'syringe_pump',
+  title: 'Syringe Pump',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 8,
+  image: 'syringe_pump',
+  shortTagline: 'Precision medication delivery device',
+  description: 'Medical syringe pump for precise medication administration at controlled rates.',
+  benefits: [
+    commonBenefits.atHome,
+    commonBenefits.support247,
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: {
+    type: 'packages',
+    packages: [
+      { id: 'sp_week', label: 'Weekly Rental', price: 35, durationMinutes: 10080 },
+      { id: 'sp_month', label: 'Monthly Rental', price: 100, originalPrice: 140, durationMinutes: 43200 },
+    ],
+  },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 24,
+    maxDaysAhead: 30,
+  },
+};
+
+const medicineDeliveryService: Service = {
+  id: 'medicine_delivery',
+  title: 'Medicine Delivery',
+  categoryId: 'medical_devices',
+  rating: 4.5,
+  reviewCount: 45,
+  image: 'medicine_delivery',
+  shortTagline: 'Doorstep medicine delivery service',
+  description: 'Fast and reliable medicine delivery service. Upload prescription and get medicines delivered to your doorstep.',
+  benefits: [
+    commonBenefits.atHome,
+    { title: 'Same Day Delivery', description: 'Orders before 2 PM delivered same day.' },
+    { title: 'Prescription Upload', description: 'Easy prescription upload via app.' },
+  ],
+  fulfillment: { mode: 'checkout', requiresPayment: true },
+  pricing: { type: 'fixed', price: 5, notes: 'Delivery fee only. Medicine cost additional.' },
+  booking: {
+    requiresMember: true,
+    requiresDate: true,
+    requiresTime: false,
+    leadTimeHours: 4,
+    maxDaysAhead: 7,
+  },
+  request: {
+    enabled: true,
+    required: true,
+    placeholder: 'List medicines needed or upload prescription...',
+  },
+};
+
+// ============================================
 // SERVICE CATEGORIES
 // ============================================
 
@@ -636,10 +1088,37 @@ export const serviceCategories: ServiceCategory[] = [
     items: [
       yogaService,
       expertNurseService,
+      transactionalCareService,
       physiotherapyService,
       doctorVisitService,
       labTestingService,
       healthCheckService,
+    ],
+  },
+  {
+    id: 'special_packages',
+    title: 'Special Packages',
+    items: [
+      cardiacPackageService,
+      oncologyPackageService,
+      neuroPackageService,
+      cardiacBasicService,
+      orthoPackageService,
+    ],
+  },
+  {
+    id: 'medical_devices',
+    title: 'Medical Devices at Home',
+    items: [
+      oxygenConcentratorService,
+      bpapService,
+      cpapService,
+      medicalCotSingleService,
+      medicalCotTwoService,
+      alfaBedService,
+      cardiacMonitorService,
+      syringePumpService,
+      medicineDeliveryService,
     ],
   },
 ];

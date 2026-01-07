@@ -1,12 +1,13 @@
 /**
  * StarRating Component
  * Displays a row of stars with partial fill support and optional review count
+ * Uses healthcare-grade SVG icons from the icon system
  */
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing, typography } from '../../theme';
+import { colors, spacing } from '../../theme';
+import { AppIcon } from '../icons';
 
 interface StarRatingProps {
   rating: number;
@@ -35,17 +36,17 @@ export function StarRating({
     if (i <= Math.floor(rating)) {
       // Full star
       stars.push(
-        <Icon key={i} name="star" size={size} color={color} />
+        <AppIcon key={i} name="star-filled" size={size} color={color} fillOpacity={1} />
       );
     } else if (i === Math.ceil(rating) && rating % 1 !== 0) {
-      // Half star - for any decimal value
+      // Half star - show as filled for simplicity (SVG doesn't have half)
       stars.push(
-        <Icon key={i} name="star-half" size={size} color={color} />
+        <AppIcon key={i} name="star-filled" size={size} color={color} fillOpacity={0.5} />
       );
     } else {
       // Empty star
       stars.push(
-        <Icon key={i} name="star-outline" size={size} color={emptyColor} />
+        <AppIcon key={i} name="star" size={size} color={emptyColor} fillOpacity={0} />
       );
     }
   }

@@ -1,6 +1,6 @@
 /**
- * SubscriptionPlanDetails Screen
- * Displays detailed information about a subscription plan
+ * Subscription Plan Details Screen
+ * Premium healthcare plan details with duotone icons
  */
 
 import React from 'react';
@@ -11,33 +11,112 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { StarRating } from '../components/ui/StarRating';
-import { getPlanById } from '../data/services';
+import { AppIcon, IconContainer, IconName } from '../components/icons';
+import { getPlanById, SubscriptionPlan } from '../data/subscriptions';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 
-// TODO: Replace with actual plan images when available
-const getPlanIcon = (imageKey: string): keyof typeof Ionicons.glyphMap => {
-  const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-    one_month: 'calendar',
-    six_month: 'calendar',
-    twelve_month: 'calendar',
-    ask_carebow: 'heart',
-  };
-  return iconMap[imageKey] || 'card';
+// Hero background colors based on plan style
+const getHeroColors = (style: string) => {
+  switch (style) {
+    case 'blue':
+      return {
+        bg: '#EFF6FF',
+        accent: '#3B82F6',
+        circle: '#DBEAFE',
+      };
+    case 'green':
+      return {
+        bg: '#ECFDF5',
+        accent: '#10B981',
+        circle: '#D1FAE5',
+      };
+    case 'gold':
+      return {
+        bg: '#1F2937',
+        accent: '#F59E0B',
+        circle: '#374151',
+      };
+    default:
+      return {
+        bg: '#F5F3FF',
+        accent: '#8B5CF6',
+        circle: '#EDE9FE',
+      };
+  }
 };
 
-const getPlanColor = (planId: string): string => {
-  const colorMap: Record<string, string> = {
-    monthly: '#3B82F6',
-    half_yearly: '#8B5CF6',
-    yearly: '#EC4899',
-    ask_carebow: '#9333EA',
-  };
-  return colorMap[planId] || '#6B7280';
+// Get plan icon
+const getPlanIcon = (planId: string): { icon: IconName; color: string; bgColor: string } => {
+  switch (planId) {
+    case 'ask_carebow':
+      return { icon: 'sparkles', color: '#8B5CF6', bgColor: '#EDE9FE' };
+    case 'monthly':
+      return { icon: 'calendar', color: '#3B82F6', bgColor: '#DBEAFE' };
+    case 'half_yearly':
+      return { icon: 'leaf', color: '#22C55E', bgColor: '#DCFCE7' };
+    case 'yearly':
+      return { icon: 'trophy', color: '#F59E0B', bgColor: '#FEF3C7' };
+    default:
+      return { icon: 'calendar', color: colors.accent, bgColor: colors.accentSoft };
+  }
+};
+
+// Floating service icons for decoration
+const FLOATING_ICONS: { icon: IconName; position: any }[] = [
+  { icon: 'nurse', position: { top: 40, left: 40 } },
+  { icon: 'stethoscope', position: { top: 50, right: 50 } },
+  { icon: 'transport', position: { top: '45%', left: 30 } },
+  { icon: 'lab', position: { top: '45%', right: 30 } },
+  { icon: 'yoga', position: { bottom: 80, left: 50 } },
+  { icon: 'food', position: { bottom: 80, right: 50 } },
+];
+
+// Hero component with styled graphics
+const PlanHero = ({ plan }: { plan: SubscriptionPlan }) => {
+  const heroColors = getHeroColors(plan.heroStyle);
+  const planIcon = getPlanIcon(plan.id);
+  const isGold = plan.heroStyle === 'gold';
+
+  return (
+    <View style={[styles.heroContainer, { backgroundColor: heroColors.bg }]}>
+      {/* Central circle with icon */}
+      <View style={[styles.heroCircle, { backgroundColor: heroColors.circle }]}>
+        <IconContainer
+          size="xl"
+          variant="soft"
+          backgroundColor={planIcon.bgColor}
+          withShadow={Platform.OS === 'ios'}
+        >
+          <AppIcon name={planIcon.icon} size={40} color={planIcon.color} fillOpacity={0.25} />
+        </IconContainer>
+      </View>
+
+      {/* Floating icons around */}
+      {FLOATING_ICONS.map((item, index) => (
+        <View
+          key={index}
+          style={[styles.floatingIcon, item.position, { opacity: 0.6 }]}
+        >
+          <AppIcon name={item.icon} size={18} color={heroColors.accent} fillOpacity={0.15} />
+        </View>
+      ))}
+
+      {/* Period label */}
+      <View style={styles.periodLabelContainer}>
+        <Text style={[styles.periodLabel, { color: isGold ? '#F59E0B' : '#374151' }]}>
+          {plan.periodLabel}
+        </Text>
+        <Text style={[styles.subscriptionText, { color: isGold ? '#F59E0B' : '#6B7280' }]}>
+          SUBSCRIPTION PLAN
+        </Text>
+      </View>
+    </View>
+  );
 };
 
 export default function PlanDetailsScreen() {
@@ -51,39 +130,35 @@ export default function PlanDetailsScreen() {
   if (!plan) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text style={styles.errorText}>Plan not found</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backLink}>Go back</Text>
-        </TouchableOpacity>
+        <View style={styles.errorContainer}>
+          <AppIcon name="info" size={64} color={colors.textTertiary} />
+          <Text style={styles.errorText}>Plan not found</Text>
+          <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
+            <Text style={styles.backLinkText}>Go back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
-  const icon = getPlanIcon(plan.image);
-  const color = getPlanColor(plan.id);
-  const isAskCareBow = plan.id === 'ask_carebow';
-
   const handleSubscribe = () => {
-    if (isAskCareBow) {
-      // Navigate to Ask CareBow paywall or feature
-      navigation.navigate('Ask');
-    } else {
-      // TODO: Navigate to payment/subscription flow
-      console.log('Subscribe to:', plan.id);
-    }
+    navigation.navigate('Checkout' as never);
   };
+
+  const planIcon = getPlanIcon(plan.id);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={plan.heroStyle === 'gold' ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Icon name="arrow-back" size={24} color={colors.textPrimary} />
+          <AppIcon name="chevron-left" size={24} color={colors.textPrimary} />
+          <Text style={styles.backText}>Plans</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Plan Details</Text>
         <View style={styles.placeholder} />
@@ -93,142 +168,85 @@ export default function PlanDetailsScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: 100 + insets.bottom },
+          { paddingBottom: 140 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={[styles.heroContainer, { backgroundColor: color }]}>
-          <Icon name={icon} size={64} color={colors.white} />
-          <Text style={styles.periodLabel}>{plan.periodLabel}</Text>
-        </View>
+        {/* Hero Image */}
+        <PlanHero plan={plan} />
 
         {/* Plan Info */}
         <View style={styles.infoContainer}>
           <Text style={styles.planTitle}>{plan.title}</Text>
+
+          {/* Star Rating */}
           <View style={styles.ratingRow}>
-            <StarRating rating={plan.rating} size={16} />
-            <Text style={styles.ratingText}>{plan.rating.toFixed(1)}</Text>
+            <StarRating rating={plan.rating} size={18} />
+            <Text style={styles.reviewCount}>({plan.reviewCount} reviews)</Text>
           </View>
 
-          {plan.price !== null ? (
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Price</Text>
-              <Text style={styles.priceValue}>
-                <Text style={styles.currency}>$</Text>
-                {plan.price}
-              </Text>
-              <Text style={styles.priceNote}>
-                {plan.id === 'monthly'
-                  ? 'per month'
-                  : plan.id === 'half_yearly'
-                  ? 'for 6 months'
-                  : plan.id === 'yearly'
-                  ? 'for 12 months'
-                  : 'per month'}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.priceContainer}>
-              <Text style={styles.aiAccessLabel}>AI-Powered Health Assistant</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Benefits */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Plan Benefits</Text>
-          <View style={styles.benefitsList}>
-            {plan.benefits?.map((benefit, index) => (
-              <View key={index} style={styles.benefitItem}>
-                <View style={[styles.benefitIcon, { backgroundColor: color }]}>
-                  <Icon name="checkmark" size={14} color={colors.white} />
-                </View>
+          {/* Benefits */}
+          <View style={styles.benefitsSection}>
+            <Text style={styles.benefitsTitle}>What's included</Text>
+            {plan.benefits.map((benefit, index) => (
+              <View key={index} style={styles.benefitRow}>
+                <AppIcon name="check-circle" size={18} color={colors.success} fillOpacity={0.2} />
                 <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))}
           </View>
+
+          {/* Excludes */}
+          {plan.excludes && plan.excludes.length > 0 && (
+            <View style={styles.excludesSection}>
+              <Text style={styles.excludesTitle}>Not included</Text>
+              {plan.excludes.map((item, index) => (
+                <View key={index} style={styles.excludeRow}>
+                  <AppIcon name="close" size={16} color={colors.textTertiary} />
+                  <Text style={styles.excludeText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Description */}
+          <Text style={styles.description}>{plan.description}</Text>
         </View>
-
-        {/* Additional Info */}
-        {!isAskCareBow && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Subscription Terms</Text>
-            <View style={styles.termsCard}>
-              <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Billing</Text>
-                <Text style={styles.termValue}>
-                  {plan.id === 'monthly'
-                    ? 'Monthly'
-                    : plan.id === 'half_yearly'
-                    ? 'Every 6 months'
-                    : 'Annually'}
-                </Text>
-              </View>
-              <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Auto-renewal</Text>
-                <Text style={styles.termValue}>Yes</Text>
-              </View>
-              <View style={styles.termRow}>
-                <Text style={styles.termLabel}>Cancel anytime</Text>
-                <Text style={styles.termValue}>Yes</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {isAskCareBow && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How It Works</Text>
-            <View style={styles.howItWorksCard}>
-              <View style={styles.stepItem}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>1</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Describe your symptoms</Text>
-                  <Text style={styles.stepDescription}>
-                    Tell CareBow what you're experiencing in your own words.
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.stepItem}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>2</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Get AI guidance</Text>
-                  <Text style={styles.stepDescription}>
-                    Receive personalized health insights and recommendations.
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.stepItem}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>3</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  <Text style={styles.stepTitle}>Take action</Text>
-                  <Text style={styles.stepDescription}>
-                    Book services or consult professionals based on your needs.
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Subscribe Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+      {/* Bottom Subscribe Bar */}
+      <View style={[
+        styles.bottomBar,
+        { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+        Platform.OS === 'ios' && styles.bottomBarIOS,
+        Platform.OS === 'android' && styles.bottomBarAndroid,
+      ]}>
+        <View style={styles.priceSection}>
+          {/* Discount Badge */}
+          <View style={[styles.discountBadge, { backgroundColor: planIcon.color }]}>
+            <Text style={styles.discountText}>{plan.discountPercent}%</Text>
+          </View>
+
+          {/* Price with proper baseline alignment */}
+          <View style={styles.priceContainer}>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceSymbol}>$</Text>
+              <Text style={styles.currentPrice}>{plan.price}</Text>
+              <Text style={styles.pricePeriod}>
+                /{plan.billingPeriod === 'monthly' ? 'mo' : plan.billingPeriod === 'yearly' ? 'yr' : '6mo'}
+              </Text>
+            </View>
+            <Text style={styles.originalPrice}>${plan.originalPrice}</Text>
+          </View>
+        </View>
+
+        {/* Subscribe Button */}
         <TouchableOpacity
-          style={[styles.subscribeButton, { backgroundColor: color }]}
+          style={[styles.subscribeButton, { borderColor: planIcon.color }]}
           onPress={handleSubscribe}
+          activeOpacity={0.8}
         >
-          <Text style={styles.subscribeButtonText}>
-            {isAskCareBow ? 'Unlock Ask CareBow' : 'Subscribe Now'}
-          </Text>
-          <Icon name="arrow-forward" size={20} color={colors.white} />
+          <Text style={[styles.subscribeButtonText, { color: planIcon.color }]}>Subscribe</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -245,212 +263,259 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.background,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  backText: {
+    ...typography.body,
+    color: colors.textPrimary,
   },
   headerTitle: {
-    ...typography.h3,
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   placeholder: {
-    width: 40,
+    width: 80,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
+    paddingBottom: 140,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xxl,
   },
   errorText: {
-    ...typography.body,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginTop: 40,
-  },
-  backLink: {
-    ...typography.body,
-    color: colors.accent,
+    ...typography.h3,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.md,
   },
-  heroContainer: {
-    height: 180,
-    borderRadius: radius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+  backLink: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
   },
-  periodLabel: {
+  backLinkText: {
     ...typography.label,
     color: colors.white,
-    marginTop: spacing.xs,
-    opacity: 0.9,
   },
-  infoContainer: {
+
+  // Hero Styles
+  heroContainer: {
+    height: 280,
+    width: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  floatingIcon: {
+    position: 'absolute',
+  },
+  periodLabelContainer: {
+    position: 'absolute',
+    bottom: 24,
+    alignItems: 'center',
+  },
+  periodLabel: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  subscriptionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 2,
+    marginTop: 4,
+  },
+
+  // Info Section
+  infoContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
   planTitle: {
-    ...typography.h1,
+    fontSize: 26,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
-    textAlign: 'center',
+    letterSpacing: -0.3,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  ratingText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.warning,
-  },
-  priceContainer: {
-    alignItems: 'center',
-  },
-  priceLabel: {
-    ...typography.tiny,
-    color: colors.textSecondary,
-    marginBottom: spacing.xxs,
-  },
-  priceValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  currency: {
-    fontSize: 24,
-    fontWeight: '500',
-  },
-  priceNote: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    marginTop: spacing.xxs,
-  },
-  aiAccessLabel: {
-    ...typography.label,
-    color: colors.accent,
-  },
-  section: {
     marginBottom: spacing.xl,
   },
-  sectionTitle: {
-    ...typography.h3,
+  reviewCount: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginLeft: 4,
+  },
+
+  // Benefits
+  benefitsSection: {
+    marginBottom: spacing.lg,
+  },
+  benefitsTitle: {
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
-  benefitsList: {
-    gap: spacing.sm,
-  },
-  benefitItem: {
+  benefitRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  benefitIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: spacing.xs,
+    paddingVertical: 4,
   },
   benefitText: {
     ...typography.body,
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     flex: 1,
   },
-  termsCard: {
-    backgroundColor: colors.surface2,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.sm,
-    ...shadows.card,
+
+  // Excludes
+  excludesSection: {
+    marginBottom: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  termRow: {
+  excludesTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
+  },
+  excludeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    rowGap: spacing.xxs,
-    columnGap: spacing.sm,
-  },
-  termLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  termValue: {
-    ...typography.caption,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  howItWorksCard: {
-    backgroundColor: colors.surface2,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.lg,
-    ...shadows.card,
-  },
-  stepItem: {
-    flexDirection: 'row',
     gap: spacing.sm,
+    marginBottom: spacing.xs,
+    paddingVertical: 2,
   },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepNumberText: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  stepContent: {
+  excludeText: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
     flex: 1,
   },
-  stepTitle: {
-    ...typography.label,
-    color: colors.textPrimary,
-    marginBottom: spacing.xxs,
-  },
-  stepDescription: {
-    ...typography.caption,
+
+  description: {
+    ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 18,
+    lineHeight: 24,
   },
-  footer: {
+
+  // Bottom Bar
+  bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    ...shadows.card,
-  },
-  subscribeButton: {
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: '#1F2937',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  bottomBarIOS: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+  },
+  bottomBarAndroid: {
+    elevation: 16,
+  },
+  priceSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  discountBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.xs,
   },
-  subscribeButtonText: {
-    ...typography.label,
+  discountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  priceContainer: {
+    flexDirection: 'column',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceSymbol: {
+    fontSize: 14,
     fontWeight: '600',
     color: colors.white,
+  },
+  currentPrice: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  pricePeriod: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginLeft: 2,
+  },
+  originalPrice: {
+    fontSize: 13,
+    color: '#6B7280',
+    textDecorationLine: 'line-through',
+  },
+  subscribeButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  subscribeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

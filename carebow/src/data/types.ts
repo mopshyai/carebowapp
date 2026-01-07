@@ -20,7 +20,7 @@ export type PackageOption = {
 export type ServicePackage = PackageOption;
 
 export type PricingModel =
-  | { type: 'fixed'; price: number; originalPrice?: number }
+  | { type: 'fixed'; price: number; originalPrice?: number; notes?: string }
   | { type: 'packages'; packages: PackageOption[] }
   | { type: 'hourly'; hourlyRate: number; minHours: number; maxHours?: number }
   | { type: 'daily'; dailyRate: number; minDays: number; maxDays?: number }
@@ -36,7 +36,7 @@ export type BookingConfig = {
   requiresMember: boolean;
   requiresDate: boolean;
   requiresTime: boolean;
-  timeMode: TimeMode;
+  timeMode?: TimeMode; // Optional - defaults to 'start_only'
   defaultDurationMinutes?: number;
   availableTimeSlots?: string[]; // ["09:00","10:00"...] optional; else free picker
   leadTimeHours?: number; // e.g. 2 hours minimum
@@ -79,7 +79,7 @@ export type Service = {
   fulfillment: FulfillmentConfig;
   pricing: PricingModel;
   booking: BookingConfig;
-  request: RequestConfig;
+  request?: RequestConfig; // Optional - not all services require request notes
 };
 
 export type ServiceCategory = {

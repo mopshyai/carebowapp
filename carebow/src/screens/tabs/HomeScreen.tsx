@@ -1,9 +1,10 @@
 /**
  * Today Screen - Premium Healthcare Dashboard
- * World-class UI with stunning visuals and perfect alignment
+ * Uses healthcare-grade SVG icons from the icon system
+ * Platform-specific polish for iOS and Android
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -12,12 +13,15 @@ import {
   TouchableOpacity,
   Dimensions,
   Pressable,
+  Animated,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
 
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { AppIcon, IconContainer, IconName, getIconColors } from '../../components/icons';
+import { StatusBadge, DotBadge, PopularBadge } from '../../components/ui/StatusBadge';
 import {
   quickPickItems,
   deviceItems,
@@ -32,6 +36,66 @@ import { subscriptionPlans, SubscriptionPlan } from '../../data/subscriptions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 60) / 2;
+
+// =============================================================================
+// ICON MAPPING FOR SERVICES
+// =============================================================================
+
+const SERVICE_ICONS: Record<string, IconName> = {
+  medical: 'stethoscope',
+  flask: 'lab',
+  heart: 'nurse',
+  'fitness-outline': 'oxygen_concentrator',
+  'pulse-outline': 'bpap',
+  'cloud-outline': 'cpap',
+  'heart-outline': 'cardiac_monitor',
+  'bed-outline': 'bed',
+  body: 'healthcheck',
+  water: 'lab',
+  'shield-checkmark': 'shield-check',
+};
+
+// =============================================================================
+// ANIMATED PRESSABLE COMPONENT
+// =============================================================================
+
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  style?: any;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: Platform.OS === 'ios' ? 0.97 : 0.98,
+      useNativeDriver: true,
+      friction: 10,
+      tension: 100,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 10,
+      tension: 100,
+    }).start();
+  };
+
+  return (
+    <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+      <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 // =============================================================================
 // SECTION HEADER
@@ -57,7 +121,7 @@ function SectionHeader({
       {actionLabel && onAction && (
         <TouchableOpacity style={styles.sectionAction} onPress={onAction} activeOpacity={0.7}>
           <Text style={styles.sectionActionText}>{actionLabel}</Text>
-          <Icon name="arrow-forward" size={14} color={colors.accent} />
+          <AppIcon name="arrow-right" size={14} color={colors.accent} />
         </TouchableOpacity>
       )}
     </View>
@@ -65,33 +129,29 @@ function SectionHeader({
 }
 
 // =============================================================================
-// HERO AI CARD - Premium without gradient
+// HERO AI CARD
 // =============================================================================
 
 function HeroAICard({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroContent}>
-          <View style={styles.heroIconWrap}>
-            <Icon name="sparkles" size={24} color="#FFF" />
-          </View>
-          <View style={styles.heroTextWrap}>
-            <Text style={styles.heroTitle}>AI Health Assistant</Text>
-            <Text style={styles.heroSubtitle}>
-              Describe your symptoms and get instant, personalized guidance
-            </Text>
-          </View>
+    <AnimatedPressable onPress={onPress} style={styles.heroCard}>
+      <View style={styles.heroContent}>
+        <View style={styles.heroIconWrap}>
+          <AppIcon name="sparkles" size={24} color="#FFF" fillOpacity={0.3} />
         </View>
-        <View style={styles.heroArrow}>
-          <Icon name="arrow-forward" size={20} color="#FFF" />
+        <View style={styles.heroTextWrap}>
+          <Text style={styles.heroTitle}>AI Health Assistant</Text>
+          <Text style={styles.heroSubtitle}>
+            Describe your symptoms and get instant, personalized guidance
+          </Text>
         </View>
-
-        {/* Decorative elements */}
-        <View style={styles.heroDecor1} />
-        <View style={styles.heroDecor2} />
       </View>
-    </Pressable>
+      <View style={styles.heroArrow}>
+        <AppIcon name="arrow-right" size={20} color="#FFF" />
+      </View>
+      <View style={styles.heroDecor1} />
+      <View style={styles.heroDecor2} />
+    </AnimatedPressable>
   );
 }
 
@@ -101,20 +161,18 @@ function HeroAICard({ onPress }: { onPress: () => void }) {
 
 function EmergencyCard({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <View style={styles.emergencyCard}>
-        <View style={styles.emergencyIconWrap}>
-          <Icon name="shield-checkmark" size={22} color={colors.error} />
-        </View>
-        <View style={styles.emergencyTextWrap}>
-          <Text style={styles.emergencyTitle}>Emergency & Safety</Text>
-          <Text style={styles.emergencySubtitle}>SOS, check-ins & contacts</Text>
-        </View>
-        <View style={styles.emergencyArrow}>
-          <Icon name="chevron-forward" size={18} color={colors.error} />
-        </View>
+    <AnimatedPressable onPress={onPress} style={styles.emergencyCard}>
+      <View style={styles.emergencyIconWrap}>
+        <AppIcon name="shield-check" size={22} color={colors.error} fillOpacity={0.15} />
       </View>
-    </Pressable>
+      <View style={styles.emergencyTextWrap}>
+        <Text style={styles.emergencyTitle}>Emergency & Safety</Text>
+        <Text style={styles.emergencySubtitle}>SOS, check-ins & contacts</Text>
+      </View>
+      <View style={styles.emergencyArrow}>
+        <AppIcon name="chevron-right" size={18} color={colors.error} />
+      </View>
+    </AnimatedPressable>
   );
 }
 
@@ -123,23 +181,36 @@ function EmergencyCard({ onPress }: { onPress: () => void }) {
 // =============================================================================
 
 function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () => void }) {
+  const iconName = SERVICE_ICONS[item.icon] || 'stethoscope';
+  const iconColors = getIconColors(iconName);
+
+  // Map tag to badge type
+  const getBadgeType = (tag: string): 'available' | 'popular' | 'verified' | '24/7' => {
+    switch (tag) {
+      case 'Available': return 'available';
+      case 'Popular': return 'popular';
+      case 'Verified': return 'verified';
+      case '24/7': return '24/7';
+      default: return 'available';
+    }
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.quickServiceCard, pressed && styles.cardPressed]}
-    >
-      <View style={[styles.quickServiceIcon, { backgroundColor: item.iconBgColor }]}>
-        <Icon name={item.icon as any} size={24} color={item.iconColor} />
-      </View>
+    <AnimatedPressable onPress={onPress} style={styles.quickServiceCard}>
+      <IconContainer
+        size="md"
+        variant="soft"
+        backgroundColor={iconColors.background}
+        withShadow={Platform.OS === 'ios'}
+      >
+        <AppIcon name={iconName} size={22} color={iconColors.primary} fillOpacity={0.2} />
+      </IconContainer>
 
       <Text style={styles.quickServiceTitle} numberOfLines={1}>{item.title}</Text>
       <Text style={styles.quickServiceSubtitle} numberOfLines={1}>{item.subtitle}</Text>
 
       <View style={styles.quickServiceMeta}>
-        <View style={[styles.quickServiceTag, { backgroundColor: `${item.tagColor}15` }]}>
-          <View style={[styles.quickServiceTagDot, { backgroundColor: item.tagColor }]} />
-          <Text style={[styles.quickServiceTagText, { color: item.tagColor }]}>{item.tag}</Text>
-        </View>
+        <DotBadge type={getBadgeType(item.tag)} label={item.tag} />
       </View>
 
       {item.priceHint && (
@@ -148,11 +219,11 @@ function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () 
 
       {item.nextSlot && (
         <View style={styles.quickServiceSlot}>
-          <Icon name="time" size={12} color={colors.success} />
+          <AppIcon name="time" size={12} color={colors.success} />
           <Text style={styles.quickServiceSlotText}>{item.nextSlot}</Text>
         </View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -161,50 +232,53 @@ function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () 
 // =============================================================================
 
 function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => void }) {
+  const iconName = SERVICE_ICONS[item.icon] || 'oxygen_concentrator';
+  const iconColors = getIconColors(iconName);
+
+  const getBadgeType = (type: string): 'free-delivery' | 'certified' | 'training' | 'setup' | 'info' => {
+    if (type === 'info') return 'free-delivery';
+    if (type === 'highlight') return 'certified';
+    return 'info';
+  };
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.equipmentCard, pressed && styles.cardPressed]}
-    >
+    <AnimatedPressable onPress={onPress} style={styles.equipmentCard}>
       <View style={styles.equipmentIconWrap}>
-        <View style={styles.equipmentIconGradient}>
-          <Icon name={item.icon as any} size={32} color={colors.textSecondary} />
-        </View>
+        <IconContainer
+          size="lg"
+          variant="soft"
+          backgroundColor={iconColors.background}
+          withShadow={Platform.OS === 'ios'}
+        >
+          <AppIcon name={iconName} size={28} color={iconColors.primary} fillOpacity={0.2} />
+        </IconContainer>
       </View>
 
       <Text style={styles.equipmentTitle} numberOfLines={2}>{item.title}</Text>
 
       <View style={styles.equipmentBadges}>
         {item.badges.slice(0, 2).map((badge, idx) => (
-          <View
+          <StatusBadge
             key={idx}
-            style={[
-              styles.equipmentBadge,
-              { backgroundColor: badge.type === 'certified' ? colors.successSoft : colors.infoSoft },
-            ]}
-          >
-            <Text
-              style={[
-                styles.equipmentBadgeText,
-                { color: badge.type === 'certified' ? colors.success : colors.info },
-              ]}
-            >
-              {badge.label}
-            </Text>
-          </View>
+            type={getBadgeType(badge.type)}
+            label={badge.label}
+            size="sm"
+          />
         ))}
       </View>
 
+      {/* Price with proper alignment */}
       <View style={styles.equipmentPricing}>
-        <Text style={styles.equipmentPrice}>{formatPrice(item.pricePerUnit)}</Text>
+        <Text style={styles.equipmentPriceSymbol}>$</Text>
+        <Text style={styles.equipmentPriceValue}>{item.pricePerUnit}</Text>
         <Text style={styles.equipmentPriceUnit}>{item.priceUnit}</Text>
       </View>
 
       <View style={styles.equipmentDelivery}>
-        <Icon name="flash" size={12} color={colors.success} />
+        <AppIcon name="flash" size={12} color={colors.success} fillOpacity={0.2} />
         <Text style={styles.equipmentDeliveryText}>{item.deliveryTime}</Text>
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -213,21 +287,21 @@ function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => voi
 // =============================================================================
 
 function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.packageCard, pressed && styles.cardPressed]}
-    >
-      {item.popular && (
-        <View style={styles.packagePopularBadge}>
-          <Icon name="star" size={10} color="#FFF" />
-          <Text style={styles.packagePopularText}>Popular</Text>
-        </View>
-      )}
+  const iconName = SERVICE_ICONS[item.icon] || 'healthcheck';
+  const iconColors = getIconColors(iconName);
 
-      <View style={[styles.packageIcon, { backgroundColor: item.iconBgColor }]}>
-        <Icon name={item.icon as any} size={22} color={item.iconColor} />
-      </View>
+  return (
+    <AnimatedPressable onPress={onPress} style={styles.packageCard}>
+      {item.popular && <PopularBadge />}
+
+      <IconContainer
+        size="md"
+        variant="soft"
+        backgroundColor={iconColors.background}
+        withShadow={Platform.OS === 'ios'}
+      >
+        <AppIcon name={iconName} size={22} color={iconColors.primary} fillOpacity={0.2} />
+      </IconContainer>
 
       <Text style={styles.packageTitle} numberOfLines={1}>{item.title}</Text>
       <Text style={styles.packageSubtitle}>{item.includedCount} tests included</Text>
@@ -235,17 +309,19 @@ function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => 
       <View style={styles.packageIncludes}>
         {item.included.slice(0, 2).map((inc, idx) => (
           <View key={idx} style={styles.packageIncludeRow}>
-            <Icon name="checkmark-circle" size={14} color={colors.success} />
+            <AppIcon name="check-circle" size={14} color={colors.success} fillOpacity={0.2} />
             <Text style={styles.packageIncludeText} numberOfLines={1}>{inc.name}</Text>
           </View>
         ))}
       </View>
 
+      {/* Price with proper alignment */}
       <View style={styles.packagePricing}>
         <Text style={styles.packagePriceLabel}>From</Text>
-        <Text style={styles.packagePrice}>{formatPrice(item.startingPrice)}</Text>
+        <Text style={styles.packagePriceSymbol}>$</Text>
+        <Text style={styles.packagePriceValue}>{item.startingPrice}</Text>
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -274,17 +350,17 @@ function AppointmentCard() {
           <Text style={styles.appointmentDoctor}>{apt.doctorName}</Text>
           <Text style={styles.appointmentSpecialty}>{apt.specialty}</Text>
           <View style={styles.appointmentMeta}>
-            <Icon name="calendar" size={12} color={colors.textTertiary} />
+            <AppIcon name="calendar" size={12} color={colors.textTertiary} />
             <Text style={styles.appointmentMetaText}>{apt.date}</Text>
             <View style={styles.appointmentDot} />
-            <Icon name="time" size={12} color={colors.textTertiary} />
+            <AppIcon name="clock" size={12} color={colors.textTertiary} />
             <Text style={styles.appointmentMetaText}>{apt.time}</Text>
           </View>
         </View>
 
         {apt.canJoin && (
           <TouchableOpacity style={styles.joinButton} activeOpacity={0.8}>
-            <Icon name="videocam" size={16} color="#FFF" />
+            <AppIcon name="video" size={16} color="#FFF" fillOpacity={0.3} />
             <Text style={styles.joinButtonText}>Join</Text>
           </TouchableOpacity>
         )}
@@ -294,73 +370,94 @@ function AppointmentCard() {
 }
 
 // =============================================================================
-// SUBSCRIPTION CARD
+// SUBSCRIPTION CARD - Premium Design
 // =============================================================================
 
 function SubscriptionCard({ plan, onPress }: { plan: SubscriptionPlan; onPress: () => void }) {
-  const isHighlight = plan.highlight;
+  const getPlanConfig = (): { color: string; bgColor: string; gradientStart: string; icon: IconName; label: string } => {
+    switch (plan.id) {
+      case 'ask_carebow':
+        return { color: '#8B5CF6', bgColor: '#F5F3FF', gradientStart: '#EDE9FE', icon: 'sparkles', label: 'AI Powered' };
+      case 'monthly':
+        return { color: '#3B82F6', bgColor: '#EFF6FF', gradientStart: '#DBEAFE', icon: 'calendar', label: 'Flexible' };
+      case 'half_yearly':
+        return { color: '#10B981', bgColor: '#ECFDF5', gradientStart: '#D1FAE5', icon: 'leaf', label: 'Best Value' };
+      case 'yearly':
+        return { color: '#F59E0B', bgColor: '#FFFBEB', gradientStart: '#FEF3C7', icon: 'trophy', label: 'Most Popular' };
+      default:
+        return { color: colors.accent, bgColor: colors.accentSoft, gradientStart: colors.accentMuted, icon: 'calendar', label: '' };
+    }
+  };
+  const config = getPlanConfig();
+  const discountPercent = plan.originalPrice > plan.price
+    ? Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100)
+    : 0;
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.subscriptionCard,
-        isHighlight && styles.subscriptionCardHighlight,
-        pressed && styles.cardPressed,
-      ]}
-    >
-      {plan.badge && (
-        <View style={[styles.subscriptionBadge, isHighlight && styles.subscriptionBadgeHighlight]}>
-          <Text style={styles.subscriptionBadgeText}>{plan.badge}</Text>
+    <AnimatedPressable onPress={onPress} style={[styles.subscriptionCard, { backgroundColor: config.bgColor }]}>
+      {/* Top label badge */}
+      {config.label && (
+        <View style={[styles.subscriptionBadge, { backgroundColor: config.color }]}>
+          <Text style={styles.subscriptionBadgeText}>{config.label}</Text>
         </View>
       )}
 
-      <View style={[styles.subscriptionIconWrap, { backgroundColor: plan.iconBgColor }]}>
-        <Icon name={plan.iconName as any} size={18} color={plan.iconColor} />
+      {/* Icon with gradient background */}
+      <View style={[styles.subscriptionIconWrap, { backgroundColor: config.gradientStart }]}>
+        <AppIcon name={config.icon} size={32} color={config.color} />
       </View>
 
-      <Text style={styles.subscriptionPeriod}>{plan.periodLabel}</Text>
-      <Text style={styles.subscriptionTitle}>{plan.title}</Text>
+      {/* Period label */}
+      <Text style={[styles.subscriptionPeriodLabel, { color: config.color }]}>
+        {plan.billingPeriod === 'monthly' ? 'Monthly' : plan.billingPeriod === 'yearly' ? 'Yearly' : '6 Months'}
+      </Text>
 
-      <View style={styles.subscriptionPriceRow}>
-        <Text style={[styles.subscriptionPrice, isHighlight && styles.subscriptionPriceHighlight]}>
-          ${plan.price}
-        </Text>
-        <Text style={styles.subscriptionPriceUnit}>
-          {plan.billingPeriod === 'monthly' ? '/mo' : plan.billingPeriod === 'yearly' ? '/yr' : '/6mo'}
-        </Text>
+      {/* Price section */}
+      <View style={styles.subscriptionPriceSection}>
+        <View style={styles.subscriptionPriceRow}>
+          <Text style={[styles.subscriptionPriceSymbol, { color: config.color }]}>$</Text>
+          <Text style={[styles.subscriptionPriceValue, { color: config.color }]}>{plan.price}</Text>
+        </View>
+        {plan.originalPrice > plan.price && (
+          <Text style={styles.subscriptionOriginalPrice}>${plan.originalPrice}</Text>
+        )}
       </View>
 
-      <View style={styles.subscriptionBenefits}>
-        {plan.benefits.slice(0, 2).map((benefit, idx) => (
-          <View key={idx} style={styles.subscriptionBenefitRow}>
-            <Icon name="checkmark" size={12} color={colors.success} />
-            <Text style={styles.subscriptionBenefitText} numberOfLines={1}>{benefit}</Text>
-          </View>
+      {/* Star Rating */}
+      <View style={styles.subscriptionRatingRow}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <AppIcon
+            key={star}
+            name={star <= Math.floor(plan.rating) ? 'star-filled' : 'star'}
+            size={14}
+            color="#F59E0B"
+          />
         ))}
+        <Text style={styles.subscriptionReviewCount}>({plan.reviewCount})</Text>
       </View>
 
-      <View style={[styles.subscriptionCta, isHighlight && styles.subscriptionCtaHighlight]}>
-        <Text style={[styles.subscriptionCtaText, isHighlight && styles.subscriptionCtaTextHighlight]}>
-          {plan.ctaLabel}
-        </Text>
-      </View>
-    </Pressable>
+      {/* Discount badge */}
+      {discountPercent > 0 && (
+        <View style={styles.subscriptionDiscount}>
+          <Text style={styles.subscriptionDiscountText}>Save {discountPercent}%</Text>
+        </View>
+      )}
+    </AnimatedPressable>
   );
 }
 
 // =============================================================================
-// QUICK ACTIONS
+// QUICK ACTIONS - Premium Design
 // =============================================================================
 
 function QuickActions() {
   const navigation = useNavigation();
 
-  const actions = [
-    { icon: 'receipt-outline', label: 'Orders', screen: 'Orders', nested: false, color: colors.info },
-    { icon: 'document-text-outline', label: 'Requests', screen: 'Requests', nested: false, color: colors.equipment },
-    { icon: 'folder-outline', label: 'Records', screen: 'HealthRecords', nested: true, color: colors.nursing },
-    { icon: 'help-circle-outline', label: 'Support', screen: 'Help', nested: true, color: colors.secondary },
+  const actions: { icon: IconName; label: string; screen: string; nested: boolean; color: string; bgColor: string }[] = [
+    { icon: 'receipt', label: 'Orders', screen: 'Orders', nested: false, color: '#3B82F6', bgColor: '#EFF6FF' },
+    { icon: 'document', label: 'Requests', screen: 'Requests', nested: false, color: '#8B5CF6', bgColor: '#F5F3FF' },
+    { icon: 'folder', label: 'Records', screen: 'HealthRecords', nested: true, color: '#10B981', bgColor: '#ECFDF5' },
+    { icon: 'help', label: 'Support', screen: 'Help', nested: true, color: '#F59E0B', bgColor: '#FFFBEB' },
   ];
 
   const handleActionPress = (action: typeof actions[0]) => {
@@ -374,16 +471,16 @@ function QuickActions() {
   return (
     <View style={styles.quickActions}>
       {actions.map((action, idx) => (
-        <Pressable
+        <AnimatedPressable
           key={idx}
-          style={({ pressed }) => [styles.quickActionItem, pressed && styles.quickActionPressed]}
+          style={[styles.quickActionItem, { backgroundColor: action.bgColor }]}
           onPress={() => handleActionPress(action)}
         >
-          <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}15` }]}>
-            <Icon name={action.icon as any} size={22} color={action.color} />
+          <View style={[styles.quickActionIcon, { backgroundColor: '#FFFFFF' }]}>
+            <AppIcon name={action.icon} size={24} color={action.color} />
           </View>
-          <Text style={styles.quickActionLabel}>{action.label}</Text>
-        </Pressable>
+          <Text style={[styles.quickActionLabel, { color: action.color }]}>{action.label}</Text>
+        </AnimatedPressable>
       ))}
     </View>
   );
@@ -531,9 +628,9 @@ export default function TodayScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
+            contentContainerStyle={styles.carePlansScroll}
             decelerationRate="fast"
-            snapToInterval={164}
+            snapToInterval={172}
           >
             {subscriptionPlans.map((plan) => (
               <SubscriptionCard
@@ -556,7 +653,7 @@ export default function TodayScreen() {
 }
 
 // =============================================================================
-// STYLES - Premium without gradients
+// STYLES
 // =============================================================================
 
 const styles = StyleSheet.create({
@@ -569,14 +666,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-  },
-  pressed: {
-    opacity: 0.95,
-    transform: [{ scale: 0.995 }],
-  },
-  cardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
   },
 
   // Header
@@ -613,11 +702,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   profileInitial: {
     fontSize: 18,
@@ -625,7 +720,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
 
-  // Hero AI Card - Premium solid color
+  // Hero AI Card
   heroCard: {
     borderRadius: 20,
     padding: 20,
@@ -633,11 +728,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     minHeight: 100,
     backgroundColor: '#0D9488',
-    shadowColor: '#0D9488',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0D9488',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
   heroContent: {
     flexDirection: 'row',
@@ -794,24 +895,13 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickServiceIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    ...shadows.card,
   },
   quickServiceTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+    marginTop: 12,
     marginBottom: 2,
   },
   quickServiceSubtitle: {
@@ -823,23 +913,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
-  },
-  quickServiceTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  quickServiceTagDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  quickServiceTagText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   quickServicePrice: {
     fontSize: 13,
@@ -868,6 +941,11 @@ const styles = StyleSheet.create({
     paddingRight: 20,
     gap: 12,
   },
+  carePlansScroll: {
+    paddingRight: 20,
+    paddingBottom: 16,
+    gap: 12,
+  },
 
   // Equipment Card
   equipmentCard: {
@@ -877,22 +955,10 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.card,
   },
   equipmentIconWrap: {
     marginBottom: 12,
-  },
-  equipmentIconGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
   },
   equipmentTitle: {
     fontSize: 14,
@@ -907,22 +973,19 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 10,
   },
-  equipmentBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  equipmentBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  // Price with proper baseline alignment
   equipmentPricing: {
     flexDirection: 'row',
     alignItems: 'baseline',
     marginBottom: 6,
   },
-  equipmentPrice: {
-    fontSize: 16,
+  equipmentPriceSymbol: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  equipmentPriceValue: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
@@ -950,42 +1013,13 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  packagePopularBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    gap: 3,
-    backgroundColor: '#F97316',
-  },
-  packagePopularText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FFF',
-    textTransform: 'uppercase',
-  },
-  packageIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
+    ...shadows.card,
   },
   packageTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
+    marginTop: 10,
     marginBottom: 2,
   },
   packageSubtitle: {
@@ -1007,17 +1041,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     flex: 1,
   },
+  // Price with proper baseline alignment
   packagePricing: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
+    gap: 2,
   },
   packagePriceLabel: {
     fontSize: 11,
     color: colors.textTertiary,
+    marginRight: 2,
   },
-  packagePrice: {
-    fontSize: 16,
+  packagePriceSymbol: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  packagePriceValue: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.accent,
   },
@@ -1029,11 +1070,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    ...shadows.card,
   },
   appointmentHeader: {
     marginBottom: 12,
@@ -1115,11 +1152,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: colors.accent,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   joinButtonText: {
     fontSize: 14,
@@ -1127,142 +1170,151 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
 
-  // Subscription Card
+  // Subscription Card - Premium Design
   subscriptionCard: {
-    width: 152,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  subscriptionCardHighlight: {
-    borderColor: colors.accent,
-    borderWidth: 2,
+    width: 160,
+    borderRadius: 20,
+    padding: 16,
+    paddingTop: 32,
+    borderWidth: 0,
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   subscriptionBadge: {
     position: 'absolute',
     top: 10,
+    left: 10,
     right: 10,
-    backgroundColor: colors.info,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 6,
-  },
-  subscriptionBadgeHighlight: {
-    backgroundColor: colors.secondary,
+    alignItems: 'center',
   },
   subscriptionBadgeText: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#FFF',
-    textTransform: 'uppercase',
-  },
-  subscriptionIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  subscriptionPeriod: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.textTertiary,
+    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
-  subscriptionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 6,
+  subscriptionIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  subscriptionPeriodLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subscriptionPriceSection: {
+    alignItems: 'center',
+    marginBottom: 8,
   },
   subscriptionPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 10,
   },
-  subscriptionPrice: {
-    fontSize: 22,
+  subscriptionPriceSymbol: {
+    fontSize: 14,
     fontWeight: '700',
-    color: colors.textPrimary,
   },
-  subscriptionPriceHighlight: {
-    color: colors.accent,
+  subscriptionPriceValue: {
+    fontSize: 28,
+    fontWeight: '800',
   },
-  subscriptionPriceUnit: {
+  subscriptionOriginalPrice: {
     fontSize: 12,
     color: colors.textTertiary,
-    marginLeft: 2,
+    textDecorationLine: 'line-through',
+    textAlign: 'center',
   },
-  subscriptionBenefits: {
-    gap: 4,
-    marginBottom: 12,
-  },
-  subscriptionBenefitRow: {
+  subscriptionRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 2,
   },
-  subscriptionBenefitText: {
+  subscriptionReviewCount: {
     fontSize: 11,
     color: colors.textSecondary,
-    flex: 1,
+    marginLeft: 4,
   },
-  subscriptionCta: {
-    backgroundColor: colors.accentMuted,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
+  subscriptionDiscount: {
+    position: 'absolute',
+    bottom: -8,
+    left: '50%',
+    transform: [{ translateX: -30 }],
+    backgroundColor: '#10B981',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 10,
   },
-  subscriptionCtaHighlight: {
-    backgroundColor: colors.accent,
-  },
-  subscriptionCtaText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.accent,
-  },
-  subscriptionCtaTextHighlight: {
-    color: '#FFF',
+  subscriptionDiscountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 
-  // Quick Actions
+  // Quick Actions - Premium Design
   quickActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   quickActionItem: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  quickActionPressed: {
-    backgroundColor: colors.surface2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   quickActionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   quickActionLabel: {
     fontSize: 12,
-    fontWeight: '500',
-    color: colors.textSecondary,
+    fontWeight: '600',
   },
 });

@@ -15,11 +15,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
-
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
 import { formatPrice, defaultTimeSlots } from '../data/catalog';
 import { StarRating } from '../components/ui/StarRating';
+import { AppIcon, IconContainer, IconName, getIconColors } from '../components/icons';
 import { PackageSelectorList } from '../components/ui/PackageSelectorList';
 import { HorizontalDatePicker } from '../components/ui/HorizontalDatePicker';
 import { MemberPicker } from '../components/ui/MemberPicker';
@@ -42,23 +41,24 @@ import { buildBookingCore } from '../lib/bookingDraft';
 import { BookingDraftInput, PricingModelType, money } from '../types/booking';
 
 // Icon mapping for service categories
-const getServiceIcon = (imageKey: string): keyof typeof Ionicons.glyphMap => {
-  const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-    companionship: 'people',
-    transport: 'car',
-    food: 'restaurant',
-    cleaning: 'sparkles',
-    culture: 'color-palette',
-    barber: 'cut',
-    yoga: 'body',
-    nurse: 'medkit',
-    transactional: 'card',
-    physio: 'fitness',
-    doctor: 'medical',
-    lab: 'flask',
-    healthcheck: 'clipboard',
+const getServiceIcon = (imageKey: string): IconName => {
+  const iconMap: Record<string, IconName> = {
+    companionship: 'companionship',
+    transport: 'transport',
+    food: 'food',
+    cleaning: 'cleaning',
+    culture: 'culture',
+    barber: 'barber',
+    yoga: 'yoga',
+    nurse: 'nurse',
+    transactional: 'transactional_care',
+    transactional_care: 'transactional_care',
+    physio: 'physio',
+    doctor: 'doctor',
+    lab: 'lab',
+    healthcheck: 'healthcheck',
   };
-  return iconMap[imageKey] || 'medical';
+  return iconMap[imageKey] || 'stethoscope';
 };
 
 export default function ServiceDetailsScreen() {
@@ -191,7 +191,7 @@ export default function ServiceDetailsScreen() {
     if (service.pricing.type === 'packages' && !bookingDraft.selectedPackageId) return false;
     if (service.pricing.type === 'hourly' && !bookingDraft.hours) return false;
     if (service.pricing.type === 'daily' && !bookingDraft.days) return false;
-    if (service.request.required && !bookingDraft.requestNotes.trim()) return false;
+    if (service.request?.required && !bookingDraft.requestNotes.trim()) return false;
     return true;
   }, [service, bookingDraft]);
 
@@ -357,7 +357,7 @@ export default function ServiceDetailsScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.errorContainer}>
-          <Icon name="alert-circle-outline" size={64} color={colors.textTertiary} />
+          <AppIcon name="info" size={64} color={colors.textTertiary} />
           <Text style={styles.errorText}>Service not found</Text>
           <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
             <Text style={styles.backLinkText}>Go back</Text>
@@ -390,11 +390,11 @@ export default function ServiceDetailsScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color={colors.textPrimary} />
+          <AppIcon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Service Details</Text>
         <TouchableOpacity style={styles.shareButton}>
-          <Icon name="share-outline" size={24} color={colors.textPrimary} />
+          <AppIcon name="arrow-right" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -408,9 +408,14 @@ export default function ServiceDetailsScreen() {
       >
         {/* Hero Section */}
         <View style={styles.heroContainer}>
-          <View style={styles.heroIconWrap}>
-            <Icon name={icon} size={48} color={colors.accent} />
-          </View>
+          <IconContainer
+            size="xl"
+            variant="soft"
+            backgroundColor={getIconColors(icon).background}
+            style={styles.heroIconWrap}
+          >
+            <AppIcon name={icon} size={48} color={getIconColors(icon).primary} fillOpacity={0.2} />
+          </IconContainer>
         </View>
 
         {/* Service Info */}
@@ -536,7 +541,7 @@ export default function ServiceDetailsScreen() {
           <View style={styles.section}>
             <View style={styles.quoteCard}>
               <View style={styles.quoteIconWrap}>
-                <Icon name="chatbubble-ellipses-outline" size={24} color={colors.accent} />
+                <AppIcon name="messages" size={24} color={colors.accent} />
               </View>
               <Text style={styles.quoteTitle}>Custom pricing</Text>
               <Text style={styles.quoteText}>
@@ -544,7 +549,7 @@ export default function ServiceDetailsScreen() {
               </Text>
               {service.pricing.bookingFee && (
                 <View style={styles.bookingFeeNote}>
-                  <Icon name="flash" size={14} color={colors.warning} />
+                  <AppIcon name="flash" size={14} color={colors.warning} fillOpacity={0.2} />
                   <Text style={styles.bookingFeeText}>
                     {formatPrice(service.pricing.bookingFee)} booking fee for priority response
                   </Text>
@@ -555,20 +560,20 @@ export default function ServiceDetailsScreen() {
         )}
 
         {/* Request Notes */}
-        {service.request.enabled && (
+        {service.request?.enabled && (
           <View style={styles.section}>
             <RequestTextArea
               value={bookingDraft?.requestNotes || ''}
               onChangeText={handleRequestNotesChange}
-              placeholder={service.request.placeholder}
-              label={service.request.required ? 'Describe your needs' : 'Additional notes (optional)'}
+              placeholder={service.request?.placeholder || 'Any special requirements...'}
+              label={service.request?.required ? 'Describe your needs' : 'Additional notes (optional)'}
             />
           </View>
         )}
 
         {/* Confirmation Note */}
         <View style={styles.confirmationNote}>
-          <Icon name="checkmark-circle" size={18} color={colors.success} />
+          <AppIcon name="check-circle" size={18} color={colors.success} fillOpacity={0.2} />
           <Text style={styles.confirmationText}>{confirmationNote}</Text>
         </View>
 
@@ -585,7 +590,7 @@ export default function ServiceDetailsScreen() {
             {service.benefits.map((benefit, index) => (
               <View key={index} style={styles.benefitItem}>
                 <View style={styles.benefitIcon}>
-                  <Icon name="checkmark-circle" size={20} color={colors.success} />
+                  <AppIcon name="check-circle" size={20} color={colors.success} fillOpacity={0.2} />
                 </View>
                 <View style={styles.benefitContent}>
                   <Text style={styles.benefitTitle}>{benefit.title}</Text>

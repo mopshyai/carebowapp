@@ -15,7 +15,9 @@ export type SubscriptionPlan = {
   id: string;
   title: string;
   description: string;
-  price: number; // USD
+  price: number; // USD - discounted price
+  originalPrice: number; // USD - original price before discount
+  discountPercent: number; // e.g., 60 for 60% off
   billingPeriod: 'monthly' | 'half_yearly' | 'yearly';
   periodLabel: string;
   pricePerMonth: number; // calculated for comparison
@@ -27,6 +29,9 @@ export type SubscriptionPlan = {
   iconName: string;
   iconColor: string;
   iconBgColor: string;
+  rating: number; // star rating
+  reviewCount: number; // number of reviews
+  heroStyle: 'blue' | 'green' | 'gold'; // hero image style
 };
 
 export type UserSubscription = {
@@ -52,10 +57,12 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   {
     id: 'ask_carebow',
     title: 'Ask CareBow',
-    description: 'AI-powered health guidance at your fingertips',
+    description: 'AI-powered health guidance at your fingertips. Get instant symptom assessments, personalized care recommendations, and 24/7 health guidance from our intelligent assistant.',
     price: 20,
+    originalPrice: 30,
+    discountPercent: 33,
     billingPeriod: 'monthly',
-    periodLabel: 'Per Month',
+    periodLabel: 'AI ASSISTANT',
     pricePerMonth: 20,
     benefits: [
       'Unlimited AI symptom checks',
@@ -69,18 +76,25 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       'In-home visits',
       'Medical equipment rental',
     ],
+    badge: 'AI Powered',
+    highlight: true,
     ctaLabel: 'Subscribe',
-    iconName: 'chatbubbles',
-    iconColor: colors.accent,
-    iconBgColor: colors.accentSoft,
+    iconName: 'sparkles',
+    iconColor: '#8B5CF6',
+    iconBgColor: '#EDE9FE',
+    rating: 4.5,
+    reviewCount: 12,
+    heroStyle: 'blue',
   },
   {
-    id: 'monthly_care',
-    title: 'Monthly Care',
-    description: 'Essential healthcare access for individuals',
+    id: 'monthly',
+    title: 'Monthly Plan',
+    description: 'The elderly care subscription program offers users the flexibility to access a wide range of services, including medical care, housekeeping, transportation, lab tests, yoga, and food services. However, the subscription itself does not include any bundled services or benefits. Instead, it provides members with the ability to purchase individual services as needed.',
     price: 30,
+    originalPrice: 50,
+    discountPercent: 40,
     billingPeriod: 'monthly',
-    periodLabel: 'Per Month',
+    periodLabel: 'ONE MONTH',
     pricePerMonth: 30,
     benefits: [
       'Access to all services',
@@ -88,18 +102,23 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       'Email & chat support',
       '5% discount on services',
     ],
-    ctaLabel: 'Choose Plan',
+    ctaLabel: 'Subscribe',
     iconName: 'calendar',
-    iconColor: colors.info,
-    iconBgColor: colors.infoSoft,
+    iconColor: '#3B82F6',
+    iconBgColor: '#EFF6FF',
+    rating: 4,
+    reviewCount: 4,
+    heroStyle: 'blue',
   },
   {
-    id: 'half_yearly_care',
-    title: 'Half-Yearly Care',
-    description: 'Better value with priority support',
+    id: 'half_yearly',
+    title: 'Half Yearly Plan',
+    description: 'By subscribing, users gain access to the service platform, allowing them to choose and pay for only the services they require, when they require them. This model offers a personalized approach, ensuring users have the freedom to select and pay for each service based on their unique needs, without being locked into a predetermined plan or package. The subscription acts as a key to unlock access, giving users full control over their care options.',
     price: 150,
+    originalPrice: 180,
+    discountPercent: 17,
     billingPeriod: 'half_yearly',
-    periodLabel: '6 Months',
+    periodLabel: 'SIX MONTH',
     pricePerMonth: 25,
     benefits: [
       'Access to all services',
@@ -109,19 +128,23 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       'Flexible rescheduling',
     ],
     badge: 'Popular',
-    highlight: true,
-    ctaLabel: 'Choose Plan',
-    iconName: 'shield-checkmark',
-    iconColor: colors.secondary,
-    iconBgColor: colors.secondarySoft,
+    ctaLabel: 'Subscribe',
+    iconName: 'leaf',
+    iconColor: '#22C55E',
+    iconBgColor: '#F0FDF4',
+    rating: 5,
+    reviewCount: 5,
+    heroStyle: 'green',
   },
   {
-    id: 'yearly_care',
-    title: 'Yearly Care',
-    description: 'Maximum savings with premium support',
+    id: 'yearly',
+    title: 'Yearly Plan',
+    description: 'In your elderly care program, the subscription model serves as a membership that grants users the ability to access and purchase individual services, such as medical care, house care, transportation, lab testing, yoga, and food services. Rather than including any services or benefits within the subscription itself, users pay a recurring fee simply to be part of the program.',
     price: 300,
+    originalPrice: 360,
+    discountPercent: 17,
     billingPeriod: 'yearly',
-    periodLabel: '12 Months',
+    periodLabel: 'TWELVE MONTH',
     pricePerMonth: 25,
     benefits: [
       'Access to all services',
@@ -133,10 +156,13 @@ export const subscriptionPlans: SubscriptionPlan[] = [
       'Family member add-ons',
     ],
     badge: 'Best Value',
-    ctaLabel: 'Choose Plan',
-    iconName: 'star',
-    iconColor: colors.warning,
-    iconBgColor: colors.warningSoft,
+    ctaLabel: 'Subscribe',
+    iconName: 'trophy',
+    iconColor: '#F59E0B',
+    iconBgColor: '#FFFBEB',
+    rating: 5,
+    reviewCount: 7,
+    heroStyle: 'gold',
   },
 ];
 
@@ -179,6 +205,13 @@ export function getAISubscriptionPlan(): SubscriptionPlan {
 
 export function getCarePlans(): SubscriptionPlan[] {
   return subscriptionPlans.filter((p) => p.id !== 'ask_carebow');
+}
+
+export function getSubscriptionPlansForHome(): SubscriptionPlan[] {
+  // Return only the 3 main subscription plans (exclude Ask CareBow)
+  return subscriptionPlans.filter((p) =>
+    p.id === 'monthly' || p.id === 'half_yearly' || p.id === 'yearly'
+  );
 }
 
 // =============================================================================

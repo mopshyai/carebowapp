@@ -1,46 +1,44 @@
 /**
  * SubscriptionPlanCard Component
- * Card for subscription plan carousel
+ * Card for subscription plan carousel with discount badges
+ * Uses healthcare-grade SVG icons from the icon system
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { SubscriptionPlan } from '../../data/types';
-import { Colors } from '@/constants/Colors';
-import { Shadow } from '@/constants/Spacing';
+import { SubscriptionPlan } from '../../data/subscriptions';
+import { colors, spacing, radius } from '../../theme';
+import { AppIcon, IconContainer, IconName } from '../icons';
 
 interface SubscriptionPlanCardProps {
   plan: SubscriptionPlan;
   onPress: () => void;
 }
 
-const getPlanConfig = (planId: string) => {
-  const config: Record<string, { color: string; bgColor: string; icon: string; badge?: string }> = {
+const getPlanConfig = (planId: string): { color: string; bgColor: string; icon: IconName } => {
+  const config: Record<string, { color: string; bgColor: string; icon: IconName }> = {
     monthly: {
-      color: Colors.blue[600],
-      bgColor: Colors.blue[50],
-      icon: 'calendar-outline',
+      color: '#3B82F6',
+      bgColor: '#DBEAFE',
+      icon: 'calendar',
     },
     half_yearly: {
-      color: Colors.purple[600],
-      bgColor: Colors.purple[50],
-      icon: 'layers-outline',
-      badge: 'Popular',
+      color: '#22C55E',
+      bgColor: '#DCFCE7',
+      icon: 'leaf',
     },
     yearly: {
-      color: Colors.primary[600],
-      bgColor: Colors.primary[50],
-      icon: 'shield-checkmark-outline',
-      badge: 'Best Value',
+      color: '#F59E0B',
+      bgColor: '#FEF3C7',
+      icon: 'trophy',
     },
     ask_carebow: {
-      color: Colors.accent[500],
-      bgColor: Colors.accent[50],
-      icon: 'sparkles-outline',
+      color: '#8B5CF6',
+      bgColor: '#EDE9FE',
+      icon: 'sparkles',
     },
   };
-  return config[planId] || { color: Colors.slate[600], bgColor: Colors.slate[100], icon: 'card-outline' };
+  return config[planId] || { color: '#64748B', bgColor: '#F1F5F9', icon: 'calendar' };
 };
 
 export function SubscriptionPlanCard({ plan, onPress }: SubscriptionPlanCardProps) {
@@ -48,40 +46,49 @@ export function SubscriptionPlanCard({ plan, onPress }: SubscriptionPlanCardProp
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {config.badge && (
-        <View style={[styles.badge, { backgroundColor: config.color }]}>
-          <Text style={styles.badgeText}>{config.badge}</Text>
+      {/* Discount Badge */}
+      {plan.discountPercent > 0 && (
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>{plan.discountPercent}% OFF</Text>
         </View>
       )}
 
-      <View style={[styles.iconWrap, { backgroundColor: config.bgColor }]}>
-        <Icon name={config.icon as any} size={24} color={config.color} />
-      </View>
+      {/* Icon */}
+      <IconContainer
+        size="md"
+        variant="soft"
+        backgroundColor={config.bgColor}
+        style={styles.iconWrap}
+      >
+        <AppIcon name={config.icon} size={22} color={config.color} fillOpacity={0.2} />
+      </IconContainer>
 
+      {/* Period Label */}
       <Text style={styles.periodLabel}>{plan.periodLabel}</Text>
+
+      {/* Title */}
       <Text style={styles.title} numberOfLines={2}>{plan.title}</Text>
 
-      {plan.price !== null ? (
-        <View style={styles.priceRow}>
-          <Text style={[styles.price, { color: config.color }]}>
-            <Text style={styles.currency}>$</Text>
-            {plan.price}
-          </Text>
-          <Text style={styles.priceUnit}>/mo</Text>
-        </View>
-      ) : (
-        <Text style={[styles.viewDetails, { color: config.color }]}>Learn more</Text>
-      )}
+      {/* Price */}
+      <View style={styles.priceContainer}>
+        <Text style={[styles.price, { color: config.color }]}>
+          ${plan.price}
+        </Text>
+        {plan.originalPrice > plan.price && (
+          <Text style={styles.originalPrice}>${plan.originalPrice}</Text>
+        )}
+      </View>
 
-      <View style={styles.featuresWrap}>
-        <View style={styles.featureRow}>
-          <Icon name="checkmark-circle" size={14} color={Colors.green[500]} />
-          <Text style={styles.featureText}>Priority support</Text>
-        </View>
-        <View style={styles.featureRow}>
-          <Icon name="checkmark-circle" size={14} color={Colors.green[500]} />
-          <Text style={styles.featureText}>All services</Text>
-        </View>
+      {/* Rating */}
+      <View style={styles.ratingRow}>
+        <AppIcon name="star-filled" size={12} color="#F59E0B" fillOpacity={1} />
+        <Text style={styles.ratingText}>{plan.rating}</Text>
+        <Text style={styles.reviewText}>({plan.reviewCount})</Text>
+      </View>
+
+      {/* CTA */}
+      <View style={[styles.ctaButton, { borderColor: config.color }]}>
+        <Text style={[styles.ctaText, { color: config.color }]}>{plan.ctaLabel}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -89,42 +96,34 @@ export function SubscriptionPlanCard({ plan, onPress }: SubscriptionPlanCardProp
 
 const styles = StyleSheet.create({
   card: {
-    minWidth: 150,
-    maxWidth: 180,
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
+    width: 160,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: Colors.slate[200],
-    ...Shadow.card,
+    borderColor: colors.border,
   },
-  badge: {
+  discountBadge: {
     position: 'absolute',
-    top: 12,
+    top: -8,
     right: 12,
+    backgroundColor: '#4CAF50',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
   },
-  badgeText: {
-    fontSize: 9,
+  discountText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: Colors.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    color: colors.white,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   periodLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
-    color: Colors.slate[400],
+    color: colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -132,44 +131,48 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.slate[900],
+    color: colors.textPrimary,
     lineHeight: 18,
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
-  priceRow: {
+  priceContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'baseline',
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: spacing.xs,
   },
   price: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
   },
-  currency: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  priceUnit: {
+  originalPrice: {
     fontSize: 12,
-    color: Colors.slate[400],
-    marginLeft: 2,
+    color: colors.textTertiary,
+    textDecorationLine: 'line-through',
   },
-  viewDetails: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  featuresWrap: {
-    gap: 6,
-  },
-  featureRow: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    marginBottom: spacing.sm,
   },
-  featureText: {
+  ratingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  reviewText: {
     fontSize: 11,
-    color: Colors.slate[500],
+    color: colors.textTertiary,
+  },
+  ctaButton: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
