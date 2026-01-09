@@ -43,17 +43,34 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children }) => children,
 }));
 
-// Mock @env
-jest.mock('@env', () => ({
-  APP_ENV: 'test',
-  APP_NAME: 'CareBow',
-  API_BASE_URL: 'https://api.carebow.com/v1',
-  API_TIMEOUT: '30000',
-  ASK_CAREBOW_API_URL: 'https://api.carebow.com/v1/ask-carebow',
-  ASK_CAREBOW_API_KEY: 'test_api_key',
-  FEATURE_HEALTH_MEMORY: 'true',
-  FEATURE_IMAGE_UPLOAD: 'true',
-  FEATURE_VOICE_INPUT: 'true',
+// @env is mocked via moduleNameMapper in jest.config.js
+
+// Mock react-native-haptic-feedback
+jest.mock('react-native-haptic-feedback', () => ({
+  trigger: jest.fn(),
+  HapticFeedbackTypes: {
+    selection: 'selection',
+    impactLight: 'impactLight',
+    impactMedium: 'impactMedium',
+    impactHeavy: 'impactHeavy',
+    notificationSuccess: 'notificationSuccess',
+    notificationWarning: 'notificationWarning',
+    notificationError: 'notificationError',
+  },
+}));
+
+// Mock react-native-image-picker
+jest.mock('react-native-image-picker', () => ({
+  launchCamera: jest.fn(),
+  launchImageLibrary: jest.fn(),
+}));
+
+// Mock @react-native-community/geolocation
+jest.mock('@react-native-community/geolocation', () => ({
+  getCurrentPosition: jest.fn(),
+  watchPosition: jest.fn(),
+  clearWatch: jest.fn(),
+  setRNConfiguration: jest.fn(),
 }));
 
 // Mock AsyncStorage

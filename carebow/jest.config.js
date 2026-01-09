@@ -27,6 +27,7 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@env$': '<rootDir>/__mocks__/@env.js',
   },
   testEnvironment: 'node',
   verbose: true,
