@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { useShallow } from 'zustand/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   FollowUpIntent,
@@ -173,11 +174,24 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
 // SELECTOR HOOKS
 // ============================================
 
+/**
+ * FIX: Use `useShallow` (Zustand v5) to compare array contents, not references.
+ *
+ * ROOT CAUSE: getUpcomingFollowUps/getScheduledFollowUps create new array refs
+ * via filter().sort().slice(). Without shallow equality, useSyncExternalStore
+ * detects ref inequality → synchronous re-render → infinite loop.
+ */
+
 export const useScheduledFollowUps = () =>
-  useFollowUpStore((state) => state.followUps.filter((f) => f.status === 'scheduled'));
+  useFollowUpStore(
+    useShallow((state) => state.followUps.filter((f) => f.status === 'scheduled'))
+  );
 
 export const useUpcomingFollowUps = (limit?: number) =>
-  useFollowUpStore((state) => state.getUpcomingFollowUps(limit));
+  useFollowUpStore(
+    useShallow((state) => state.getUpcomingFollowUps(limit))
+  );
 
+// Returns boolean (primitive) - no shallow needed
 export const useHasScheduledFollowUp = (episodeId: string) =>
   useFollowUpStore((state) => state.hasScheduledFollowUp(episodeId));

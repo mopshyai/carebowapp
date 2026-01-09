@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { useShallow } from 'zustand/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Episode,
@@ -224,9 +225,21 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
 // SELECTOR HOOKS
 // ============================================
 
+// Returns same object ref from .find() - no shallow needed
 export const useActiveEpisode = () => useEpisodeStore((state) => state.getActiveEpisode());
+
+// Returns same array ref from state - no shallow needed
 export const useAllEpisodes = () => useEpisodeStore((state) => state.episodes);
+
+/**
+ * FIX: getRecentEpisodes creates NEW array via .sort().slice() on every call.
+ * Use useShallow to compare array contents, not references.
+ */
 export const useRecentEpisodes = (limit?: number) =>
-  useEpisodeStore((state) => state.getRecentEpisodes(limit));
+  useEpisodeStore(
+    useShallow((state) => state.getRecentEpisodes(limit))
+  );
+
+// Returns same array ref from state.messages[id], or undefined - no shallow needed
 export const useEpisodeMessages = (episodeId: string) =>
-  useEpisodeStore((state) => state.messages[episodeId] || []);
+  useEpisodeStore((state) => state.messages[episodeId]);
