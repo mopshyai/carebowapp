@@ -9,7 +9,7 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native - secrets and signing (keep these ignored)
 .kotlin/
 *.orig.*
 *.jks
@@ -17,6 +17,7 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.pem
 
 # Metro
 .metro-health-check*
@@ -28,7 +29,6 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
 # local env files
 .env*.local
@@ -38,6 +38,19 @@ yarn-error.*
 
 app-example
 
-# generated native folders
-/ios
-/android
+# iOS build artifacts (track ios/ folder, ignore build outputs)
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+ios/CareBow.xcworkspace/xcuserdata/
+ios/CareBow.xcodeproj/xcuserdata/
+ios/CareBow.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
+# Android build artifacts (track android/ folder, ignore build outputs)
+android/build/
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
+android/*.iml
+android/.idea/

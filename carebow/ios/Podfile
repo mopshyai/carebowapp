@@ -1,0 +1,58 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'CareBow' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  target 'CareBowTests' do
+    inherit! :complete
+  end
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false
+    )
+
+    # Enable Swift for the main app to fix Swift runtime linking
+    main_project = installer.aggregate_targets.first.user_project
+    main_project.targets.each do |target|
+      if target.name == 'CareBow'
+        target.build_configurations.each do |config|
+          config.build_settings['SWIFT_VERSION'] = '5.0'
+          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
+          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+        end
+
+        # Add Swift.swift file to the project if not already added
+        swift_file_path = 'CareBow/Swift.swift'
+        swift_file_ref = main_project.main_group.find_subpath('CareBow').files.find { |f| f.path == 'Swift.swift' }
+        if swift_file_ref.nil?
+          group = main_project.main_group.find_subpath('CareBow')
+          file_ref = group.new_file(swift_file_path)
+          target.source_build_phase.add_file_reference(file_ref)
+        end
+      end
+    end
+    main_project.save
+  end
+end
