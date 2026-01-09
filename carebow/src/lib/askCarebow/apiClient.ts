@@ -9,6 +9,7 @@ import type { ImageAttachment } from '../../components/askCarebow/ImageUploadBot
 import type { EnhancedResponse } from '../../components/askCarebow/EnhancedChatBubble';
 import {
   HEALTH_BUDDY_SYSTEM_PROMPT,
+  FAMILY_MODE_ADDENDUM,
   FOLLOW_UP_ENGINE_PROMPT,
   MEMORY_EXTRACTOR_PROMPT,
   IMAGE_INTERPRETER_PROMPT,
@@ -30,6 +31,7 @@ import type { MemoryType, ConfidenceLevel, TriageLevel, UncertaintyLevel } from 
 // Re-export prompts for external use
 export {
   HEALTH_BUDDY_SYSTEM_PROMPT,
+  FAMILY_MODE_ADDENDUM,
   FOLLOW_UP_ENGINE_PROMPT,
   MEMORY_EXTRACTOR_PROMPT,
   IMAGE_INTERPRETER_PROMPT,
@@ -58,6 +60,7 @@ export type AskCareBowMessagePayload = {
     forWhom: 'me' | 'family';
     ageGroup?: string;
     relationship?: string;
+    caregiverPresent?: boolean; // Only for family mode - is the caregiver with the patient?
   };
   messageText: string;
   attachments: Array<{
@@ -410,12 +413,27 @@ export async function uploadImage(image: ImageAttachment): Promise<string> {
 export function createMessagePayload(
   userId: string,
   messageText: string,
-  context: { forWhom: 'me' | 'family'; ageGroup?: string; relationship?: string },
+  context: {
+    forWhom: 'me' | 'family';
+    ageGroup?: string;
+    relationship?: string;
+    caregiverPresent?: boolean;
+  },
   attachments: ImageAttachment[],
   memorySnapshot: MemorySnapshot,
   conversationId?: string,
   includeSystemPrompt: boolean = true
 ): AskCareBowMessagePayload {
+  // Build system prompt with family mode addendum if applicable
+  let systemPrompt: string | undefined;
+  if (includeSystemPrompt && !conversationId) {
+    systemPrompt = HEALTH_BUDDY_SYSTEM_PROMPT;
+    // Add family mode addendum if applicable
+    if (context.forWhom === 'family') {
+      systemPrompt += FAMILY_MODE_ADDENDUM;
+    }
+  }
+
   return {
     userId,
     context,
@@ -427,7 +445,6 @@ export function createMessagePayload(
     })),
     memorySnapshot,
     conversationId,
-    // Include system prompt on first message of conversation
-    systemPrompt: includeSystemPrompt && !conversationId ? HEALTH_BUDDY_SYSTEM_PROMPT : undefined,
+    systemPrompt,
   };
 }

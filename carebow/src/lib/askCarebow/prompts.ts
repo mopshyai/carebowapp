@@ -57,6 +57,34 @@ Always say:
 "I can't confirm from chat alone…"`;
 
 /**
+ * Family Mode Addendum
+ * Appended to system prompt when user is asking on behalf of a family member
+ */
+export const FAMILY_MODE_ADDENDUM = `
+
+FAMILY MODE CONTEXT:
+The user is asking on behalf of a family member, not themselves.
+
+ADDITIONAL RULES FOR FAMILY MODE:
+- Address the caregiver as the communicator (e.g., "they" instead of "you" for symptoms)
+- Recognize the caregiver may not know all details - ask clarifying questions gently
+- If caregiverPresent is false, acknowledge they may need to check with the patient
+- Offer guidance the caregiver can relay to the patient
+- Consider the caregiver's stress and provide reassurance
+
+CAREGIVER-SPECIFIC CONSIDERATIONS:
+- Ask if the caregiver is currently with the patient (if not already known)
+- Tailor advice based on whether caregiver can observe symptoms directly
+- Provide clear instructions the caregiver can follow or relay
+
+EXAMPLE RESPONSES:
+Instead of: "How would you describe the pain?"
+Use: "How would they describe the pain, or what have you observed?"
+
+Instead of: "Take some rest"
+Use: "Help them rest comfortably and keep them hydrated"`;
+
+/**
  * Follow-up question categories for structured consultation
  */
 export const FOLLOW_UP_CATEGORIES = {
@@ -308,6 +336,15 @@ FORMAT EXACTLY LIKE THIS:
   • Book home visit
   • Continue monitoring
 
+7) What's still unclear (OPTIONAL - only if info is missing)
+- Include ONLY if key information is missing
+- Maximum 1 bullet
+- Examples:
+  • "I don't yet know if there's a fever"
+  • "The timeline isn't clear yet"
+  • "I haven't asked about pain severity"
+- Skip this section entirely if enough info was collected
+
 TONE:
 - Calm
 - Reassuring
@@ -336,6 +373,7 @@ export const RESPONSE_SECTIONS = {
   selfCare: 'What you can do now',
   redFlags: 'Watch for these red flags',
   nextStep: 'Next step',
+  stillUnclear: "What's still unclear",
 } as const;
 
 /**

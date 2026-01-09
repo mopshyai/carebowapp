@@ -3,12 +3,18 @@
  * Root component with navigation setup
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar, useColorScheme } from 'react-native';
 import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import RootNavigator from './navigation';
+import { initializeFeedbackDevTools } from './utils/feedbackDevTools';
+
+// Initialize dev tools on app load
+if (__DEV__) {
+  initializeFeedbackDevTools();
+}
 
 export default function App() {
   const colorScheme = useColorScheme();

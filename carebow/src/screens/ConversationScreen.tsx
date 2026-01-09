@@ -47,9 +47,19 @@ import {
   ServiceRecommendationCard,
   TypingIndicator,
   SubscriptionGate,
+  TriageActionBar,
+  FollowUpCheckIn,
+  StillNeedCard,
 } from '../components/askCarebow';
 import { EnhancedChatBubble, EnhancedResponse, DEFAULT_ACTION_BUTTONS } from '../components/askCarebow/EnhancedChatBubble';
 import { MemoryCandidateCard } from '../components/askCarebow/MemoryCandidateCard';
+import { getTriageLevel, TriageLevel } from '../utils/triageCTAMapping';
+import { useEpisodeStore } from '../store/episodeStore';
+import { useFollowUpStore, useHasScheduledFollowUp } from '../store/followUpStore';
+import { getAgeGroupFromAge } from '../utils/episodeTitleGenerator';
+import { formatFollowUpDate } from '../types/followUp';
+import { resetShownExplanations } from '../utils/questionExplanations';
+import { detectMissingInfo } from '../utils/missingInfoDetector';
 
 export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
@@ -71,6 +81,22 @@ export default function ConversationScreen() {
   const [enhancedResponses, setEnhancedResponses] = useState<Record<string, EnhancedResponse>>({});
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
+  const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
+
+  // Episode store
+  const {
+    startEpisode,
+    addMessage: addEpisodeMessage,
+    setTriageLevel: setEpisodeTriageLevel,
+    getActiveEpisode,
+    getEpisode,
+  } = useEpisodeStore();
+
+  // Follow-up store
+  const { scheduleFollowUp, getFollowUpsForEpisode } = useFollowUpStore();
+  const hasScheduledFollowUp = useHasScheduledFollowUp(currentEpisodeId || '');
+  const [followUpScheduledLabel, setFollowUpScheduledLabel] = useState<string | null>(null);
 
   // Store state and actions
   const {
@@ -80,6 +106,7 @@ export default function ConversationScreen() {
     hasSubscription,
     freeQuestionsUsed,
     maxFreeQuestions,
+    trial,
     startNewSession,
     addUserMessage,
     addAssistantMessage,
@@ -92,6 +119,7 @@ export default function ConversationScreen() {
     setIsProcessing,
     incrementFreeQuestions,
     canAskQuestion,
+    startTrial,
   } = useAskCarebowStore();
 
   // Health memory store
@@ -107,13 +135,32 @@ export default function ConversationScreen() {
   // Initialize session on mount
   useEffect(() => {
     if (!currentSession) {
+      // Reset question explanations for new conversation
+      resetShownExplanations();
+
       // Start a new session with the initial symptom
       const session = startNewSession('user_1', 'member_1', params.memberName as string);
 
       // If initial symptom provided, process it
       const initialSymptom = params.symptom as string;
       if (initialSymptom) {
-        handleSendMessage(initialSymptom);
+        // Create episode if not resuming an existing one
+        let episodeId = currentEpisodeId;
+        if (!episodeId) {
+          const episode = startEpisode({
+            symptomText: initialSymptom,
+            forWhom: (params.context as 'me' | 'family') || 'me',
+            age: params.age,
+            relationship: params.relation,
+          });
+          episodeId = episode.id;
+          setCurrentEpisodeId(episode.id);
+        }
+
+        // Defer message sending to avoid setState during render
+        setTimeout(() => {
+          handleSendMessage(initialSymptom);
+        }, 0);
       }
     }
   }, []);
@@ -135,9 +182,23 @@ export default function ConversationScreen() {
         return;
       }
 
+      // Auto-start trial on first message if not already started
+      if (!trial.hasUsedTrial && !trial.trialStartDate) {
+        startTrial();
+      }
+
       // Add user message
       addUserMessage(text);
       incrementFreeQuestions();
+
+      // Save to episode
+      if (currentEpisodeId) {
+        addEpisodeMessage({
+          episodeId: currentEpisodeId,
+          role: 'user',
+          text,
+        });
+      }
 
       // Show typing indicator
       setIsTyping(true);
@@ -149,6 +210,9 @@ export default function ConversationScreen() {
           params.context === 'family' ? 'family' : 'me'
         );
 
+        // Parse caregiver presence from params
+        const isCaregiverPresent = params.caregiverPresent === 'true';
+
         // Create API payload
         const payload = createMessagePayload(
           'user_1',
@@ -157,6 +221,7 @@ export default function ConversationScreen() {
             forWhom: (params.context as 'me' | 'family') || 'me',
             ageGroup: params.age,
             relationship: params.relation,
+            caregiverPresent: params.context === 'family' ? isCaregiverPresent : undefined,
           },
           images || [],
           memorySnapshot,
@@ -186,6 +251,16 @@ export default function ConversationScreen() {
         const lastMessageId = `msg_${Date.now()}`;
         for (const msg of response.messages) {
           addAssistantMessage(msg);
+
+          // Save to episode
+          if (currentEpisodeId && msg.text) {
+            addEpisodeMessage({
+              episodeId: currentEpisodeId,
+              role: 'assistant',
+              text: msg.text,
+            });
+          }
+
           // Small delay between multiple messages
           if (response.messages.length > 1) {
             await new Promise((resolve) => setTimeout(resolve, 300));
@@ -200,9 +275,27 @@ export default function ConversationScreen() {
           }));
         }
 
-        // Show action buttons if we have triage guidance
-        if (apiResponse.triageLevel && apiResponse.triageLevel !== 'self_care') {
+        // Calculate and set triage level
+        if (apiResponse.triageLevel) {
+          setTriageLevel(apiResponse.triageLevel as TriageLevel);
           setShowActionButtons(true);
+          // Save to episode
+          if (currentEpisodeId) {
+            setEpisodeTriageLevel(currentEpisodeId, apiResponse.triageLevel as TriageLevel);
+          }
+        } else if (response.urgencyLevel) {
+          // Fallback: calculate from local response
+          const calculatedTriage = getTriageLevel({
+            urgencyLevel: response.urgencyLevel,
+            hasRedFlags: (currentSession?.healthContext.riskFactors?.length ?? 0) > 0,
+            severity: currentSession?.healthContext.severity,
+          });
+          setTriageLevel(calculatedTriage);
+          setShowActionButtons(true);
+          // Save to episode
+          if (currentEpisodeId) {
+            setEpisodeTriageLevel(currentEpisodeId, calculatedTriage);
+          }
         }
 
         // Add memory candidates if any
@@ -244,7 +337,7 @@ export default function ConversationScreen() {
         setIsProcessing(false);
       }
     },
-    [currentSession, isProcessing, conversationId, params]
+    [currentSession, isProcessing, conversationId, params, trial, startTrial]
   );
 
   // Handle action button press
@@ -284,6 +377,27 @@ export default function ConversationScreen() {
   const handleQuickOptionSelect = (option: QuickOption) => {
     handleSendMessage(option.value);
   };
+
+  // Handle follow-up scheduling
+  const handleScheduleFollowUp = useCallback((days: number) => {
+    if (!currentEpisodeId) return;
+
+    const episode = getEpisode(currentEpisodeId);
+    if (!episode) return;
+
+    const followUp = scheduleFollowUp({
+      episodeId: currentEpisodeId,
+      episodeTitle: episode.title,
+      daysFromNow: days,
+      reasonSnippet: episode.lastMessageSnippet,
+    });
+
+    setFollowUpScheduledLabel(formatFollowUpDate(followUp.followUpAt));
+  }, [currentEpisodeId, getEpisode, scheduleFollowUp]);
+
+  const handleDismissFollowUp = useCallback(() => {
+    // Just dismiss the UI, don't store anything
+  }, []);
 
   // Handle service booking
   const handleBookService = (serviceId: string) => {
@@ -343,6 +457,7 @@ export default function ConversationScreen() {
             message={message}
             onBookService={handleBookService}
             urgencyLevel={currentSession?.urgencyLevel}
+            episodeId={currentEpisodeId || undefined}
           />
         ))}
 
@@ -367,6 +482,35 @@ export default function ConversationScreen() {
             onDismiss={dismissCandidate}
             onDismissAll={clearPendingCandidates}
           />
+        )}
+
+        {/* Triage Action Bar - shown after assessment */}
+        {showActionButtons && triageLevel && !isTyping && (
+          <>
+            <TriageActionBar
+              triageLevel={triageLevel}
+              episodeId={currentEpisodeId || undefined}
+              onAction={(action) => {
+                if (action === 'connect_doctor' || action === 'schedule_teleconsult') {
+                  navigation.navigate('Services' as never, { category: 'video-consult' });
+                } else if (action === 'book_home_visit' || action === 'home_visit_options') {
+                  navigation.navigate('Services' as never, { category: 'doctor-visit' });
+                }
+              }}
+            />
+            {/* Still Need Card - shows missing info */}
+            {currentSession?.healthContext && (() => {
+              const missingField = detectMissingInfo(currentSession.healthContext);
+              return missingField ? <StillNeedCard missingField={missingField} /> : null;
+            })()}
+            {/* Follow-up Check-in */}
+            <FollowUpCheckIn
+              onSchedule={handleScheduleFollowUp}
+              onDismiss={handleDismissFollowUp}
+              isScheduled={hasScheduledFollowUp || !!followUpScheduledLabel}
+              scheduledLabel={followUpScheduledLabel || undefined}
+            />
+          </>
         )}
 
         {/* Subscription Gate */}
@@ -403,9 +547,10 @@ interface MessageRendererProps {
   message: Message;
   onBookService: (serviceId: string) => void;
   urgencyLevel?: string;
+  episodeId?: string;
 }
 
-function MessageRenderer({ message, onBookService, urgencyLevel }: MessageRendererProps) {
+function MessageRenderer({ message, onBookService, urgencyLevel, episodeId }: MessageRendererProps) {
   switch (message.contentType) {
     case 'emergency_alert':
       return <EmergencyAlert message={message.text} />;
@@ -417,7 +562,7 @@ function MessageRenderer({ message, onBookService, urgencyLevel }: MessageRender
           urgencyLevel={urgencyLevel as any}
         />
       ) : (
-        <ChatBubble message={message} />
+        <ChatBubble message={message} episodeId={episodeId} />
       );
 
     case 'service_recommendation':
@@ -427,13 +572,13 @@ function MessageRenderer({ message, onBookService, urgencyLevel }: MessageRender
           onBook={() => onBookService(message.serviceRecommendation!.serviceId)}
         />
       ) : (
-        <ChatBubble message={message} />
+        <ChatBubble message={message} episodeId={episodeId} />
       );
 
     case 'text':
     case 'question':
     default:
-      return <ChatBubble message={message} />;
+      return <ChatBubble message={message} episodeId={episodeId} />;
   }
 }
 

@@ -28,6 +28,7 @@ import RequestsScreen from '../screens/RequestsScreen';
 import RequestDetailsScreen from '../screens/RequestDetailsScreen';
 import ModalScreen from '../screens/ModalScreen';
 import HealthMemoryScreen from '../screens/HealthMemoryScreen';
+import EpisodeSummaryScreen from '../screens/EpisodeSummaryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -154,6 +155,13 @@ export default function RootNavigator() {
         component={HealthMemoryScreen}
         options={{
           animation: 'default',
+        }}
+      />
+      <Stack.Screen
+        name="EpisodeSummary"
+        component={EpisodeSummaryScreen}
+        options={{
+          animation: 'slide_from_right',
         }}
       />
     </Stack.Navigator>

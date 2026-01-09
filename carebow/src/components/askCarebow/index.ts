@@ -23,3 +23,8 @@ export { CollapsibleSection, UnderstandingSection, PossibilitiesSection, Serious
 export { EnhancedChatBubble, DEFAULT_ACTION_BUTTONS } from './EnhancedChatBubble';
 export type { EnhancedResponse } from './EnhancedChatBubble';
 export { MemoryCandidateCard } from './MemoryCandidateCard';
+export { TriageActionBar } from './TriageActionBar';
+export { ComingSoonSheet } from './ComingSoonSheet';
+export { FollowUpCheckIn } from './FollowUpCheckIn';
+export { StillNeedCard } from './StillNeedCard';
+export { FeedbackButtons } from './FeedbackButtons';

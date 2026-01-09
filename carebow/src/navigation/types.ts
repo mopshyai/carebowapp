@@ -35,6 +35,7 @@ export type RootStackParamList = {
   Modal: undefined;
   // New screens
   HealthMemory: undefined;
+  EpisodeSummary: { episodeId: string };
 };
 
 // Main Tab Navigator

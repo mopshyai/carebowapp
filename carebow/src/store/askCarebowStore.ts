@@ -561,9 +561,8 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
         if (state.hasSubscription) return true;
         // Also allow during active trial
         if (get().isTrialActive()) return true;
-        // Auto-start 3-day free trial on first use (no hard paywall)
+        // Allow if trial hasn't been used yet (will be auto-started on first message)
         if (!state.trial.hasUsedTrial && !state.trial.trialStartDate) {
-          get().startTrial();
           return true;
         }
         // Fallback to free questions limit after trial expires

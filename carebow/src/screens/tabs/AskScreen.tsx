@@ -62,6 +62,7 @@ export default function AskCareBowScreen() {
   const [contextType, setContextType] = useState<'me' | 'family'>('me');
   const [familyRelation, setFamilyRelation] = useState('');
   const [familyAge, setFamilyAge] = useState('');
+  const [caregiverPresent, setCaregiverPresent] = useState<boolean>(true);
   const [symptomInput, setSymptomInput] = useState('');
   const [showRelationshipPicker, setShowRelationshipPicker] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
@@ -120,6 +121,8 @@ export default function AskCareBowScreen() {
       relation: familyRelation,
       age: familyAge,
       memberName: contextType === 'family' ? familyRelation : 'Me',
+      // Pass caregiver presence for family mode
+      caregiverPresent: contextType === 'family' ? String(caregiverPresent) : undefined,
       // Pass image URIs as JSON string (navigation params must be serializable)
       attachedImages: JSON.stringify(attachedImages),
     });
@@ -303,6 +306,55 @@ export default function AskCareBowScreen() {
                 keyboardType="numeric"
                 maxLength={3}
               />
+            </View>
+
+            {/* Caregiver Presence Toggle */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Are you with them right now?</Text>
+              <View style={styles.presenceToggle}>
+                <TouchableOpacity
+                  style={[
+                    styles.presenceOption,
+                    caregiverPresent && styles.presenceOptionActive,
+                  ]}
+                  onPress={() => setCaregiverPresent(true)}
+                >
+                  <Icon
+                    name="checkmark-circle"
+                    size={16}
+                    color={caregiverPresent ? colors.accent : colors.textTertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.presenceOptionText,
+                      caregiverPresent && styles.presenceOptionTextActive,
+                    ]}
+                  >
+                    Yes, I'm with them
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.presenceOption,
+                    !caregiverPresent && styles.presenceOptionActive,
+                  ]}
+                  onPress={() => setCaregiverPresent(false)}
+                >
+                  <Icon
+                    name="call"
+                    size={16}
+                    color={!caregiverPresent ? colors.accent : colors.textTertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.presenceOptionText,
+                      !caregiverPresent && styles.presenceOptionTextActive,
+                    ]}
+                  >
+                    No, asking remotely
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.infoBox}>
@@ -747,6 +799,35 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     ...typography.body,
     color: colors.textPrimary,
+  },
+  presenceToggle: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  presenceOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xxs,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  presenceOptionActive: {
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.accent,
+  },
+  presenceOptionText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  presenceOptionTextActive: {
+    color: colors.accent,
+    fontWeight: '500',
   },
   infoBox: {
     backgroundColor: colors.surface,

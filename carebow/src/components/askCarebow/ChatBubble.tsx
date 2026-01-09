@@ -3,17 +3,36 @@
  * Displays individual messages in the Ask CareBow chat
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { Message } from '../../types/askCarebow';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { getQuestionExplanation } from '../../utils/questionExplanations';
+import { FeedbackButtons } from './FeedbackButtons';
 
 interface ChatBubbleProps {
   message: Message;
+  episodeId?: string;
+  showFeedback?: boolean;
 }
 
-export function ChatBubble({ message }: ChatBubbleProps) {
+export function ChatBubble({ message, episodeId, showFeedback = true }: ChatBubbleProps) {
   const isUser = message.role === 'user';
+  const isAssistant = message.role === 'assistant';
+
+  // Get explanation for assistant questions (memoized to avoid recalculation)
+  const explanation = useMemo(() => {
+    if (isUser) return null;
+    return getQuestionExplanation(message.text);
+  }, [isUser, message.text]);
+
+  // Only show feedback for assistant messages with sufficient content
+  const shouldShowFeedback = useMemo(() => {
+    if (!showFeedback || !isAssistant || !episodeId) return false;
+    // Only show for messages with substantial content (not just short acknowledgments)
+    return message.text.length > 50;
+  }, [showFeedback, isAssistant, episodeId, message.text]);
 
   return (
     <View style={[styles.container, isUser ? styles.userContainer : styles.assistantContainer]}>
@@ -22,6 +41,21 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           {message.text}
         </Text>
       </View>
+      {/* "Why I'm asking" explanation for critical questions */}
+      {explanation && (
+        <View style={styles.explanationContainer}>
+          <Icon name="information-circle-outline" size={12} color={colors.textTertiary} />
+          <Text style={styles.explanationText}>{explanation}</Text>
+        </View>
+      )}
+      {/* Feedback buttons for assistant messages */}
+      {shouldShowFeedback && episodeId && (
+        <FeedbackButtons
+          episodeId={episodeId}
+          messageId={message.id}
+          messageSnippet={message.text}
+        />
+      )}
       <Text style={[styles.timestamp, isUser ? styles.userTimestamp : styles.assistantTimestamp]}>
         {formatTime(message.timestamp)}
       </Text>
@@ -81,5 +115,18 @@ const styles = StyleSheet.create({
   },
   assistantTimestamp: {
     color: colors.textTertiary,
+  },
+  explanationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginTop: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+  },
+  explanationText: {
+    ...typography.tiny,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    flex: 1,
   },
 });

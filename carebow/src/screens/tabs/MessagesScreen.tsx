@@ -1,3 +1,9 @@
+/**
+ * Messages Screen (My Care / Conversations)
+ * Shows health episodes and doctor conversations
+ */
+
+import React from 'react';
 import {
   View,
   Text,
@@ -9,10 +15,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '@/constants/Colors';
-import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
+import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { useAllEpisodes, useEpisodeStore } from '../../store/episodeStore';
+import { useUpcomingFollowUps, useFollowUpStore } from '../../store/followUpStore';
+import { EpisodeCard, FollowUpCard } from '../../components/episodes';
+import { Episode } from '../../types/episode';
 
-const conversations = [
+// Doctor conversations (existing data)
+const doctorConversations = [
   {
     id: '1',
     name: 'Dr. Sarah Chen',
@@ -22,7 +32,7 @@ const conversations = [
     timestamp: '10 min ago',
     unread: 2,
     online: true,
-    avatarColor: Colors.purple[500],
+    avatarColor: colors.accent,
   },
   {
     id: '2',
@@ -33,31 +43,50 @@ const conversations = [
     timestamp: '2 hours ago',
     unread: 0,
     online: false,
-    avatarColor: Colors.blue[500],
-  },
-  {
-    id: '3',
-    name: 'CareBow Support',
-    initials: 'CB',
-    role: 'Care Team',
-    lastMessage: 'How can we help you today?',
-    timestamp: 'Yesterday',
-    unread: 0,
-    online: true,
-    avatarColor: Colors.pink[600],
+    avatarColor: colors.info,
   },
 ];
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
+  const episodes = useAllEpisodes();
+  const { resumeEpisode } = useEpisodeStore();
+  const upcomingFollowUps = useUpcomingFollowUps(5);
+  const { markFollowUpDone } = useFollowUpStore();
+
+  // Sort episodes by most recent
+  const sortedEpisodes = [...episodes].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  const handleEpisodePress = (episode: Episode) => {
+    resumeEpisode(episode.id);
+    navigation.navigate('Conversation' as never, {
+      episodeId: episode.id,
+      symptom: episode.lastMessageSnippet,
+      context: episode.forWhom,
+      relation: episode.relationship,
+    });
+  };
+
+  const handleFollowUpPress = (episodeId: string) => {
+    const episode = episodes.find((e) => e.id === episodeId);
+    if (episode) {
+      handleEpisodePress(episode);
+    }
+  };
+
+  const handleDoctorPress = (doctorId: string) => {
+    navigation.navigate('Thread' as never, { id: doctorId });
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 48 }]}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerSubtitle}>Chat with your care team</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <Text style={styles.headerTitle}>My Care</Text>
+        <Text style={styles.headerSubtitle}>Your health conversations</Text>
       </View>
 
       <ScrollView
@@ -68,28 +97,87 @@ export default function MessagesScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info Banner */}
-        <View style={styles.infoBanner}>
-          <View style={styles.infoBannerIcon}>
-            <Icon name="heart" size={20} color={Colors.purple[600]} />
+        {/* Ask CareBow Banner */}
+        <TouchableOpacity
+          style={styles.askBanner}
+          onPress={() => navigation.navigate('Ask' as never)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.askBannerIcon}>
+            <Icon name="heart" size={20} color={colors.textInverse} />
           </View>
-          <View style={styles.infoBannerContent}>
-            <Text style={styles.infoBannerTitle}>New symptoms?</Text>
-            <Text style={styles.infoBannerText}>
-              Use Ask CareBow to describe what you're experiencing. I'll guide you to the right care.
+          <View style={styles.askBannerContent}>
+            <Text style={styles.askBannerTitle}>New symptoms?</Text>
+            <Text style={styles.askBannerText}>
+              Start a conversation with Ask CareBow
             </Text>
           </View>
+          <Icon name="add-circle" size={24} color={colors.accent} />
+        </TouchableOpacity>
+
+        {/* Follow-ups Section */}
+        {upcomingFollowUps.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Upcoming Check-ins</Text>
+              <View style={styles.followUpBadge}>
+                <Icon name="notifications" size={10} color={colors.accent} />
+                <Text style={styles.followUpBadgeText}>{upcomingFollowUps.length}</Text>
+              </View>
+            </View>
+            <View style={styles.followUpsList}>
+              {upcomingFollowUps.map((followUp) => (
+                <FollowUpCard
+                  key={followUp.id}
+                  followUp={followUp}
+                  onPress={() => handleFollowUpPress(followUp.episodeId)}
+                  onMarkDone={() => markFollowUpDone(followUp.id)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Health Episodes Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Health Episodes</Text>
+            {sortedEpisodes.length > 0 && (
+              <Text style={styles.sectionCount}>{sortedEpisodes.length}</Text>
+            )}
+          </View>
+
+          {sortedEpisodes.length > 0 ? (
+            <View style={styles.episodesList}>
+              {sortedEpisodes.map((episode) => (
+                <EpisodeCard
+                  key={episode.id}
+                  episode={episode}
+                  onPress={() => handleEpisodePress(episode)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyEpisodes}>
+              <Icon name="chatbubbles-outline" size={32} color={colors.textTertiary} />
+              <Text style={styles.emptyText}>No health episodes yet</Text>
+              <Text style={styles.emptySubtext}>
+                Your Ask CareBow conversations will appear here
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Conversations List */}
+        {/* Doctor Conversations Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Conversations</Text>
-          <View style={styles.conversationsList}>
-            {conversations.map((conv) => (
+          <Text style={styles.sectionTitle}>Doctor Messages</Text>
+          <View style={styles.doctorList}>
+            {doctorConversations.map((conv) => (
               <TouchableOpacity
                 key={conv.id}
-                style={styles.conversationCard}
-                onPress={() => navigation.navigate('Thread' as never, { id: conv.id })}
+                style={styles.doctorCard}
+                onPress={() => handleDoctorPress(conv.id)}
+                activeOpacity={0.7}
               >
                 <View style={styles.avatarContainer}>
                   <View style={[styles.avatar, { backgroundColor: conv.avatarColor }]}>
@@ -98,56 +186,30 @@ export default function MessagesScreen() {
                   {conv.online && <View style={styles.onlineIndicator} />}
                 </View>
 
-                <View style={styles.conversationContent}>
-                  <View style={styles.conversationHeader}>
-                    <View>
-                      <Text style={styles.conversationName}>{conv.name}</Text>
-                      <Text style={styles.conversationRole}>{conv.role}</Text>
+                <View style={styles.doctorContent}>
+                  <View style={styles.doctorHeader}>
+                    <View style={styles.doctorInfo}>
+                      <Text style={styles.doctorName}>{conv.name}</Text>
+                      <Text style={styles.doctorRole}>{conv.role}</Text>
                     </View>
-                    <View style={styles.conversationMeta}>
+                    <View style={styles.doctorMeta}>
                       {conv.unread > 0 && (
                         <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadBadgeText}>{conv.unread}</Text>
+                          <Text style={styles.unreadText}>{conv.unread}</Text>
                         </View>
                       )}
-                      <Icon name="chevron-forward" size={16} color={Colors.gray[400]} />
+                      <Icon name="chevron-forward" size={16} color={colors.textTertiary} />
                     </View>
                   </View>
-
-                  <Text
-                    style={[styles.lastMessage, conv.unread > 0 && styles.lastMessageUnread]}
-                    numberOfLines={2}
-                  >
+                  <Text style={styles.lastMessage} numberOfLines={1}>
                     {conv.lastMessage}
                   </Text>
-
-                  <View style={styles.timestampContainer}>
-                    <Icon name="time-outline" size={12} color={Colors.gray[500]} />
-                    <Text style={styles.timestamp}>{conv.timestamp}</Text>
-                  </View>
+                  <Text style={styles.timestamp}>{conv.timestamp}</Text>
                 </View>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-
-        {/* Empty State (shown when no conversations) */}
-        {conversations.length === 0 && (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyStateIcon}>
-              <Icon name="chatbubbles-outline" size={40} color={Colors.gray[400]} />
-            </View>
-            <Text style={styles.emptyStateTitle}>No messages yet</Text>
-            <Text style={styles.emptyStateText}>
-              After you connect with a doctor, your conversations will appear here.
-            </Text>
-            <View style={styles.emptyStateHint}>
-              <Text style={styles.emptyStateHintText}>
-                Start by using <Text style={styles.emptyStateHintBold}>Ask CareBow</Text> to describe your symptoms and get personalized guidance.
-              </Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -156,214 +218,204 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.purple[50],
+    backgroundColor: colors.surface2,
   },
   header: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing[6],
-    paddingBottom: Spacing[6],
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
+    borderBottomColor: colors.border,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[0.5],
+    ...typography.h1,
+    color: colors.textPrimary,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: Colors.gray[600],
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xxs,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing[6],
-    paddingTop: Spacing[6],
+    padding: spacing.lg,
   },
-  infoBanner: {
-    backgroundColor: Colors.purple[50],
+  askBanner: {
+    backgroundColor: colors.accentMuted,
     borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
+    borderColor: colors.accentSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing[3],
-    marginBottom: Spacing[6],
-    ...Shadow.sm,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
-  infoBannerIcon: {
+  askBannerIcon: {
     width: 40,
     height: 40,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadow.sm,
+    ...shadows.button,
   },
-  infoBannerContent: {
+  askBannerContent: {
     flex: 1,
   },
-  infoBannerTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.purple[900],
-    marginBottom: Spacing[1],
+  askBannerTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
   },
-  infoBannerText: {
-    fontSize: 12,
-    color: Colors.purple[700],
-    lineHeight: 18,
+  askBannerText: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   section: {
-    marginBottom: Spacing[6],
+    marginBottom: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[3],
-    paddingHorizontal: Spacing[1],
+    ...typography.labelSmall,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  conversationsList: {
-    gap: Spacing[2],
+  sectionCount: {
+    ...typography.caption,
+    color: colors.accent,
+    backgroundColor: colors.accentMuted,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.xs,
   },
-  conversationCard: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    borderRadius: BorderRadius['2xl'],
-    padding: Spacing[5],
+  episodesList: {
+    gap: spacing.sm,
+  },
+  followUpsList: {
+    gap: spacing.xs,
+  },
+  followUpBadge: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing[4],
+    alignItems: 'center',
+    gap: spacing.xxs,
+    backgroundColor: colors.accentMuted,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.xs,
+  },
+  followUpBadgeText: {
+    ...typography.tiny,
+    color: colors.accent,
+  },
+  emptyEpisodes: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  emptyText: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
+  emptySubtext: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.xxs,
+  },
+  doctorList: {
+    gap: spacing.sm,
+  },
+  doctorCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   avatarContainer: {
     position: 'relative',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
+    ...typography.label,
+    color: colors.textInverse,
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
+    bottom: 0,
+    right: 0,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.green[500],
+    backgroundColor: colors.success,
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: colors.surface,
   },
-  conversationContent: {
+  doctorContent: {
     flex: 1,
   },
-  conversationHeader: {
+  doctorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing[1],
   },
-  conversationName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[0.5],
+  doctorInfo: {
+    flex: 1,
   },
-  conversationRole: {
-    fontSize: 12,
-    color: Colors.gray[500],
+  doctorName: {
+    ...typography.label,
+    color: colors.textPrimary,
   },
-  conversationMeta: {
+  doctorRole: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  doctorMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing[2],
+    gap: spacing.xs,
   },
   unreadBadge: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.purple[600],
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  unreadBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.white,
+  unreadText: {
+    ...typography.tiny,
+    color: colors.textInverse,
   },
   lastMessage: {
-    fontSize: 12,
-    color: Colors.gray[600],
-    lineHeight: 18,
-    marginBottom: Spacing[2],
-  },
-  lastMessageUnread: {
-    color: Colors.gray[900],
-    fontWeight: '500',
-  },
-  timestampContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[1.5],
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xxs,
   },
   timestamp: {
-    fontSize: 12,
-    color: Colors.gray[500],
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: Spacing[12],
-  },
-  emptyStateIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing[4],
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.gray[900],
-    marginBottom: Spacing[2],
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: Colors.gray[600],
-    lineHeight: 22,
-    textAlign: 'center',
-    marginBottom: Spacing[6],
-    paddingHorizontal: Spacing[4],
-  },
-  emptyStateHint: {
-    backgroundColor: Colors.purple[50],
-    borderWidth: 1,
-    borderColor: Colors.purple[200],
-    borderRadius: BorderRadius.xl,
-    padding: Spacing[4],
-    maxWidth: 300,
-  },
-  emptyStateHintText: {
-    fontSize: 12,
-    color: Colors.purple[800],
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  emptyStateHintBold: {
-    fontWeight: '700',
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginTop: spacing.xxs,
   },
 });
