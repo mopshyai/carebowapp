@@ -23,10 +23,20 @@ import {
   IMAGE_VISIBLE_FEATURES,
   IMAGE_FOLLOW_UP_QUESTIONS,
   TRIAGE_LEVELS,
+  EXTERNAL_TRIAGE_LEVELS,
+  INTERNAL_TRIAGE_LEVELS,
   RESPONSE_SECTIONS,
   UNCERTAINTY_LEVELS,
+  mapToExternalTriageLevel,
 } from './prompts';
-import type { MemoryType, ConfidenceLevel, TriageLevel, UncertaintyLevel } from './prompts';
+import type {
+  MemoryType,
+  ConfidenceLevel,
+  TriageLevel,
+  ExternalTriageLevel,
+  InternalTriageLevel,
+  UncertaintyLevel,
+} from './prompts';
 
 // Re-export prompts for external use
 export {
@@ -45,10 +55,13 @@ export {
   IMAGE_VISIBLE_FEATURES,
   IMAGE_FOLLOW_UP_QUESTIONS,
   TRIAGE_LEVELS,
+  EXTERNAL_TRIAGE_LEVELS,
+  INTERNAL_TRIAGE_LEVELS,
   RESPONSE_SECTIONS,
   UNCERTAINTY_LEVELS,
+  mapToExternalTriageLevel,
 };
-export type { MemoryType, ConfidenceLevel, TriageLevel, UncertaintyLevel };
+export type { MemoryType, ConfidenceLevel, TriageLevel, ExternalTriageLevel, InternalTriageLevel, UncertaintyLevel };
 
 // ============================================
 // API TYPES
@@ -77,7 +90,8 @@ export type AskCareBowMessageResponse = {
   conversationId: string;
   assistantMessage: string;
   enhancedResponse?: EnhancedResponse;
-  triageLevel: 'emergency' | 'urgent' | 'soon' | 'self_care';
+  // P0-2 FIX: Only expose 4 external triage levels
+  triageLevel: ExternalTriageLevel;
   followUpQuestions: string[];
   memoryCandidates: MemoryCandidate[];
 };
@@ -234,24 +248,73 @@ function detectKeywords(text: string): string {
 }
 
 /**
- * Determine triage level based on keywords
+ * Determine triage level based on keywords and age context
+ * CRITICAL: Pediatric cases (infant/child) require heightened urgency
+ * P0-2 FIX: Returns only 4 external levels
  */
-function determineTriageLevel(text: string): 'emergency' | 'urgent' | 'soon' | 'self_care' {
+function determineTriageLevel(
+  text: string,
+  ageGroup?: string
+): ExternalTriageLevel {
   const lowerText = text.toLowerCase();
+  const isPediatric = ageGroup === 'infant' || ageGroup === 'child';
+  const isInfant = ageGroup === 'infant';
+  const isSenior = ageGroup === 'senior';
 
-  const emergencyKeywords = ['chest pain', 'can\'t breathe', 'unconscious', 'severe bleeding', 'stroke'];
-  const urgentKeywords = ['high fever', 'severe pain', 'vomiting blood', 'sudden weakness'];
-  const soonKeywords = ['persistent', 'getting worse', 'several days'];
-
+  // Emergency keywords - always emergency regardless of age
+  const emergencyKeywords = ['chest pain', 'can\'t breathe', 'unconscious', 'severe bleeding', 'stroke', 'seizure', 'not breathing'];
   if (emergencyKeywords.some(k => lowerText.includes(k))) return 'emergency';
+
+  // PEDIATRIC SAFETY: Fever in infants is ALWAYS urgent/emergency
+  const hasFever = lowerText.includes('fever') || lowerText.includes('temperature') || lowerText.includes('102') || lowerText.includes('103') || lowerText.includes('104');
+  if (hasFever && isInfant) {
+    // Any fever in infant under 3 months is emergency
+    return 'emergency';
+  }
+  if (hasFever && isPediatric) {
+    // Fever in children is at minimum urgent
+    return 'urgent';
+  }
+
+  // PEDIATRIC SAFETY: Other concerning symptoms in children
+  const pediatricUrgentKeywords = ['not eating', 'won\'t eat', 'not drinking', 'won\'t drink', 'lethargic', 'limp', 'floppy', 'won\'t wake', 'rash', 'vomiting'];
+  if (isPediatric && pediatricUrgentKeywords.some(k => lowerText.includes(k))) {
+    return 'urgent';
+  }
+
+  // SENIOR SAFETY: Falls and confusion are more serious
+  if (isSenior && (lowerText.includes('fall') || lowerText.includes('fell') || lowerText.includes('confusion') || lowerText.includes('confused'))) {
+    return 'urgent';
+  }
+
+  // Standard urgent keywords
+  const urgentKeywords = ['high fever', 'severe pain', 'vomiting blood', 'sudden weakness', 'blood in stool'];
   if (urgentKeywords.some(k => lowerText.includes(k))) return 'urgent';
+
+  // Soon keywords
+  const soonKeywords = ['persistent', 'getting worse', 'several days', 'spreading'];
   if (soonKeywords.some(k => lowerText.includes(k))) return 'soon';
 
+  // P0-2: Map monitor and non_urgent to self_care (only 4 external levels)
+  // Monitor/mild keywords now map to self_care
   return 'self_care';
 }
 
 /**
+ * P1-4 FIX: Allowed memory candidate types only.
+ * NEVER save: past_episode, emotional states, one-time symptoms.
+ * ALLOWED: allergy, condition, medication, preference, trigger
+ */
+const ALLOWED_MEMORY_TYPES = ['allergy', 'condition', 'medication', 'preference', 'trigger'] as const;
+type AllowedMemoryType = typeof ALLOWED_MEMORY_TYPES[number];
+
+function isAllowedMemoryType(type: string): type is AllowedMemoryType {
+  return ALLOWED_MEMORY_TYPES.includes(type as AllowedMemoryType);
+}
+
+/**
  * Generate mock memory candidates based on message content
+ * P1-4 FIX: Only generates allowed types (allergy, condition, medication, preference, trigger)
  */
 function generateMemoryCandidates(text: string): MemoryCandidate[] {
   const candidates: MemoryCandidate[] = [];
@@ -283,7 +346,7 @@ function generateMemoryCandidates(text: string): MemoryCandidate[] {
     });
   }
 
-  // Detect conditions
+  // Detect conditions (chronic/recurring)
   if (lowerText.includes('diabetes') || lowerText.includes('diabetic')) {
     candidates.push({
       id: `cand_${Date.now()}_3`,
@@ -295,20 +358,47 @@ function generateMemoryCandidates(text: string): MemoryCandidate[] {
     });
   }
 
-  // Add default candidates if none detected
-  if (candidates.length === 0) {
-    const keyword = detectKeywords(text);
-    if (keyword !== 'default') {
+  if (lowerText.includes('asthma') || lowerText.includes('asthmatic')) {
+    candidates.push({
+      id: `cand_${Date.now()}_4`,
+      type: 'condition',
+      label: 'Condition',
+      value: 'Asthma',
+      confidence: 'high',
+      reason: 'You mentioned having asthma',
+    });
+  }
+
+  // Detect preferences
+  if (lowerText.includes('prefer') && (lowerText.includes('home') || lowerText.includes('natural'))) {
+    candidates.push({
+      id: `cand_${Date.now()}_5`,
+      type: 'preference',
+      label: 'Preference',
+      value: 'Prefers home remedies',
+      confidence: 'medium',
+      reason: 'You expressed a preference for home remedies',
+    });
+  }
+
+  // Detect triggers
+  if (lowerText.includes('trigger') || lowerText.includes('causes') || lowerText.includes('makes it worse')) {
+    const triggerMatch = lowerText.match(/(stress|food|weather|exercise|sleep) (trigger|causes|makes)/);
+    if (triggerMatch) {
       candidates.push({
-        id: `cand_${Date.now()}_default`,
-        type: 'past_episode',
-        label: 'Past Episode',
-        value: `Experienced ${keyword} symptoms`,
-        confidence: 'low',
-        reason: 'To track patterns in your health history',
+        id: `cand_${Date.now()}_6`,
+        type: 'trigger',
+        label: 'Trigger',
+        value: `${triggerMatch[1]} may trigger symptoms`,
+        confidence: 'medium',
+        reason: 'You mentioned this as a potential trigger',
       });
     }
   }
+
+  // P1-4 FIX: NO default fallback to past_episode
+  // If no valid candidates detected, return empty array
+  // One-time symptoms and emotional states should NOT be saved
 
   return candidates;
 }
@@ -324,7 +414,7 @@ export async function sendAskCareBowMessage(
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
 
     const keyword = detectKeywords(payload.messageText);
-    const triageLevel = determineTriageLevel(payload.messageText);
+    const triageLevel = determineTriageLevel(payload.messageText, payload.context.ageGroup);
     const followUpQuestions = MOCK_FOLLOW_UP_QUESTIONS[keyword] || MOCK_FOLLOW_UP_QUESTIONS.default;
     const enhancedResponse = MOCK_ENHANCED_RESPONSES[keyword] || MOCK_ENHANCED_RESPONSES.default;
     const memoryCandidates = generateMemoryCandidates(payload.messageText);

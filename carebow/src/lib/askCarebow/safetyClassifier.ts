@@ -249,7 +249,7 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     pattern: /(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i,
     category: 'mental_health',
     urgencyBoost: 50,
-    immediateAction: 'Contact crisis helpline or emergency services immediately',
+    immediateAction: 'Please call or text 988 (Suicide & Crisis Lifeline) now, or go to your nearest emergency room. You are not alone, and help is available 24/7.',
     description: 'Suicidal ideation',
   },
   {
@@ -257,7 +257,7 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     pattern: /self[- ]harm|cutting\s*(myself|self)|hurt(ing)?\s*myself/i,
     category: 'mental_health',
     urgencyBoost: 45,
-    immediateAction: 'Contact crisis helpline or seek immediate support',
+    immediateAction: 'Please call or text 988 (Suicide & Crisis Lifeline) now. You deserve support, and trained counselors are available 24/7 to help.',
     description: 'Self-harm',
   },
   {
@@ -265,7 +265,7 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     pattern: /overdos(e|ed|ing)|took\s*too\s*many\s*(pills|medication)/i,
     category: 'mental_health',
     urgencyBoost: 50,
-    immediateAction: 'Call emergency services or poison control immediately',
+    immediateAction: 'Call 911 or Poison Control (1-800-222-1222) immediately. If this was intentional, also call or text 988 (Suicide & Crisis Lifeline). Do not wait — help is available now.',
     description: 'Overdose',
   },
 
@@ -924,6 +924,82 @@ function calculateUrgencyLevel(score: number, redFlagCount: number): UrgencyLeve
   if (score >= 20) return 'non_urgent';
   if (score >= 10) return 'monitor';
   return 'self_care';
+}
+
+// ============================================
+// SYMPTOM CONTEXT ANALYZER
+// ============================================
+
+// ============================================
+// CRISIS RESOURCES (P0-1 FIX)
+// ============================================
+
+/**
+ * Crisis resource text for self-harm, suicide, and overdose situations.
+ * These MUST appear in assistant responses, not just metadata.
+ */
+export const CRISIS_RESOURCES = {
+  suicide_crisis: `If you're in the U.S., call or text 988 (Suicide & Crisis Lifeline). You are not alone, and trained counselors are available 24/7.`,
+  self_harm: `If you're in the U.S., call or text 988 (Suicide & Crisis Lifeline). You deserve support, and help is available.`,
+  overdose: `Call 911 immediately. If in the U.S., you can also call Poison Control at 1-800-222-1222. If this was intentional, also call or text 988 (Suicide & Crisis Lifeline).`,
+  immediate_danger: `If you or someone else is in immediate danger, please call 911 now.`,
+} as const;
+
+export type CrisisType = 'suicide' | 'self_harm' | 'overdose' | 'none';
+
+/**
+ * Detects if text contains crisis indicators (self-harm, suicide, overdose)
+ * Returns the type of crisis detected for appropriate resource matching
+ */
+export function detectCrisisType(text: string): CrisisType {
+  const normalizedText = text.toLowerCase();
+
+  // Check for suicide ideation
+  if (/(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i.test(normalizedText)) {
+    return 'suicide';
+  }
+
+  // Check for self-harm
+  if (/self[- ]harm|cutting\s*(myself|self)|hurt(ing)?\s*myself/i.test(normalizedText)) {
+    return 'self_harm';
+  }
+
+  // Check for overdose
+  if (/overdos(e|ed|ing)|took\s*too\s*many\s*(pills|medication)/i.test(normalizedText)) {
+    return 'overdose';
+  }
+
+  return 'none';
+}
+
+/**
+ * Formats crisis resources for inclusion in assistant response.
+ * This is the TEXT that should appear in the assistant's message.
+ */
+export function formatCrisisResponse(crisisType: CrisisType, includeImmediateDanger: boolean = false): string {
+  if (crisisType === 'none') return '';
+
+  let response = '';
+
+  // Add immediate danger instruction if needed
+  if (includeImmediateDanger) {
+    response += CRISIS_RESOURCES.immediate_danger + '\n\n';
+  }
+
+  // Add crisis-specific resources
+  switch (crisisType) {
+    case 'suicide':
+      response += CRISIS_RESOURCES.suicide_crisis;
+      break;
+    case 'self_harm':
+      response += CRISIS_RESOURCES.self_harm;
+      break;
+    case 'overdose':
+      response += CRISIS_RESOURCES.overdose;
+      break;
+  }
+
+  return response;
 }
 
 // ============================================

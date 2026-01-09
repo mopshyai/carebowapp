@@ -302,11 +302,11 @@ INPUT:
 - User context
 
 STEP 1: TRIAGE
-Classify urgency as ONE of:
-- emergency
-- urgent
-- soon
-- self_care
+Classify urgency as ONE of these 4 levels:
+- emergency (seek immediate care - call 911)
+- urgent (see doctor today)
+- soon (see doctor within 24-48 hours)
+- self_care (can manage at home, monitor, or schedule when convenient)
 
 STEP 2: USER RESPONSE (STRUCTURED)
 
@@ -357,11 +357,48 @@ Always end with:
 A gentle next action.`;
 
 /**
- * Triage levels for urgency classification
+ * Internal triage levels (6 levels for detailed assessment)
  */
-export const TRIAGE_LEVELS = ['emergency', 'urgent', 'soon', 'self_care'] as const;
+export const INTERNAL_TRIAGE_LEVELS = ['emergency', 'urgent', 'soon', 'non_urgent', 'monitor', 'self_care'] as const;
 
-export type TriageLevel = typeof TRIAGE_LEVELS[number];
+export type InternalTriageLevel = typeof INTERNAL_TRIAGE_LEVELS[number];
+
+/**
+ * External triage levels (4 levels for user-facing display)
+ * P0-2 FIX: Only expose 4 levels to users/UI
+ */
+export const EXTERNAL_TRIAGE_LEVELS = ['emergency', 'urgent', 'soon', 'self_care'] as const;
+
+export type ExternalTriageLevel = typeof EXTERNAL_TRIAGE_LEVELS[number];
+
+/**
+ * Maps internal 6-level triage to external 4-level triage
+ * - emergency -> emergency
+ * - urgent -> urgent
+ * - soon -> soon
+ * - non_urgent -> self_care (can schedule when convenient)
+ * - monitor -> self_care (watch and wait at home)
+ * - self_care -> self_care
+ */
+export function mapToExternalTriageLevel(internal: InternalTriageLevel): ExternalTriageLevel {
+  switch (internal) {
+    case 'emergency':
+      return 'emergency';
+    case 'urgent':
+      return 'urgent';
+    case 'soon':
+      return 'soon';
+    case 'non_urgent':
+    case 'monitor':
+    case 'self_care':
+    default:
+      return 'self_care';
+  }
+}
+
+// Legacy export for backwards compatibility
+export const TRIAGE_LEVELS = EXTERNAL_TRIAGE_LEVELS;
+export type TriageLevel = ExternalTriageLevel;
 
 /**
  * Response section headers for structured output

@@ -18,7 +18,14 @@ import {
   durationLabels,
   frequencyLabels,
 } from '@/types/askCarebow';
-import { detectEmergency, assessUrgency, SafetyAssessment } from './safetyClassifier';
+import {
+  detectEmergency,
+  assessUrgency,
+  SafetyAssessment,
+  detectCrisisType,
+  formatCrisisResponse,
+  CrisisType,
+} from './safetyClassifier';
 import { getFollowUpQuestion, shouldAskMoreQuestions, parseUserResponse } from './followUpQuestions';
 import { getServiceRecommendations } from './serviceRouter';
 import { buildGuidanceResponse } from './guidanceBuilder';
@@ -53,7 +60,7 @@ export async function processUserInput(
   // STEP 1: Check for emergency/red flag symptoms
   const emergencyCheck = detectEmergency(normalizedText);
   if (emergencyCheck.isEmergency) {
-    return generateEmergencyResponse(emergencyCheck.detectedSymptoms);
+    return generateEmergencyResponse(emergencyCheck.detectedSymptoms, userText);
   }
 
   // STEP 2: Route based on conversation phase
@@ -94,20 +101,27 @@ function handleInitialInput(
     ...parsedContext,
   };
 
-  // Generate acknowledgment and first follow-up question
-  const acknowledgment = generateAcknowledgment(primarySymptom);
-  const firstQuestion = getFollowUpQuestion('duration', healthContext);
+  // P1-1 FIX: Determine first question based on what's already known
+  // P1-3 FIX: Use correct priority order (onset -> location -> severity -> pattern)
+  let firstQuestionType: FollowUpQuestionType = 'duration'; // onset
+  if (parsedContext.duration) {
+    firstQuestionType = 'location';
+  }
+
+  const firstQuestion = getFollowUpQuestion(firstQuestionType, { ...healthContext, ...healthContextUpdates });
+
+  // P1-1 FIX: Build single formatted first response
+  const formattedResponse = buildFirstResponse(
+    primarySymptom,
+    originalText,
+    firstQuestion.question
+  );
 
   const messages: Omit<Message, 'id' | 'timestamp'>[] = [
     {
       role: 'assistant',
-      contentType: 'text',
-      text: acknowledgment,
-    },
-    {
-      role: 'assistant',
       contentType: 'question',
-      text: firstQuestion.question,
+      text: formattedResponse,
       quickOptions: firstQuestion.quickOptions,
     },
   ];
@@ -116,7 +130,7 @@ function handleInitialInput(
     messages,
     phaseUpdate: 'gathering',
     healthContextUpdates,
-    questionAsked: 'duration',
+    questionAsked: firstQuestionType,
   };
 }
 
@@ -188,22 +202,37 @@ function handlePostGuidanceInput(
 // ============================================
 
 function generateEmergencyResponse(
-  detectedSymptoms: string[]
+  detectedSymptoms: string[],
+  userText: string = ''
 ): ConversationResponse {
   const symptomList = detectedSymptoms.join(', ');
+
+  // P0-1: Check for crisis situations (self-harm, suicide, overdose)
+  const crisisType = detectCrisisType(userText);
+  const crisisResources = formatCrisisResponse(crisisType, true);
+
+  // Build appropriate response based on crisis type
+  let emergencyText = '';
+  if (crisisType !== 'none') {
+    // For mental health crises, use a calmer, more supportive tone
+    emergencyText = `I hear you, and I want you to know that help is available right now.\n\n${crisisResources}`;
+  } else {
+    // Standard emergency response
+    emergencyText = 'Please take these steps immediately:\n\n1. If you or someone is in immediate danger, call emergency services (911 in the US)\n\n2. Do not drive yourself if you feel unwell - have someone else drive you or call an ambulance\n\n3. Stay calm and try to remain still until help arrives\n\n4. If possible, have someone stay with you';
+  }
 
   return {
     messages: [
       {
         role: 'assistant',
         contentType: 'emergency_alert',
-        text: `Based on what you've described (${symptomList}), this could be a serious situation that requires immediate medical attention.`,
+        text: `Based on what you've described (${symptomList}), this could be a serious situation that requires immediate attention.`,
         isEmergency: true,
       },
       {
         role: 'assistant',
         contentType: 'text',
-        text: 'Please take these steps immediately:\n\n1. If you or someone is in immediate danger, call emergency services (911 in the US)\n\n2. Do not drive yourself if you feel unwell - have someone else drive you or call an ambulance\n\n3. Stay calm and try to remain still until help arrives\n\n4. If possible, have someone stay with you',
+        text: emergencyText,
       },
     ],
     phaseUpdate: 'completed',
@@ -252,11 +281,18 @@ function generateAssessmentAndGuidance(
     });
   }
 
-  // Add helpful follow-up prompt
+  // P1-2 FIX: Replace generic closer with specific next action
+  // NO "Is there anything else..." or "Let me know..." - use specific action
+  const nextActionText = serviceRecommendations.length > 0
+    ? `Would you like me to help you book ${serviceRecommendations[0].serviceTitle}?`
+    : assessment.urgency === 'emergency' || assessment.urgency === 'urgent'
+      ? 'Please prioritize seeking medical care based on the guidance above.'
+      : 'Monitor your symptoms over the next 24 hours and let me know if anything changes.';
+
   messages.push({
     role: 'assistant',
     contentType: 'text',
-    text: 'Is there anything else you\'d like to know about your symptoms, or would you like help booking a service?',
+    text: nextActionText,
   });
 
   return {
@@ -320,36 +356,93 @@ function parseInitialInput(text: string): Partial<HealthContext> {
   return context;
 }
 
-function generateAcknowledgment(symptom: string): string {
-  const acknowledgments = [
-    `I understand you're experiencing ${symptom.toLowerCase()}. Let me ask a few questions to better understand your situation.`,
-    `Thank you for sharing. ${symptom} can have various causes, and I'd like to learn more to provide helpful guidance.`,
-    `I hear you. To give you the most relevant guidance about ${symptom.toLowerCase()}, I need to understand a bit more.`,
-  ];
+// ============================================
+// P1-1 FIX: FIRST-RESPONSE FORMAT
+// ============================================
 
-  return acknowledgments[Math.floor(Math.random() * acknowledgments.length)];
+/**
+ * Extracts key points from user's initial message for bullet reflection.
+ * Returns 1-2 brief bullet points summarizing what was understood.
+ */
+function extractUnderstandingBullets(symptom: string, text: string): string[] {
+  const bullets: string[] = [];
+  const lowerText = text.toLowerCase();
+
+  // Primary symptom bullet
+  bullets.push(`You're experiencing ${symptom.toLowerCase()}`);
+
+  // Add context if detected
+  if (lowerText.includes('worried') || lowerText.includes('anxious') || lowerText.includes('scared') || lowerText.includes('concerned')) {
+    bullets.push(`You're feeling worried about this`);
+  } else if (lowerText.includes('pain') || lowerText.includes('hurt')) {
+    bullets.push(`This is causing you discomfort`);
+  } else if (lowerText.includes('days') || lowerText.includes('week') || lowerText.includes('while')) {
+    bullets.push(`This has been going on for some time`);
+  } else if (lowerText.includes('suddenly') || lowerText.includes('just started') || lowerText.includes('just now')) {
+    bullets.push(`This started recently`);
+  }
+
+  // Ensure max 2 bullets
+  return bullets.slice(0, 2);
+}
+
+/**
+ * P1-1 FIX: Builds a strictly formatted first response.
+ * Format:
+ * 1) ONE sentence emotional acknowledgment
+ * 2) 1-2 bullets reflecting what was understood
+ * 3) EXACTLY ONE follow-up question
+ *
+ * NO advice, NO possibilities, NO long disclaimers.
+ */
+function buildFirstResponse(
+  symptom: string,
+  originalText: string,
+  followUpQuestion: string
+): string {
+  // 1) ONE sentence emotional acknowledgment (calm, empathetic)
+  const acknowledgment = `I hear you, and I'm glad you reached out.`;
+
+  // 2) 1-2 bullets reflecting what was understood
+  const bullets = extractUnderstandingBullets(symptom, originalText);
+  const bulletSection = `From what you shared:\n${bullets.map(b => `• ${b}`).join('\n')}`;
+
+  // 3) EXACTLY ONE follow-up question
+  const question = followUpQuestion;
+
+  return `${acknowledgment}\n\n${bulletSection}\n\n${question}`;
 }
 
 function getNextQuestionType(
   questionsAsked: FollowUpQuestionType[],
   context: HealthContext
 ): FollowUpQuestionType | null {
+  // P1-3 FIX: Enforce priority order:
+  // onset → location → severity → pattern → associated symptoms → risk factors
+  // Max 2 questions per turn (handled by caller)
   const questionPriority: FollowUpQuestionType[] = [
-    'duration',
-    'severity',
-    'frequency',
-    'associated_symptoms',
-    'recent_events',
-    'chronic_conditions',
+    'duration',           // onset
+    'location',           // location
+    'severity',           // severity
+    'frequency',          // pattern
+    'associated_symptoms', // associated symptoms
+    'risk_factors',       // risk factors
+    'chronic_conditions', // chronic conditions (secondary)
+    'recent_events',      // recent events (secondary)
   ];
 
   // Find the next question that hasn't been asked
   for (const questionType of questionPriority) {
     if (!questionsAsked.includes(questionType)) {
-      // Skip duration if already known
+      // P1-3 FIX: Skip if already known (don't re-ask)
       if (questionType === 'duration' && context.duration) continue;
-      // Skip severity if already known
       if (questionType === 'severity' && context.severity) continue;
+      if (questionType === 'frequency' && context.frequency) continue;
+      if (questionType === 'location' && context.additionalNotes?.includes('location')) continue;
+      if (questionType === 'associated_symptoms' && context.associatedSymptoms.length > 0) continue;
+      if (questionType === 'risk_factors' && context.riskFactors.length > 0) continue;
+      if (questionType === 'chronic_conditions' && context.chronicConditions.length > 0) continue;
+      if (questionType === 'recent_events' && context.recentEvents.length > 0) continue;
 
       return questionType;
     }
@@ -398,18 +491,19 @@ function generateFollowUpResponse(
   healthContext: HealthContext
 ): string {
   // Handle common follow-up questions
+  // P1-2 FIX: All responses end with specific action or follow-up question
   if (text.includes('how long') || text.includes('when will')) {
-    return 'Recovery time varies depending on the underlying cause. If you\'ve booked a consultation, your healthcare provider can give you a more specific timeline based on your situation.';
+    return 'Recovery time varies depending on the underlying cause. A healthcare provider can give you a more specific timeline based on your situation. Would you like to schedule a consultation?';
   }
 
   if (text.includes('worse') || text.includes('not getting better')) {
-    return 'If your symptoms are getting worse or not improving, I recommend seeing a healthcare provider. Would you like me to help you book a consultation?';
+    return 'If your symptoms are getting worse or not improving, I recommend seeing a healthcare provider today. Would you like me to help you book a consultation now?';
   }
 
   if (text.includes('serious') || text.includes('worried')) {
-    return 'I understand your concern. Based on what you\'ve shared, the situation doesn\'t appear to be immediately dangerous, but it\'s always good to get professional confirmation. A quick consultation can give you peace of mind.';
+    return 'I understand your concern. Based on what you\'ve shared, the situation doesn\'t appear to be immediately dangerous, but professional confirmation can give you peace of mind. Would you like to connect with a doctor?';
   }
 
-  // Default response
-  return 'Is there something specific about your symptoms you\'d like to know more about? I\'m here to help guide you.';
+  // P1-2 FIX: Replace generic default with specific follow-up question
+  return 'Are your symptoms staying the same, getting better, or getting worse?';
 }
