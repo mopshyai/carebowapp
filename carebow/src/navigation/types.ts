@@ -10,7 +10,14 @@ import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigat
 // Root Stack Navigator
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  Conversation: { symptom: string; context: 'family' | 'me'; relation: string; age: string; memberName: string } | undefined;
+  Conversation: {
+    symptom: string;
+    context: 'family' | 'me';
+    relation: string;
+    age: string;
+    memberName: string;
+    attachedImages?: string; // JSON string of ImageAttachment[]
+  } | undefined;
   Assessment: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
   Schedule: undefined;
@@ -26,6 +33,8 @@ export type RootStackParamList = {
   RequestDetails: { id: string };
   Safety: NavigatorScreenParams<SafetyStackParamList>;
   Modal: undefined;
+  // New screens
+  HealthMemory: undefined;
 };
 
 // Main Tab Navigator

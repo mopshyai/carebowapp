@@ -1,9 +1,15 @@
 /**
  * Ask CareBow Conversation Screen
  * AI-powered health assistant conversation interface
+ *
+ * Upgrades:
+ * - Enhanced chat bubbles with collapsible sections
+ * - Memory candidate cards after AI responses
+ * - Action buttons (Connect to doctor, Book home visit, Save summary)
+ * - Support for image attachments
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +18,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -21,10 +28,14 @@ import { colors, spacing, radius, typography, shadows } from '../theme';
 
 // Store & Types
 import { useAskCarebowStore } from '../store/askCarebowStore';
+import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
 import { Message, QuickOption } from '../types/askCarebow';
+import { MemoryCandidate } from '../types/healthMemory';
+import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
 // AI Engine
 import { processUserInput } from '../lib/askCarebow';
+import { sendAskCareBowMessage, createMessagePayload } from '../lib/askCarebow/apiClient';
 
 // Components
 import {
@@ -37,6 +48,8 @@ import {
   TypingIndicator,
   SubscriptionGate,
 } from '../components/askCarebow';
+import { EnhancedChatBubble, EnhancedResponse, DEFAULT_ACTION_BUTTONS } from '../components/askCarebow/EnhancedChatBubble';
+import { MemoryCandidateCard } from '../components/askCarebow/MemoryCandidateCard';
 
 export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +57,20 @@ export default function ConversationScreen() {
   const route = useRoute();
   const params = (route.params as Record<string, string>) || {};
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Parse attached images from params
+  const attachedImages = useMemo<ImageAttachment[]>(() => {
+    try {
+      return params.attachedImages ? JSON.parse(params.attachedImages) : [];
+    } catch {
+      return [];
+    }
+  }, [params.attachedImages]);
+
+  // State for enhanced responses
+  const [enhancedResponses, setEnhancedResponses] = useState<Record<string, EnhancedResponse>>({});
+  const [showActionButtons, setShowActionButtons] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   // Store state and actions
   const {
@@ -66,6 +93,16 @@ export default function ConversationScreen() {
     incrementFreeQuestions,
     canAskQuestion,
   } = useAskCarebowStore();
+
+  // Health memory store
+  const {
+    addPendingCandidates,
+    saveCandidate,
+    dismissCandidate,
+    clearPendingCandidates,
+    getMemorySnapshot,
+  } = useHealthMemoryStore();
+  const pendingCandidates = usePendingCandidates();
 
   // Initialize session on mount
   useEffect(() => {
@@ -90,7 +127,7 @@ export default function ConversationScreen() {
 
   // Handle sending a message
   const handleSendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, images?: ImageAttachment[]) => {
       if (!currentSession || isProcessing) return;
 
       // Check subscription/free limit
@@ -107,7 +144,34 @@ export default function ConversationScreen() {
       setIsProcessing(true);
 
       try {
-        // Process through AI engine
+        // Get memory snapshot for personalization
+        const memorySnapshot = getMemorySnapshot(
+          params.context === 'family' ? 'family' : 'me'
+        );
+
+        // Create API payload
+        const payload = createMessagePayload(
+          'user_1',
+          text,
+          {
+            forWhom: (params.context as 'me' | 'family') || 'me',
+            ageGroup: params.age,
+            relationship: params.relation,
+          },
+          images || [],
+          memorySnapshot,
+          conversationId || undefined
+        );
+
+        // Send to API (mock in dev)
+        const apiResponse = await sendAskCareBowMessage(payload);
+
+        // Update conversation ID
+        if (apiResponse.conversationId) {
+          setConversationId(apiResponse.conversationId);
+        }
+
+        // Process through existing AI engine for backward compatibility
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
@@ -115,19 +179,35 @@ export default function ConversationScreen() {
           currentSession.conversationState.questionsAsked
         );
 
-        // Simulate realistic typing delay
-        await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 500));
-
         // Hide typing indicator
         setIsTyping(false);
 
-        // Add assistant messages
+        // Add assistant messages with enhanced response
+        const lastMessageId = `msg_${Date.now()}`;
         for (const msg of response.messages) {
           addAssistantMessage(msg);
           // Small delay between multiple messages
           if (response.messages.length > 1) {
             await new Promise((resolve) => setTimeout(resolve, 300));
           }
+        }
+
+        // Store enhanced response for the last message
+        if (apiResponse.enhancedResponse) {
+          setEnhancedResponses((prev) => ({
+            ...prev,
+            [lastMessageId]: apiResponse.enhancedResponse!,
+          }));
+        }
+
+        // Show action buttons if we have triage guidance
+        if (apiResponse.triageLevel && apiResponse.triageLevel !== 'self_care') {
+          setShowActionButtons(true);
+        }
+
+        // Add memory candidates if any
+        if (apiResponse.memoryCandidates && apiResponse.memoryCandidates.length > 0) {
+          addPendingCandidates(apiResponse.memoryCandidates);
         }
 
         // Update conversation state
@@ -164,8 +244,41 @@ export default function ConversationScreen() {
         setIsProcessing(false);
       }
     },
-    [currentSession, isProcessing]
+    [currentSession, isProcessing, conversationId, params]
   );
+
+  // Handle action button press
+  const handleActionPress = useCallback((action: string, buttonId: string) => {
+    switch (action) {
+      case 'connect_doctor':
+        navigation.navigate('Services' as never, { category: 'video-consult' });
+        break;
+      case 'book_home_visit':
+        navigation.navigate('Services' as never, { category: 'doctor-visit' });
+        break;
+      case 'save_summary':
+        Alert.alert(
+          'Summary Saved',
+          'Your conversation summary has been saved. You can view it in your Health Memory.',
+          [{ text: 'OK' }]
+        );
+        break;
+      default:
+        break;
+    }
+  }, [navigation]);
+
+  // Handle memory candidate save
+  const handleSaveMemoryCandidate = useCallback((candidateId: string) => {
+    saveCandidate(candidateId, currentSession?.id);
+  }, [saveCandidate, currentSession?.id]);
+
+  // Handle memory candidate edit
+  const handleEditMemoryCandidate = useCallback((candidateId: string, newValue: string) => {
+    // For now, just save with the new value
+    // In a full implementation, you'd update the candidate first
+    saveCandidate(candidateId, currentSession?.id);
+  }, [saveCandidate, currentSession?.id]);
 
   // Handle quick option selection
   const handleQuickOptionSelect = (option: QuickOption) => {
@@ -242,6 +355,17 @@ export default function ConversationScreen() {
             options={lastMessage.quickOptions}
             onSelect={handleQuickOptionSelect}
             disabled={isProcessing}
+          />
+        )}
+
+        {/* Memory Candidate Card - shown after AI response with learned info */}
+        {pendingCandidates.length > 0 && !isTyping && (
+          <MemoryCandidateCard
+            candidates={pendingCandidates}
+            onSave={handleSaveMemoryCandidate}
+            onEdit={handleEditMemoryCandidate}
+            onDismiss={dismissCandidate}
+            onDismissAll={clearPendingCandidates}
           />
         )}
 

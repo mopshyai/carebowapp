@@ -1,9 +1,15 @@
 /**
  * Ask CareBow Tab Screen
  * Entry point for the AI Health Assistant with Trial System
+ *
+ * Upgrades:
+ * - Image upload with bottom sheet
+ * - Health buddy starter prompts
+ * - Inline red-flag warning
+ * - Health Memory entry point
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,8 +30,12 @@ import {
   useTrialState,
   useCanAccessPremiumFeatures,
 } from '../../store/askCarebowStore';
+import { useHealthMemoryStore, useMemoryCount } from '../../store/healthMemoryStore';
 import { TrialSignupCard, TrialBanner } from '../../components/askCarebow/TrialSignupCard';
 import { VoiceInput } from '../../components/askCarebow/VoiceInput';
+import { ImageUploadBottomSheet, ImageAttachment } from '../../components/askCarebow/ImageUploadBottomSheet';
+import { ImageThumbnailRow } from '../../components/askCarebow/ImageThumbnailRow';
+import { RedFlagWarning, detectRedFlags } from '../../components/askCarebow/RedFlagWarning';
 
 const relationships = [
   { value: '', label: 'Select relationship...' },
@@ -35,6 +45,15 @@ const relationships = [
   { value: 'child', label: 'Child' },
   { value: 'sibling', label: 'Sibling' },
   { value: 'other', label: 'Other family member' },
+];
+
+// Health buddy starter prompts - improved
+const STARTER_PROMPTS = [
+  { text: "I'm feeling sick and worried", icon: 'sad-outline' },
+  { text: 'I have a rash (photo attached)', icon: 'image-outline' },
+  { text: 'Pain in my ____ for ____ days', icon: 'body-outline' },
+  { text: 'My child has fever', icon: 'thermometer-outline' },
+  { text: 'I feel anxious / stressed', icon: 'heart-outline' },
 ];
 
 export default function AskCareBowScreen() {
@@ -47,12 +66,40 @@ export default function AskCareBowScreen() {
   const [showRelationshipPicker, setShowRelationshipPicker] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
 
+  // New state for image upload
+  const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
+  const [showImageSheet, setShowImageSheet] = useState(false);
+
   // Get subscription and trial status from store
   const { hasSubscription, clearCurrentSession } = useAskCarebowStore();
   const isTrialActive = useIsTrialActive();
   const trialDaysRemaining = useTrialDaysRemaining();
   const trialState = useTrialState();
   const canAccessPremium = useCanAccessPremiumFeatures();
+
+  // Health memory
+  const memoryCount = useMemoryCount();
+
+  // Red flag detection
+  const showRedFlagWarning = useMemo(() => {
+    return detectRedFlags(symptomInput);
+  }, [symptomInput]);
+
+  // Emotional keyword detection for reassurance message
+  const EMOTIONAL_KEYWORDS = ['worried', 'scared', 'anxious', 'stressed', 'nervous', 'afraid', 'frightened', 'panicking', 'overwhelmed', 'terrified'];
+  const showEmotionalReassurance = useMemo(() => {
+    const lowerInput = symptomInput.toLowerCase();
+    return EMOTIONAL_KEYWORDS.some(keyword => lowerInput.includes(keyword));
+  }, [symptomInput]);
+
+  // Image handlers
+  const handleImagesSelected = useCallback((images: ImageAttachment[]) => {
+    setAttachedImages((prev) => [...prev, ...images].slice(0, 3));
+  }, []);
+
+  const handleRemoveImage = useCallback((id: string) => {
+    setAttachedImages((prev) => prev.filter((img) => img.id !== id));
+  }, []);
 
   // Handle voice transcription completion
   const handleTranscriptionComplete = (text: string) => {
@@ -66,13 +113,21 @@ export default function AskCareBowScreen() {
     // Clear any existing session before starting a new one
     clearCurrentSession();
 
+    // Navigate with all context including images
     navigation.navigate('Conversation' as never, {
       symptom: symptomInput,
       context: contextType,
       relation: familyRelation,
       age: familyAge,
       memberName: contextType === 'family' ? familyRelation : 'Me',
+      // Pass image URIs as JSON string (navigation params must be serializable)
+      attachedImages: JSON.stringify(attachedImages),
     });
+  };
+
+  // Navigate to Health Memory screen
+  const handleOpenHealthMemory = () => {
+    navigation.navigate('HealthMemory' as never);
   };
 
   const canStart =
@@ -90,15 +145,29 @@ export default function AskCareBowScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Icon name="heart" size={28} color={colors.textInverse} />
+        {/* Header with Health Memory entry point */}
+        <View style={styles.headerRow}>
+          <View style={styles.header}>
+            <View style={styles.headerIcon}>
+              <Icon name="heart" size={28} color={colors.textInverse} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Ask CareBow</Text>
+              <Text style={styles.headerBadge}>AI Health Assistant</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.headerTitle}>Ask CareBow</Text>
-            <Text style={styles.headerBadge}>AI Health Assistant</Text>
-          </View>
+          {/* Health Memory Entry Point */}
+          <TouchableOpacity
+            style={styles.memoryButton}
+            onPress={handleOpenHealthMemory}
+          >
+            <Icon name="leaf" size={18} color={colors.accent} />
+            {memoryCount > 0 && (
+              <View style={styles.memoryBadge}>
+                <Text style={styles.memoryBadgeText}>{memoryCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
         <Text style={styles.headerSubtitle}>
           I'll help you understand your symptoms and guide you to the right care.
@@ -249,9 +318,9 @@ export default function AskCareBowScreen() {
         <View style={styles.section}>
           <View style={styles.labelRow}>
             <Text style={styles.labelNoMargin}>
-              What's going on? <Text style={styles.required}>*</Text>
+              Tell me what's been bothering you. <Text style={styles.required}>*</Text>
             </Text>
-            {/* Input Mode Toggle */}
+            {/* Input Mode Toggle with Image */}
             <View style={styles.inputModeToggle}>
               <TouchableOpacity
                 style={[styles.modeButton, inputMode === 'text' && styles.modeButtonActive]}
@@ -273,11 +342,56 @@ export default function AskCareBowScreen() {
                   color={inputMode === 'voice' ? colors.accent : colors.textTertiary}
                 />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modeButton}
+                onPress={() => setShowImageSheet(true)}
+              >
+                <Icon
+                  name="camera-outline"
+                  size={16}
+                  color={attachedImages.length > 0 ? colors.accent : colors.textTertiary}
+                />
+                {attachedImages.length > 0 && (
+                  <View style={styles.imageCountBadge}>
+                    <Text style={styles.imageCountText}>{attachedImages.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
+          {/* Helper text */}
+          <Text style={styles.inputHelperText}>
+            You can start anywhere — symptoms, worries, or something that feels small.
+          </Text>
+
+          {/* Image Permission Clarity */}
+          <Text style={styles.imagePermissionText}>
+            You can safely share photos (like rashes, swelling, or wounds) if that helps explain things.
+          </Text>
+
           {inputMode === 'text' ? (
             <>
+              {/* Emotional Acknowledgement (shown ABOVE input when emotional keywords detected) */}
+              {showEmotionalReassurance && (
+                <View style={styles.emotionalReassurance}>
+                  <Icon name="heart" size={14} color={colors.accent} />
+                  <Text style={styles.emotionalReassuranceText}>
+                    Thanks for telling me — I'm here with you. We'll take this one step at a time.
+                  </Text>
+                </View>
+              )}
+
+              {/* Image Thumbnail Row (if images attached) */}
+              {attachedImages.length > 0 && (
+                <ImageThumbnailRow
+                  images={attachedImages}
+                  onRemove={handleRemoveImage}
+                  onAddMore={() => setShowImageSheet(true)}
+                  maxImages={3}
+                />
+              )}
+
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.textInput}
@@ -294,6 +408,15 @@ export default function AskCareBowScreen() {
                   textAlignVertical="top"
                 />
               </View>
+
+              {/* Red Flag Warning (inline, below input) */}
+              <RedFlagWarning visible={showRedFlagWarning} />
+
+              {/* Safe Space + Memory Signal */}
+              <Text style={styles.safeSpaceSignal}>
+                Private • Judgment-free • I remember helpful details (like allergies or past issues) to personalize care — you can edit or delete them anytime.
+              </Text>
+
               <Text style={styles.inputHint}>
                 Be as specific as possible. Include when it started, how severe it is, and anything
                 you've tried.
@@ -307,22 +430,29 @@ export default function AskCareBowScreen() {
           )}
         </View>
 
-        {/* Example Prompts */}
+        {/* Image Invitation Hints (non-interactive) */}
+        <View style={styles.imageInvitationSection}>
+          <Text style={styles.imageInvitationTitle}>You can also share:</Text>
+          <View style={styles.imageInvitationList}>
+            <Text style={styles.imageInvitationItem}>📸 Rash / skin issue</Text>
+            <Text style={styles.imageInvitationItem}>🤕 Pain or swelling</Text>
+            <Text style={styles.imageInvitationItem}>🫁 Breathing or chest issue</Text>
+            <Text style={styles.imageInvitationItem}>🧠 Stress or anxiety</Text>
+          </View>
+        </View>
+
+        {/* Health Buddy Starter Prompts (improved) */}
         <View style={styles.examplesSection}>
           <Text style={styles.examplesTitle}>Try something like:</Text>
           <View style={styles.examplesList}>
-            {[
-              "I've had a headache for 2 days",
-              'Stomach pain after eating',
-              'Feeling tired all the time',
-              'Skin rash on my arm',
-            ].map((example, index) => (
+            {STARTER_PROMPTS.map((prompt, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.exampleChip}
-                onPress={() => setSymptomInput(example)}
+                onPress={() => setSymptomInput(prompt.text)}
               >
-                <Text style={styles.exampleChipText}>{example}</Text>
+                <Icon name={prompt.icon} size={12} color={colors.textTertiary} />
+                <Text style={styles.exampleChipText}>{prompt.text}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -353,6 +483,15 @@ export default function AskCareBowScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Image Upload Bottom Sheet */}
+      <ImageUploadBottomSheet
+        visible={showImageSheet}
+        onClose={() => setShowImageSheet(false)}
+        onImagesSelected={handleImagesSelected}
+        currentImageCount={attachedImages.length}
+        maxImages={3}
+      />
     </View>
   );
 }
@@ -368,11 +507,43 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+  },
+  memoryButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  memoryBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface2,
+  },
+  memoryBadgeText: {
+    ...typography.tiny,
+    color: colors.textInverse,
+    fontSize: 10,
   },
   headerIcon: {
     width: 56,
@@ -433,9 +604,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.full,
+    position: 'relative',
   },
   modeButtonActive: {
     backgroundColor: colors.accentMuted,
+  },
+  imageCountBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageCountText: {
+    ...typography.tiny,
+    color: colors.textInverse,
+    fontSize: 9,
   },
   section: {
     marginBottom: spacing.lg,
@@ -595,6 +783,57 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
   },
+  inputHelperText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontStyle: 'italic',
+  },
+  imagePermissionText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
+  },
+  safeSpaceSignal: {
+    ...typography.tiny,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    lineHeight: 16,
+  },
+  emotionalReassurance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.accentMuted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  emotionalReassuranceText: {
+    ...typography.caption,
+    color: colors.accent,
+    flex: 1,
+  },
+  imageInvitationSection: {
+    marginBottom: spacing.md,
+  },
+  imageInvitationTitle: {
+    ...typography.labelSmall,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+  },
+  imageInvitationList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  imageInvitationItem: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
   examplesSection: {
     marginBottom: spacing.lg,
   },
@@ -609,6 +848,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   exampleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
