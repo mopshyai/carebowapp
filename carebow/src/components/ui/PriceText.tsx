@@ -4,7 +4,7 @@
  * Prevents price overflow on small screens and with long prices
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
@@ -86,7 +86,7 @@ const sizeConfig = {
 // PRICE TEXT COMPONENT
 // =============================================================================
 
-export function PriceText({
+export const PriceText = memo(function PriceText({
   amount,
   prefix,
   currencySymbol = '$',
@@ -189,7 +189,7 @@ export function PriceText({
       )}
     </View>
   );
-}
+});
 
 // =============================================================================
 // PRICE ROW COMPONENT (for badge + price combinations)

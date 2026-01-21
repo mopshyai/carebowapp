@@ -8,7 +8,7 @@
  * - WCAG AA compliant contrast
  */
 
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, Platform, ViewStyle } from 'react-native';
 import { AppIcon, IconName } from '../icons';
 import { colors, spacing, radius } from '../../theme';
@@ -116,7 +116,7 @@ interface StatusBadgeProps {
   style?: ViewStyle;
 }
 
-export function StatusBadge({
+export const StatusBadge = memo(function StatusBadge({
   type,
   label,
   size = 'sm',
@@ -156,7 +156,7 @@ export function StatusBadge({
       </Text>
     </View>
   );
-}
+});
 
 // Inline dot badge (smaller, simpler)
 interface DotBadgeProps {
@@ -165,7 +165,7 @@ interface DotBadgeProps {
   style?: ViewStyle;
 }
 
-export function DotBadge({ type, label, style }: DotBadgeProps) {
+export const DotBadge = memo(function DotBadge({ type, label, style }: DotBadgeProps) {
   const config = BADGE_CONFIGS[type];
 
   return (
@@ -174,7 +174,7 @@ export function DotBadge({ type, label, style }: DotBadgeProps) {
       <Text style={[styles.dotLabel, { color: config.textColor }]}>{label}</Text>
     </View>
   );
-}
+});
 
 // Discount badge (positioned absolutely)
 interface DiscountBadgeProps {
@@ -182,7 +182,7 @@ interface DiscountBadgeProps {
   style?: ViewStyle;
 }
 
-export function DiscountBadge({ percent, style }: DiscountBadgeProps) {
+export const DiscountBadge = memo(function DiscountBadge({ percent, style }: DiscountBadgeProps) {
   return (
     <View
       style={[
@@ -195,14 +195,14 @@ export function DiscountBadge({ percent, style }: DiscountBadgeProps) {
       <Text style={styles.discountText}>{percent}% OFF</Text>
     </View>
   );
-}
+});
 
 // Popular badge (positioned absolutely with star)
 interface PopularBadgeProps {
   style?: ViewStyle;
 }
 
-export function PopularBadge({ style }: PopularBadgeProps) {
+export const PopularBadge = memo(function PopularBadge({ style }: PopularBadgeProps) {
   return (
     <View
       style={[
@@ -216,7 +216,7 @@ export function PopularBadge({ style }: PopularBadgeProps) {
       <Text style={styles.popularText}>Popular</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // Base badge

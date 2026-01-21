@@ -1,12 +1,12 @@
 /**
  * Orders Store
  * Manages completed orders after payment
- *
- * TODO: Persist to AsyncStorage when implementing offline support
- * TODO: Sync with backend API when available
+ * Persists orders to AsyncStorage for offline support
  */
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Order, OrderStatus, PaymentInfo, CartItem, BookingDraft } from '@/data/types';
 
 type OrdersStore = {
@@ -36,8 +36,10 @@ type OrdersStore = {
 // Generate unique ID
 const generateId = () => `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-export const useOrdersStore = create<OrdersStore>((set, get) => ({
-  orders: [],
+export const useOrdersStore = create<OrdersStore>()(
+  persist(
+    (set, get) => ({
+      orders: [],
 
   // Create order from cart item (after checkout)
   createOrderFromCart: (cartItem, payment) => {
@@ -171,4 +173,10 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   clearOrders: () => {
     set({ orders: [] });
   },
-}));
+    }),
+    {
+      name: '@carebow/orders',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);

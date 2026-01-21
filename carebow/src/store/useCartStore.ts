@@ -1,12 +1,12 @@
 /**
  * Cart Store
  * Manages shopping cart state and booking drafts
- *
- * TODO: Persist to AsyncStorage when implementing offline support
- * TODO: Sync with backend API when available
+ * Persists cart items to AsyncStorage for offline support
  */
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookingDraft, CartItem, Service, PackageOption } from '@/data/types';
 import { calculatePrice } from '@/data/services';
 
@@ -82,9 +82,11 @@ const createInitialDraft = (service: Service): BookingDraft => {
   };
 };
 
-export const useCartStore = create<CartStore>((set, get) => ({
-  items: [],
-  bookingDraft: null,
+export const useCartStore = create<CartStore>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      bookingDraft: null,
 
   // Initialize booking draft from a service
   initBookingDraft: (service) => {
@@ -201,4 +203,14 @@ export const useCartStore = create<CartStore>((set, get) => ({
   getTotalPrice: () => {
     return get().items.reduce((total, item) => total + item.total, 0);
   },
-}));
+    }),
+    {
+      name: '@carebow/cart',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Only persist cart items, not the transient bookingDraft
+      partialize: (state) => ({
+        items: state.items,
+      }),
+    }
+  )
+);
