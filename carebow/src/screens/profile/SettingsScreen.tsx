@@ -106,7 +106,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: () => {
           logout();
-          navigation.reset({ index: 0, routes: [{ name: 'Tabs' as never }] });
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
         },
       },
     ]);

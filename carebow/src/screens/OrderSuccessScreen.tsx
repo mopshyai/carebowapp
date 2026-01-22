@@ -49,7 +49,7 @@ export default function OrderSuccessScreen() {
   const handleViewOrders = () => {
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Tabs' }],
+      routes: [{ name: 'MainTabs' }],
     });
   };
 

@@ -122,7 +122,7 @@ export default function ProfileIndexScreen() {
 
   const handleSignOut = () => {
     logout();
-    navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
   };
 
   return (

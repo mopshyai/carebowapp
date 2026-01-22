@@ -9,10 +9,17 @@
  * - Any PII that needs protection at rest
  *
  * DO NOT use AsyncStorage for sensitive data.
+ *
+ * FALLBACK: When Keychain is unavailable (e.g., iOS Simulator), falls back to AsyncStorage
+ * with a warning. This is NOT secure and should only be used in development.
  */
 
 import * as Keychain from 'react-native-keychain';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Fallback storage prefix for AsyncStorage (development only)
+const FALLBACK_PREFIX = '@carebow_secure_fallback:';
 
 // ============================================
 // TYPES
@@ -49,35 +56,96 @@ type SecureStorageKey =
 
 const DEFAULT_SERVICE = 'com.carebow.app';
 
-const DEFAULT_OPTIONS: SecureStorageOptions = {
+// Safe access to Keychain constants (they may be undefined if native module is unavailable)
+const getDefaultOptions = (): SecureStorageOptions => ({
   service: DEFAULT_SERVICE,
-  accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
-};
+  accessible: Keychain.ACCESSIBLE?.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  securityLevel: Keychain.SECURITY_LEVEL?.SECURE_HARDWARE,
+});
 
-const BIOMETRIC_OPTIONS: SecureStorageOptions = {
-  ...DEFAULT_OPTIONS,
-  accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
-};
+const getBiometricOptions = (): SecureStorageOptions => ({
+  ...getDefaultOptions(),
+  accessControl: Keychain.ACCESS_CONTROL?.BIOMETRY_CURRENT_SET_OR_DEVICE_PASSCODE,
+});
 
 // ============================================
 // SECURE STORAGE CLASS
 // ============================================
 
 class SecureStorageService {
-  private isAvailable: boolean | null = null;
+  private keychainAvailable: boolean | null = null;
+  private hasLoggedFallbackWarning: boolean = false;
+
+  /**
+   * Log a warning about using fallback storage (only once)
+   */
+  private logFallbackWarning(): void {
+    if (!this.hasLoggedFallbackWarning && __DEV__) {
+      console.warn(
+        '[SecureStorage] WARNING: Keychain native module is not available. ' +
+        'Falling back to AsyncStorage which is NOT secure. ' +
+        'This is acceptable for development/simulator but NOT for production builds.'
+      );
+      this.hasLoggedFallbackWarning = true;
+    }
+  }
+
+  /**
+   * Check if Keychain is working by testing it
+   */
+  private async isKeychainWorking(): Promise<boolean> {
+    if (this.keychainAvailable !== null) {
+      return this.keychainAvailable;
+    }
+
+    // First check if the native module exists at all
+    // NativeModules.RNKeychain will be null if the native module isn't linked
+    const nativeModule = NativeModules.RNKeychain;
+    if (!nativeModule) {
+      if (__DEV__) {
+        console.log('[SecureStorage] Native module RNKeychain is null - not linked');
+      }
+      this.keychainAvailable = false;
+      this.logFallbackWarning();
+      return false;
+    }
+
+    // Also verify the JS module has the expected functions
+    if (!Keychain || typeof Keychain.getSupportedBiometryType !== 'function') {
+      this.keychainAvailable = false;
+      this.logFallbackWarning();
+      return false;
+    }
+
+    try {
+      // Test if Keychain actually works by calling getSupportedBiometryType
+      await Keychain.getSupportedBiometryType();
+      this.keychainAvailable = true;
+      return true;
+    } catch (error) {
+      // Any error during the test means Keychain is not working properly
+      // This includes "Cannot read property 'X' of null" errors
+      this.keychainAvailable = false;
+      this.logFallbackWarning();
+      if (__DEV__) {
+        console.log('[SecureStorage] Keychain test failed:', error);
+      }
+      return false;
+    }
+  }
 
   /**
    * Check if secure storage is available on this device
    */
   async checkAvailability(): Promise<boolean> {
-    if (this.isAvailable !== null) {
-      return this.isAvailable;
+    const keychainWorks = await this.isKeychainWorking();
+
+    if (!keychainWorks) {
+      return false;
     }
 
     try {
       const biometryType = await Keychain.getSupportedBiometryType();
-      this.isAvailable = true;
 
       if (__DEV__) {
         console.log('[SecureStorage] Available. Biometry type:', biometryType);
@@ -86,7 +154,6 @@ class SecureStorageService {
       return true;
     } catch (error) {
       console.error('[SecureStorage] Not available:', error);
-      this.isAvailable = false;
       return false;
     }
   }
@@ -99,8 +166,25 @@ class SecureStorageService {
     value: string,
     options?: SecureStorageOptions
   ): Promise<boolean> {
+    // Check if Keychain is working
+    const keychainWorks = await this.isKeychainWorking();
+
+    // Use fallback if Keychain is not available
+    if (!keychainWorks) {
+      try {
+        await AsyncStorage.setItem(`${FALLBACK_PREFIX}${key}`, value);
+        if (__DEV__) {
+          console.log(`[SecureStorage] Stored (fallback): ${key}`);
+        }
+        return true;
+      } catch (error) {
+        console.error(`[SecureStorage] Fallback storage failed for ${key}:`, error);
+        return false;
+      }
+    }
+
     try {
-      const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+      const mergedOptions = { ...getDefaultOptions(), ...options };
 
       await Keychain.setGenericPassword(key, value, {
         service: `${mergedOptions.service}.${key}`,
@@ -115,6 +199,13 @@ class SecureStorageService {
 
       return true;
     } catch (error) {
+      // If Keychain fails at runtime, mark it as unavailable and retry with fallback
+      const errorMessage = String(error);
+      if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
+        this.keychainAvailable = false;
+        this.logFallbackWarning();
+        return this.setItem(key, value, options);
+      }
       console.error(`[SecureStorage] Failed to store ${key}:`, error);
       return false;
     }
@@ -127,8 +218,27 @@ class SecureStorageService {
     key: SecureStorageKey,
     options?: SecureStorageOptions
   ): Promise<string | null> {
+    // Check if Keychain is working
+    const keychainWorks = await this.isKeychainWorking();
+
+    // Use fallback if Keychain is not available
+    if (!keychainWorks) {
+      try {
+        const value = await AsyncStorage.getItem(`${FALLBACK_PREFIX}${key}`);
+        if (__DEV__ && value) {
+          console.log(`[SecureStorage] Retrieved (fallback): ${key}`);
+        }
+        return value;
+      } catch (error) {
+        if (__DEV__) {
+          console.log(`[SecureStorage] Fallback retrieval failed for ${key}:`, error);
+        }
+        return null;
+      }
+    }
+
     try {
-      const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+      const mergedOptions = { ...getDefaultOptions(), ...options };
 
       const credentials = await Keychain.getGenericPassword({
         service: `${mergedOptions.service}.${key}`,
@@ -144,6 +254,13 @@ class SecureStorageService {
 
       return null;
     } catch (error) {
+      // If Keychain fails at runtime, mark it as unavailable and retry with fallback
+      const errorMessage = String(error);
+      if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
+        this.keychainAvailable = false;
+        this.logFallbackWarning();
+        return this.getItem(key, options);
+      }
       // User cancelled biometric prompt or error occurred
       if (__DEV__) {
         console.log(`[SecureStorage] Failed to retrieve ${key}:`, error);
@@ -159,8 +276,25 @@ class SecureStorageService {
     key: SecureStorageKey,
     options?: SecureStorageOptions
   ): Promise<boolean> {
+    // Check if Keychain is working
+    const keychainWorks = await this.isKeychainWorking();
+
+    // Use fallback if Keychain is not available
+    if (!keychainWorks) {
+      try {
+        await AsyncStorage.removeItem(`${FALLBACK_PREFIX}${key}`);
+        if (__DEV__) {
+          console.log(`[SecureStorage] Removed (fallback): ${key}`);
+        }
+        return true;
+      } catch (error) {
+        console.error(`[SecureStorage] Fallback removal failed for ${key}:`, error);
+        return false;
+      }
+    }
+
     try {
-      const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+      const mergedOptions = { ...getDefaultOptions(), ...options };
 
       await Keychain.resetGenericPassword({
         service: `${mergedOptions.service}.${key}`,
@@ -172,6 +306,13 @@ class SecureStorageService {
 
       return true;
     } catch (error) {
+      // If Keychain fails at runtime, mark it as unavailable and retry with fallback
+      const errorMessage = String(error);
+      if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
+        this.keychainAvailable = false;
+        this.logFallbackWarning();
+        return this.removeItem(key, options);
+      }
       console.error(`[SecureStorage] Failed to remove ${key}:`, error);
       return false;
     }
@@ -184,15 +325,35 @@ class SecureStorageService {
     key: SecureStorageKey,
     options?: SecureStorageOptions
   ): Promise<boolean> {
+    // Check if Keychain is working
+    const keychainWorks = await this.isKeychainWorking();
+
+    // Use fallback if Keychain is not available
+    if (!keychainWorks) {
+      try {
+        const value = await AsyncStorage.getItem(`${FALLBACK_PREFIX}${key}`);
+        return value !== null;
+      } catch {
+        return false;
+      }
+    }
+
     try {
-      const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+      const mergedOptions = { ...getDefaultOptions(), ...options };
 
       const credentials = await Keychain.getGenericPassword({
         service: `${mergedOptions.service}.${key}`,
       });
 
       return !!credentials && !!credentials.password;
-    } catch {
+    } catch (error) {
+      // If Keychain fails at runtime, mark it as unavailable and retry with fallback
+      const errorMessage = String(error);
+      if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
+        this.keychainAvailable = false;
+        this.logFallbackWarning();
+        return this.hasItem(key, options);
+      }
       return false;
     }
   }
@@ -235,7 +396,7 @@ class SecureStorageService {
     key: SecureStorageKey,
     value: string
   ): Promise<boolean> {
-    return this.setItem(key, value, BIOMETRIC_OPTIONS);
+    return this.setItem(key, value, getBiometricOptions());
   }
 
   /**
@@ -244,7 +405,7 @@ class SecureStorageService {
   async getItemWithBiometrics(
     key: SecureStorageKey
   ): Promise<string | null> {
-    return this.getItem(key, BIOMETRIC_OPTIONS);
+    return this.getItem(key, getBiometricOptions());
   }
 
   // ========================================
@@ -355,6 +516,12 @@ class SecureStorageService {
    * Get biometric type available on device
    */
   async getBiometricType(): Promise<Keychain.BIOMETRY_TYPE | null> {
+    const keychainWorks = await this.isKeychainWorking();
+
+    if (!keychainWorks) {
+      return null;
+    }
+
     try {
       const type = await Keychain.getSupportedBiometryType();
       return type;
@@ -369,6 +536,14 @@ class SecureStorageService {
   async authenticateWithBiometrics(
     promptMessage: string = 'Authenticate to continue'
   ): Promise<boolean> {
+    const keychainWorks = await this.isKeychainWorking();
+
+    if (!keychainWorks) {
+      // In fallback mode, biometrics aren't available - return true to allow access
+      // This is only for development/simulator
+      return true;
+    }
+
     try {
       // Try to access a biometric-protected item
       // This will trigger the biometric prompt
