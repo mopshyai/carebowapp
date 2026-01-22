@@ -18,6 +18,9 @@ import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { SafetyContact } from '../types';
 import { sendMissedCheckInAlert } from '../services/sosService';
 import { getLocationWithFallback, LocationData } from '../services/locationService';
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('MissedCheckIn');
 
 // ============================================
 // TYPES
@@ -66,7 +69,7 @@ export function MissedCheckInModal({
       onNotifyContacts();
       onClose();
     } catch (error) {
-      console.error('Failed to notify contacts:', error);
+      logger.error('Failed to notify contacts', error);
     } finally {
       setIsNotifying(false);
     }

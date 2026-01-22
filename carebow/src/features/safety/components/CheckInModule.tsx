@@ -27,6 +27,9 @@ import {
   formatScheduledTime,
 } from '../services/checkInService';
 import { triggerSuccessHaptic } from '../services/sosService';
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('CheckIn');
 
 // ============================================
 // TYPES
@@ -132,7 +135,7 @@ export function CheckInModule({
         checkmarkScale.value = withTiming(0, { duration: 200 });
       }, 2000);
     } catch (error) {
-      console.error('Check-in failed:', error);
+      logger.error('Check-in failed', error);
     } finally {
       setIsLoading(false);
     }

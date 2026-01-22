@@ -22,6 +22,9 @@ import NetInfo, { NetInfoState, NetInfoSubscription } from '@react-native-commun
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, typography } from '../theme';
 import { api } from '../services/api';
+import { createLogger } from './logger';
+
+const logger = createLogger('Network');
 
 // ============================================
 // SYNC HANDLERS
@@ -42,15 +45,15 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.healthRecords.create(data);
-        if (__DEV__) console.log('[Sync] Creating health record:', data.id);
+        logger.debug('[Sync] Creating health record:', data.id);
         break;
       case 'update':
         // await api.healthRecords.update(data.id as string, data);
-        if (__DEV__) console.log('[Sync] Updating health record:', data.id);
+        logger.debug('[Sync] Updating health record:', data.id);
         break;
       case 'delete':
         // await api.healthRecords.delete(data.id as string);
-        if (__DEV__) console.log('[Sync] Deleting health record:', data.id);
+        logger.debug('[Sync] Deleting health record:', data.id);
         break;
     }
   },
@@ -60,15 +63,15 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.orders.create(data);
-        if (__DEV__) console.log('[Sync] Creating order:', data.id);
+        logger.debug('[Sync] Creating order:', data.id);
         break;
       case 'update':
         // await api.orders.update(data.id as string, data);
-        if (__DEV__) console.log('[Sync] Updating order:', data.id);
+        logger.debug('[Sync] Updating order:', data.id);
         break;
       case 'delete':
         // await api.orders.cancel(data.id as string);
-        if (__DEV__) console.log('[Sync] Cancelling order:', data.id);
+        logger.debug('[Sync] Cancelling order:', data.id);
         break;
     }
   },
@@ -78,15 +81,15 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.serviceRequests.create(data);
-        if (__DEV__) console.log('[Sync] Creating service request:', data.id);
+        logger.debug('[Sync] Creating service request:', data.id);
         break;
       case 'update':
         // await api.serviceRequests.update(data.id as string, data);
-        if (__DEV__) console.log('[Sync] Updating service request:', data.id);
+        logger.debug('[Sync] Updating service request:', data.id);
         break;
       case 'delete':
         // await api.serviceRequests.cancel(data.id as string);
-        if (__DEV__) console.log('[Sync] Cancelling service request:', data.id);
+        logger.debug('[Sync] Cancelling service request:', data.id);
         break;
     }
   },
@@ -96,7 +99,7 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'update':
         // await api.users.updateProfile(data);
-        if (__DEV__) console.log('[Sync] Updating user profile');
+        logger.debug('[Sync] Updating user profile');
         break;
     }
   },
@@ -106,15 +109,15 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.familyMembers.create(data);
-        if (__DEV__) console.log('[Sync] Creating family member:', data.id);
+        logger.debug('[Sync] Creating family member:', data.id);
         break;
       case 'update':
         // await api.familyMembers.update(data.id as string, data);
-        if (__DEV__) console.log('[Sync] Updating family member:', data.id);
+        logger.debug('[Sync] Updating family member:', data.id);
         break;
       case 'delete':
         // await api.familyMembers.delete(data.id as string);
-        if (__DEV__) console.log('[Sync] Deleting family member:', data.id);
+        logger.debug('[Sync] Deleting family member:', data.id);
         break;
     }
   },
@@ -124,15 +127,15 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.addresses.create(data);
-        if (__DEV__) console.log('[Sync] Creating address:', data.id);
+        logger.debug('[Sync] Creating address:', data.id);
         break;
       case 'update':
         // await api.addresses.update(data.id as string, data);
-        if (__DEV__) console.log('[Sync] Updating address:', data.id);
+        logger.debug('[Sync] Updating address:', data.id);
         break;
       case 'delete':
         // await api.addresses.delete(data.id as string);
-        if (__DEV__) console.log('[Sync] Deleting address:', data.id);
+        logger.debug('[Sync] Deleting address:', data.id);
         break;
     }
   },
@@ -142,7 +145,7 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.safety.recordCheckIn(data);
-        if (__DEV__) console.log('[Sync] Recording check-in:', data.timestamp);
+        logger.debug('[Sync] Recording check-in:', data.timestamp);
         break;
     }
   },
@@ -152,7 +155,7 @@ const syncHandlers: Record<string, SyncHandler> = {
     switch (type) {
       case 'create':
         // await api.analytics.track(data);
-        if (__DEV__) console.log('[Sync] Tracking analytics event:', data.event);
+        logger.debug('[Sync] Tracking analytics event:', data.event);
         break;
     }
   },
@@ -310,7 +313,7 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
         setPendingOperations(JSON.parse(queueData));
       }
     } catch (error) {
-      console.error('[NetworkProvider] Failed to load sync queue:', error);
+      logger.error('Failed to load sync queue', error);
     }
   };
 
@@ -318,7 +321,7 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
     try {
       await AsyncStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(operations));
     } catch (error) {
-      console.error('[NetworkProvider] Failed to save sync queue:', error);
+      logger.error('Failed to save sync queue', error);
     }
   };
 
@@ -335,18 +338,14 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
       setPendingOperations(updatedQueue);
       await saveSyncQueue(updatedQueue);
 
-      if (__DEV__) {
-        console.log('[NetworkProvider] Added to sync queue:', newOperation);
-      }
+      logger.debug('Added to sync queue', newOperation);
     },
     [pendingOperations]
   );
 
   const syncPendingOperations = useCallback(async () => {
     if (!networkState.isConnected || !networkState.isInternetReachable) {
-      if (__DEV__) {
-        console.log('[NetworkProvider] Cannot sync - offline');
-      }
+      logger.debug('Cannot sync - offline');
       return;
     }
 
@@ -354,9 +353,7 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
       return;
     }
 
-    if (__DEV__) {
-      console.log('[NetworkProvider] Syncing', pendingOperations.length, 'operations');
-    }
+    logger.debug('Syncing operations', pendingOperations.length);
 
     const remainingOperations: PendingOperation[] = [];
 
@@ -367,12 +364,10 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
 
         if (handler) {
           await handler(operation.type, operation.data);
-          if (__DEV__) {
-            console.log('[NetworkProvider] Synced operation:', operation.id, operation.entity, operation.type);
-          }
+          logger.debug('Synced operation', { id: operation.id, entity: operation.entity, type: operation.type });
         } else {
           // Unknown entity type - log warning and skip
-          console.warn('[NetworkProvider] Unknown entity type:', operation.entity);
+          logger.warn('Unknown entity type', operation.entity);
         }
       } catch (error) {
         // If sync fails, add back to queue with increased retry count
@@ -383,11 +378,7 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
           });
         } else {
           // Max retries exceeded, log and discard
-          console.error(
-            '[NetworkProvider] Operation failed after max retries:',
-            operation.id,
-            error
-          );
+          logger.error('Operation failed after max retries', { id: operation.id, error });
         }
       }
     }

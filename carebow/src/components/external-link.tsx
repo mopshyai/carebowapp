@@ -1,5 +1,8 @@
 import { Linking, TouchableOpacity, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { type ReactNode } from 'react';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ExternalLink');
 
 type Props = {
   href: string;
@@ -16,7 +19,7 @@ export function ExternalLink({ href, children, style, textStyle }: Props) {
         await Linking.openURL(href);
       }
     } catch (error) {
-      console.error('Failed to open URL:', error);
+      logger.error('Failed to open URL', error);
     }
   };
 

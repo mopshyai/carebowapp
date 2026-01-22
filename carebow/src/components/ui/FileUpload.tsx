@@ -22,6 +22,9 @@ import DocumentPicker, {
 } from 'react-native-document-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('FileUpload');
 
 // ============================================
 // TYPES
@@ -280,7 +283,7 @@ export function FileUpload({
         // User cancelled, do nothing
         return;
       }
-      console.error('[FileUpload] Error picking document:', err);
+      logger.error('Error picking document', err);
       Alert.alert('Error', 'Failed to select file. Please try again.');
     }
   }, [disabled, isUploading, multiple, files, maxFiles, onFilesSelected, validateFile, getDocumentPickerTypes]);

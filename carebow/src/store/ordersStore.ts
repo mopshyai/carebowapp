@@ -16,6 +16,9 @@ import {
   money,
   generateBookingId,
 } from '@/types/booking';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('OrdersStore');
 
 // ============================================
 // STORE TYPES
@@ -89,7 +92,7 @@ export const useOrdersStore = create<OrdersStore>()(
           orders: [newOrder, ...state.orders],
         }));
 
-        console.log('[OrdersStore] Created pending order:', newOrder.id);
+        logger.debug('Created pending order', newOrder.id);
         return newOrder;
       },
 
@@ -119,7 +122,7 @@ export const useOrdersStore = create<OrdersStore>()(
           ),
         }));
 
-        console.log('[OrdersStore] Payment success for order:', orderId);
+        logger.debug('Payment success for order', orderId);
       },
 
       /**
@@ -145,7 +148,7 @@ export const useOrdersStore = create<OrdersStore>()(
           ),
         }));
 
-        console.log('[OrdersStore] Payment failed for order:', orderId, reason);
+        logger.debug('Payment failed for order', { orderId, reason });
       },
 
       /**
@@ -177,7 +180,7 @@ export const useOrdersStore = create<OrdersStore>()(
           ),
         }));
 
-        console.log('[OrdersStore] Cancelled order:', orderId);
+        logger.debug('Cancelled order', orderId);
       },
 
       /**
@@ -199,7 +202,7 @@ export const useOrdersStore = create<OrdersStore>()(
           ),
         }));
 
-        console.log('[OrdersStore] Refunded order:', orderId);
+        logger.debug('Refunded order', orderId);
       },
 
       /**
@@ -216,7 +219,7 @@ export const useOrdersStore = create<OrdersStore>()(
           ),
         }));
 
-        console.log('[OrdersStore] Fulfilled order:', orderId);
+        logger.debug('Fulfilled order', orderId);
       },
 
       /**
@@ -266,7 +269,7 @@ export const useOrdersStore = create<OrdersStore>()(
        */
       clearOrders: () => {
         set({ orders: [] });
-        console.log('[OrdersStore] Cleared all orders');
+        logger.debug('Cleared all orders');
       },
     }),
     {

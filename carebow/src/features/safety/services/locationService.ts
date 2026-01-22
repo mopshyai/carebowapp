@@ -6,6 +6,9 @@
 import { Platform, PermissionsAndroid } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
 import { PermissionStatus } from '../types';
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('Location');
 
 // ============================================
 // TYPES
@@ -52,7 +55,7 @@ export async function requestLocationPermission(): Promise<PermissionStatus> {
     // Geolocation will prompt automatically when called
     return 'granted';
   } catch (error) {
-    console.error('Error requesting location permission:', error);
+    logger.error('Error requesting location permission', error);
     return 'denied';
   }
 }
@@ -68,7 +71,7 @@ export async function getLocationPermissionStatus(): Promise<PermissionStatus> {
     // iOS - assume granted since we can't check without triggering the prompt
     return 'granted';
   } catch (error) {
-    console.error('Error getting location permission status:', error);
+    logger.error('Error getting location permission status', error);
     return 'denied';
   }
 }
@@ -98,7 +101,7 @@ export async function getCurrentLocation(
         });
       },
       (error) => {
-        console.error('Error getting location:', error);
+        logger.error('Error getting location', error);
         resolve({
           success: false,
           error: error.message || 'Failed to get location',
@@ -131,7 +134,7 @@ export async function getLastKnownLocation(): Promise<LocationResult> {
         });
       },
       (error) => {
-        console.error('Error getting last known location:', error);
+        logger.error('Error getting last known location', error);
         resolve({
           success: false,
           error: error.message || 'No last known location available',
@@ -197,6 +200,6 @@ export async function getAddressFromCoordinates(
 ): Promise<string | null> {
   // In RN CLI, reverse geocoding requires an external API
   // For now, return null - you can implement using Google Maps Geocoding API
-  console.log('Reverse geocoding not implemented in RN CLI. Coordinates:', lat, lng);
+  logger.debug('Reverse geocoding not implemented in RN CLI. Coordinates:', { lat, lng });
   return null;
 }

@@ -16,6 +16,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('ImageUpload');
 
 // Dynamic import for react-native-image-picker to handle cases where native module isn't linked
 let launchCamera: any;
@@ -128,7 +131,7 @@ export function ImageUploadBottomSheet({
 
       processResponse(result);
     } catch (error) {
-      console.error('Camera error:', error);
+      logger.error('Camera error', error);
       Alert.alert('Error', 'Failed to open camera. Please check permissions.');
     }
   };
@@ -160,7 +163,7 @@ export function ImageUploadBottomSheet({
 
       processResponse(result);
     } catch (error) {
-      console.error('Library error:', error);
+      logger.error('Library error', error);
       Alert.alert('Error', 'Failed to open photo library. Please check permissions.');
     }
   };

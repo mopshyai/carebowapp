@@ -16,6 +16,9 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { SentryService, addBreadcrumb } from '@/services/monitoring/SentryService';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ErrorBoundary');
 
 // ============================================
 // TYPES
@@ -55,15 +58,13 @@ export const ErrorLogger = {
    * Log an error to the reporting service
    */
   logError: (error: Error, errorInfo?: ErrorInfo, context?: Record<string, unknown>) => {
-    // Always log to console in development
-    if (__DEV__) {
-      console.error('[ErrorBoundary] Caught error:', error);
-      if (errorInfo) {
-        console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
-      }
-      if (context) {
-        console.error('[ErrorBoundary] Context:', context);
-      }
+    // Log errors (logger is environment-aware)
+    logger.error('Caught error', error);
+    if (errorInfo) {
+      logger.error('Component stack', errorInfo.componentStack);
+    }
+    if (context) {
+      logger.error('Context', context);
     }
 
     // Send to Sentry for crash reporting
@@ -92,19 +93,15 @@ export const ErrorLogger = {
     };
 
     // In production, this could be stored in AsyncStorage and sent when the app recovers
-    // For now, just log it
-    if (!__DEV__) {
-      console.log('[ErrorLogger] Error recorded:', JSON.stringify(errorRecord, null, 2));
-    }
+    // For now, log it (logger handles environment filtering)
+    logger.info('Error recorded', errorRecord);
   },
 
   /**
    * Log a warning (non-fatal)
    */
   logWarning: (message: string, context?: Record<string, unknown>) => {
-    if (__DEV__) {
-      console.warn('[ErrorBoundary] Warning:', message, context);
-    }
+    logger.warn(message, context);
 
     // Send to Sentry as a message with warning level
     SentryService.captureMessage(message, 'warning', context as Record<string, string | number | boolean | undefined>);

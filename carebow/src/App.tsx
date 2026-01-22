@@ -23,6 +23,9 @@ import { ToastProvider } from './components/ui/Toast';
 import { initializeSentry } from './services/monitoring/SentryService';
 import { useAuthStore } from './store/useAuthStore';
 import { ThemeProvider, useTheme } from './theme';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('App');
 
 // Initialize services on app load
 initializeSentry();
@@ -157,9 +160,7 @@ function AppContent() {
         // Add any other initialization logic here
         // e.g., fetch user preferences, check for updates, etc.
 
-        if (__DEV__) {
-          console.log('[App] Initialization complete');
-        }
+        logger.debug('Initialization complete');
       } catch (error) {
         ErrorLogger.logError(
           error instanceof Error ? error : new Error(String(error)),
@@ -177,17 +178,15 @@ function AppContent() {
   // Handle deep links that arrive while app is running
   useEffect(() => {
     const handleDeepLink = (event: { url: string }) => {
-      if (__DEV__) {
-        console.log('[App] Deep link received:', event.url);
-      }
+      logger.debug('Deep link received:', event.url);
     };
 
     const subscription = Linking.addEventListener('url', handleDeepLink);
 
     // Handle deep link that opened the app
     Linking.getInitialURL().then((url) => {
-      if (url && __DEV__) {
-        console.log('[App] Initial deep link:', url);
+      if (url) {
+        logger.debug('Initial deep link:', url);
       }
     });
 
@@ -220,9 +219,9 @@ function AppContent() {
         linking={linking}
         onStateChange={(state) => {
           // Can be used for analytics screen tracking
-          if (__DEV__ && state) {
+          if (state) {
             const currentRoute = state.routes[state.index];
-            console.log('[Navigation] Screen:', currentRoute?.name);
+            logger.debug('Navigation screen:', currentRoute?.name);
           }
         }}
         fallback={null}

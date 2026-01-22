@@ -27,6 +27,9 @@ import {
   createEmptyCarePreferences,
 } from '@/types/profile';
 import type { OnboardingStackParamList } from '@/navigation/types';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('CreateProfile');
 
 type CreateProfileNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'CreateProfile'>;
 type CreateProfileRouteProp = RouteProp<OnboardingStackParamList, 'CreateProfile'>;
@@ -139,7 +142,7 @@ export default function CreateProfileScreen() {
       setOnboardingStep('complete');
       navigation.navigate('OnboardingComplete');
     } catch (error) {
-      console.error('Failed to create profile:', error);
+      logger.error('Failed to create profile', error);
     } finally {
       setIsLoading(false);
     }

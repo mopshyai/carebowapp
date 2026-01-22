@@ -7,6 +7,9 @@ import { Linking, Platform } from 'react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { SafetyContact, SMS_TEMPLATES, createGoogleMapsLink } from '../types';
 import { LocationData, getLocationWithFallback } from './locationService';
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('SOS');
 
 // ============================================
 // TYPES
@@ -28,25 +31,25 @@ export async function triggerSOSHaptic(): Promise<void> {
   try {
     // Strong haptic feedback for SOS
     ReactNativeHapticFeedback.trigger('notificationWarning');
-  } catch (error) {
+  } catch {
     // Haptics may not be available on all devices
-    console.log('Haptics not available');
+    logger.debug('Haptics not available');
   }
 }
 
 export async function triggerSuccessHaptic(): Promise<void> {
   try {
     ReactNativeHapticFeedback.trigger('notificationSuccess');
-  } catch (error) {
-    console.log('Haptics not available');
+  } catch {
+    logger.debug('Haptics not available');
   }
 }
 
 export async function triggerLightHaptic(): Promise<void> {
   try {
     await ReactNativeHapticFeedback.trigger('impactLight');
-  } catch (error) {
-    console.log('Haptics not available');
+  } catch {
+    logger.debug('Haptics not available');
   }
 }
 
@@ -69,7 +72,7 @@ export async function openPhoneDialer(phoneNumber: string): Promise<boolean> {
     }
     return false;
   } catch (error) {
-    console.error('Failed to open phone dialer:', error);
+    logger.error('Failed to open phone dialer', error);
     return false;
   }
 }
@@ -142,7 +145,7 @@ export async function openSMSComposer(
 
     return false;
   } catch (error) {
-    console.error('Failed to open SMS composer:', error);
+    logger.error('Failed to open SMS composer', error);
     return false;
   }
 }

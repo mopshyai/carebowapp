@@ -14,6 +14,9 @@ import {
   NEGATIVE_FEEDBACK_REASONS,
   generateFeedbackId,
 } from '../types/feedback';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Feedback');
 
 interface FeedbackState {
   // All feedback entries
@@ -68,8 +71,8 @@ export const useFeedbackStore = create<FeedbackState>()(
           ratedMessages: { ...state.ratedMessages, [messageId]: true },
         }));
 
-        // Log to console for dev review
-        console.log('[Feedback]', {
+        // Log for dev review
+        logger.debug('Feedback submitted', {
           rating,
           reason: reason ? NEGATIVE_FEEDBACK_REASONS[reason] : undefined,
           episodeId,
@@ -139,26 +142,28 @@ export const useFeedbackStore = create<FeedbackState>()(
 
       logFeedbackSummary: () => {
         const summary = get().getFeedbackSummary();
-        console.log('\n========== FEEDBACK SUMMARY ==========');
-        console.log(`Total Feedback: ${summary.totalFeedback}`);
-        console.log(`Helpful: ${summary.helpfulCount} (${summary.helpfulPercentage}%)`);
-        console.log(`Not Helpful: ${summary.notHelpfulCount}`);
-        console.log('\nNegative Feedback Reasons:');
-        Object.entries(summary.reasonBreakdown).forEach(([reason, count]) => {
-          if (count > 0) {
-            console.log(`  - ${NEGATIVE_FEEDBACK_REASONS[reason as NegativeFeedbackReason]}: ${count}`);
-          }
+        const reasonsWithCounts = Object.entries(summary.reasonBreakdown)
+          .filter(([, count]) => count > 0)
+          .map(([reason, count]) => `${NEGATIVE_FEEDBACK_REASONS[reason as NegativeFeedbackReason]}: ${count}`)
+          .join(', ');
+
+        const recentItems = summary.recentFeedback
+          .slice(0, 5)
+          .map((entry, i) => `${i + 1}. ${entry.rating}${entry.reason ? ` (${NEGATIVE_FEEDBACK_REASONS[entry.reason]})` : ''}`)
+          .join(', ');
+
+        logger.info('Feedback summary', {
+          total: summary.totalFeedback,
+          helpful: `${summary.helpfulCount} (${summary.helpfulPercentage}%)`,
+          notHelpful: summary.notHelpfulCount,
+          reasons: reasonsWithCounts || 'none',
+          recent: recentItems || 'none',
         });
-        console.log('\nRecent Feedback:');
-        summary.recentFeedback.slice(0, 5).forEach((entry, i) => {
-          console.log(`  ${i + 1}. ${entry.rating}${entry.reason ? ` (${NEGATIVE_FEEDBACK_REASONS[entry.reason]})` : ''}`);
-        });
-        console.log('======================================\n');
       },
 
       clearAllFeedback: () => {
         set({ entries: [], ratedMessages: {} });
-        console.log('[Feedback] All feedback cleared');
+        logger.debug('All feedback cleared');
       },
     }),
     {

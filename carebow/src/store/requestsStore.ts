@@ -16,6 +16,9 @@ import {
   money,
   generateBookingId,
 } from '@/types/booking';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('RequestsStore');
 
 // ============================================
 // STORE TYPES
@@ -88,7 +91,7 @@ export const useRequestsStore = create<RequestsStore>()(
           requests: [newRequest, ...state.requests],
         }));
 
-        console.log('[RequestsStore] Created request:', newRequest.id);
+        logger.debug('Created request', newRequest.id);
         return newRequest;
       },
 
@@ -106,7 +109,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Updated status for request:', requestId, status);
+        logger.debug('Updated status for request', { requestId, status });
       },
 
       /**
@@ -128,7 +131,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Marked in review:', requestId);
+        logger.debug('Marked in review', requestId);
       },
 
       /**
@@ -145,7 +148,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Cancelled request:', requestId);
+        logger.debug('Cancelled request', requestId);
       },
 
       /**
@@ -162,7 +165,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Closed request:', requestId);
+        logger.debug('Closed request', requestId);
       },
 
       /**
@@ -190,7 +193,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Attached quote to request:', requestId, quotedTotal);
+        logger.debug('Attached quote to request', { requestId, quotedTotal });
       },
 
       /**
@@ -207,7 +210,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Accepted quote for request:', requestId);
+        logger.debug('Accepted quote for request', requestId);
       },
 
       /**
@@ -233,7 +236,7 @@ export const useRequestsStore = create<RequestsStore>()(
           ),
         }));
 
-        console.log('[RequestsStore] Marked booking fee paid:', requestId, amount);
+        logger.debug('Marked booking fee paid', { requestId, amount });
       },
 
       /**
@@ -283,7 +286,7 @@ export const useRequestsStore = create<RequestsStore>()(
        */
       clearRequests: () => {
         set({ requests: [] });
-        console.log('[RequestsStore] Cleared all requests');
+        logger.debug('Cleared all requests');
       },
     }),
     {

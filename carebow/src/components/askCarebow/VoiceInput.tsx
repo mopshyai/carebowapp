@@ -18,6 +18,9 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { transcribeAudioNative, mockTranscribeAudio } from '../../lib/askCarebow/whisperTranscription';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('VoiceInput');
 
 type VoiceInputProps = {
   onTranscriptionComplete: (text: string) => void;
@@ -102,7 +105,7 @@ export function VoiceInput({
         );
         return false;
       } catch (err) {
-        console.warn(err);
+        logger.warn('Permission request failed', err);
         return false;
       }
     }
@@ -134,7 +137,7 @@ export function VoiceInput({
       setRecordingState('recording');
       onRecordingStart?.();
     } catch (err) {
-      console.error('Failed to start recording:', err);
+      logger.error('Failed to start recording', err);
       setError('Failed to start recording');
       setRecordingState('idle');
     }
@@ -168,7 +171,7 @@ export function VoiceInput({
         setError(result.error || 'Failed to transcribe audio');
       }
     } catch (err) {
-      console.error('Failed to process recording:', err);
+      logger.error('Failed to process recording', err);
       setError('Failed to process recording');
     } finally {
       setRecordingState('idle');
@@ -184,7 +187,7 @@ export function VoiceInput({
       await audioRecorderPlayer.stopRecorder();
       audioRecorderPlayer.removeRecordBackListener();
     } catch (err) {
-      console.error('Failed to cancel recording:', err);
+      logger.error('Failed to cancel recording', err);
     } finally {
       setRecordingState('idle');
       setRecordingDuration(0);

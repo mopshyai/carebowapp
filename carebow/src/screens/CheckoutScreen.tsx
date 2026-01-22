@@ -26,6 +26,9 @@ import { buildBookingCore } from '../lib/bookingDraft';
 import { BookingDraftInput, PricingModelType } from '../types/booking';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatPrice } from '../data/catalog';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Checkout');
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -150,7 +153,7 @@ export default function CheckoutScreen() {
         Alert.alert('Payment Failed', result.error || 'Please try again.');
       }
     } catch (error) {
-      console.error('[Checkout] Error during payment:', error);
+      logger.error('Error during payment', error);
 
       if (createdOrderId) {
         markPaymentFailure(createdOrderId, 'Payment processing error');

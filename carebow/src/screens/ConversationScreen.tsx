@@ -36,6 +36,9 @@ import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottom
 // AI Engine
 import { processUserInput } from '../lib/askCarebow';
 import { sendAskCareBowMessage, createMessagePayload } from '../lib/askCarebow/apiClient';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('Conversation');
 
 // Components
 import {
@@ -326,7 +329,7 @@ export default function ConversationScreen() {
           }
         }
       } catch (error) {
-        console.error('Error processing message:', error);
+        logger.error('Error processing message', error);
         setIsTyping(false);
         addAssistantMessage({
           role: 'assistant',

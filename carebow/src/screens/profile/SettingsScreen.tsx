@@ -19,6 +19,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useTranslation, LANGUAGES, type SupportedLanguage } from '../../localization';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('Settings');
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -34,21 +37,21 @@ export default function SettingsScreen() {
       {
         text: 'Light',
         onPress: () => {
-          console.log('[Settings] Setting theme to light');
+          logger.debug('Setting theme to light');
           updateAppSettings({ theme: 'light' });
         }
       },
       {
         text: 'Dark',
         onPress: () => {
-          console.log('[Settings] Setting theme to dark');
+          logger.debug('Setting theme to dark');
           updateAppSettings({ theme: 'dark' });
         }
       },
       {
         text: 'System',
         onPress: () => {
-          console.log('[Settings] Setting theme to system');
+          logger.debug('Setting theme to system');
           updateAppSettings({ theme: 'system' });
         }
       },
@@ -61,7 +64,7 @@ export default function SettingsScreen() {
       ([code, meta]) => ({
         text: `${meta.nativeName} (${meta.name})`,
         onPress: () => {
-          console.log('[Settings] Setting language to', code);
+          logger.debug('Setting language to', code);
           setLanguage(code);
           updateAppSettings({ language: code });
         },
@@ -76,7 +79,7 @@ export default function SettingsScreen() {
 
   const handleMeasurementChange = () => {
     const newUnit = appSettings.measurementUnit === 'imperial' ? 'metric' : 'imperial';
-    console.log('[Settings] Changing measurement from', appSettings.measurementUnit, 'to', newUnit);
+    logger.debug('Changing measurement', { from: appSettings.measurementUnit, to: newUnit });
     updateAppSettings({ measurementUnit: newUnit });
     Alert.alert('Updated', `Measurement units set to ${newUnit === 'imperial' ? 'Imperial' : 'Metric'}`);
   };

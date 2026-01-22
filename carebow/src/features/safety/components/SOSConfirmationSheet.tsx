@@ -27,6 +27,9 @@ import {
   triggerSOSHaptic,
 } from '../services/sosService';
 import { LocationData } from '../services/locationService';
+import { createLogger } from '../../../utils/logger';
+
+const logger = createLogger('SOS');
 
 // ============================================
 // TYPES
@@ -99,7 +102,7 @@ export function SOSConfirmationSheet({
       // Move to action selection phase
       setPhase('actions');
     } catch (error) {
-      console.error('SOS trigger failed:', error);
+      logger.error('SOS trigger failed', error);
       setPhase('actions');
     } finally {
       setIsLoading(false);
