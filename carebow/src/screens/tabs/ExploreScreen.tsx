@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { useTheme } from '@/providers/ThemeProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -182,7 +183,7 @@ const QUICK_TIPS: QuickTip[] = [
   {
     id: 't4',
     title: 'Medication Check',
-    tip: 'Review medications with a doctor every 6 months to ensure they're still necessary and safe.',
+    tip: "Review medications with a doctor every 6 months to ensure they're still necessary and safe.",
     icon: 'check-circle',
     color: '#F59E0B',
   },
@@ -220,122 +221,128 @@ function CategoryPill({
   category,
   isSelected,
   onPress,
+  themeColors,
 }: {
   category: { id: ContentCategory; label: string; icon: string };
   isSelected: boolean;
   onPress: () => void;
+  themeColors: ReturnType<typeof useTheme>['colors'];
 }) {
   return (
     <TouchableOpacity
-      style={[styles.categoryPill, isSelected && styles.categoryPillSelected]}
+      style={[
+        styles.categoryPill,
+        { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+        isSelected && [styles.categoryPillSelected, { backgroundColor: themeColors.accent, borderColor: themeColors.accent }],
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <Icon
         name={category.icon}
         size={16}
-        color={isSelected ? '#FFF' : colors.textSecondary}
+        color={isSelected ? '#FFF' : themeColors.textSecondary}
       />
-      <Text style={[styles.categoryPillText, isSelected && styles.categoryPillTextSelected]}>
+      <Text style={[styles.categoryPillText, { color: themeColors.textSecondary }, isSelected && styles.categoryPillTextSelected]}>
         {category.label}
       </Text>
     </TouchableOpacity>
   );
 }
 
-function FeaturedArticleCard({ article }: { article: HealthArticle }) {
+function FeaturedArticleCard({ article, themeColors }: { article: HealthArticle; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   return (
-    <Pressable style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
+    <Pressable style={({ pressed }) => [styles.featuredCard, { backgroundColor: themeColors.surface }, pressed && styles.cardPressed]}>
       <View style={styles.featuredCardGradient}>
         <View style={styles.featuredBadge}>
           <Icon name="star" size={12} color="#F59E0B" />
           <Text style={styles.featuredBadgeText}>Featured</Text>
         </View>
-        <View style={styles.featuredIconContainer}>
-          <Icon name={article.icon} size={32} color={colors.accent} />
+        <View style={[styles.featuredIconContainer, { backgroundColor: `${themeColors.accent}15` }]}>
+          <Icon name={article.icon} size={32} color={themeColors.accent} />
         </View>
-        <Text style={styles.featuredTitle} numberOfLines={2}>
+        <Text style={[styles.featuredTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
           {article.title}
         </Text>
-        <Text style={styles.featuredDescription} numberOfLines={2}>
+        <Text style={[styles.featuredDescription, { color: themeColors.textSecondary }]} numberOfLines={2}>
           {article.description}
         </Text>
         <View style={styles.featuredMeta}>
-          <Icon name="clock" size={14} color={colors.textTertiary} />
-          <Text style={styles.featuredMetaText}>{article.readTime}</Text>
+          <Icon name="clock" size={14} color={themeColors.textTertiary} />
+          <Text style={[styles.featuredMetaText, { color: themeColors.textTertiary }]}>{article.readTime}</Text>
         </View>
       </View>
     </Pressable>
   );
 }
 
-function ArticleCard({ article }: { article: HealthArticle }) {
+function ArticleCard({ article, themeColors }: { article: HealthArticle; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   return (
-    <Pressable style={({ pressed }) => [styles.articleCard, pressed && styles.cardPressed]}>
-      <View style={[styles.articleIcon, { backgroundColor: `${colors.accent}15` }]}>
-        <Icon name={article.icon} size={24} color={colors.accent} />
+    <Pressable style={({ pressed }) => [styles.articleCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }, pressed && styles.cardPressed]}>
+      <View style={[styles.articleIcon, { backgroundColor: `${themeColors.accent}15` }]}>
+        <Icon name={article.icon} size={24} color={themeColors.accent} />
       </View>
       <View style={styles.articleContent}>
-        <Text style={styles.articleTitle} numberOfLines={2}>
+        <Text style={[styles.articleTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
           {article.title}
         </Text>
-        <Text style={styles.articleDescription} numberOfLines={2}>
+        <Text style={[styles.articleDescription, { color: themeColors.textSecondary }]} numberOfLines={2}>
           {article.description}
         </Text>
         <View style={styles.articleMeta}>
           <View style={styles.articleTags}>
             {article.tags.slice(0, 2).map((tag, idx) => (
-              <View key={idx} style={styles.articleTag}>
-                <Text style={styles.articleTagText}>{tag}</Text>
+              <View key={idx} style={[styles.articleTag, { backgroundColor: themeColors.surface2 }]}>
+                <Text style={[styles.articleTagText, { color: themeColors.textTertiary }]}>{tag}</Text>
               </View>
             ))}
           </View>
-          <Text style={styles.articleReadTime}>{article.readTime}</Text>
+          <Text style={[styles.articleReadTime, { color: themeColors.textTertiary }]}>{article.readTime}</Text>
         </View>
       </View>
-      <Icon name="chevron-right" size={20} color={colors.textTertiary} />
+      <Icon name="chevron-right" size={20} color={themeColors.textTertiary} />
     </Pressable>
   );
 }
 
-function QuickTipCard({ tip }: { tip: QuickTip }) {
+function QuickTipCard({ tip, themeColors }: { tip: QuickTip; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   return (
-    <View style={[styles.quickTipCard, { borderLeftColor: tip.color }]}>
+    <View style={[styles.quickTipCard, { borderLeftColor: tip.color, backgroundColor: themeColors.surface }]}>
       <View style={[styles.quickTipIcon, { backgroundColor: `${tip.color}15` }]}>
         <Icon name={tip.icon} size={20} color={tip.color} />
       </View>
       <View style={styles.quickTipContent}>
-        <Text style={styles.quickTipTitle}>{tip.title}</Text>
-        <Text style={styles.quickTipText}>{tip.tip}</Text>
+        <Text style={[styles.quickTipTitle, { color: themeColors.textPrimary }]}>{tip.title}</Text>
+        <Text style={[styles.quickTipText, { color: themeColors.textSecondary }]}>{tip.tip}</Text>
       </View>
     </View>
   );
 }
 
-function ResourceCard({ resource }: { resource: ResourceLink }) {
+function ResourceCard({ resource, themeColors }: { resource: ResourceLink; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   const handlePress = () => {
     Linking.openURL(resource.url);
   };
 
   return (
-    <TouchableOpacity style={styles.resourceCard} onPress={handlePress} activeOpacity={0.7}>
-      <View style={styles.resourceIcon}>
-        <Icon name={resource.icon} size={20} color={colors.accent} />
+    <TouchableOpacity style={[styles.resourceCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]} onPress={handlePress} activeOpacity={0.7}>
+      <View style={[styles.resourceIcon, { backgroundColor: `${themeColors.accent}15` }]}>
+        <Icon name={resource.icon} size={20} color={themeColors.accent} />
       </View>
       <View style={styles.resourceContent}>
-        <Text style={styles.resourceTitle}>{resource.title}</Text>
-        <Text style={styles.resourceDescription}>{resource.description}</Text>
+        <Text style={[styles.resourceTitle, { color: themeColors.textPrimary }]}>{resource.title}</Text>
+        <Text style={[styles.resourceDescription, { color: themeColors.textSecondary }]}>{resource.description}</Text>
       </View>
-      <Icon name="external-link" size={18} color={colors.textTertiary} />
+      <Icon name="external-link" size={18} color={themeColors.textTertiary} />
     </TouchableOpacity>
   );
 }
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionHeader({ title, subtitle, themeColors }: { title: string; subtitle?: string; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+      <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+      {subtitle && <Text style={[styles.sectionSubtitle, { color: themeColors.textTertiary }]}>{subtitle}</Text>}
     </View>
   );
 }
@@ -346,6 +353,7 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
+  const { colors: themeColors } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<ContentCategory>('all');
 
   const filteredArticles = useMemo(() => {
@@ -354,7 +362,7 @@ export default function ExploreScreen() {
   }, [selectedCategory]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -365,12 +373,12 @@ export default function ExploreScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Explore</Text>
-          <Text style={styles.headerSubtitle}>Health tips & resources for caregivers</Text>
+          <Text style={[styles.headerTitle, { color: themeColors.textPrimary }]}>Explore</Text>
+          <Text style={[styles.headerSubtitle, { color: themeColors.textSecondary }]}>Health tips & resources for caregivers</Text>
         </View>
 
         {/* Featured Section */}
-        <SectionHeader title="Featured Articles" />
+        <SectionHeader title="Featured Articles" themeColors={themeColors} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -379,24 +387,24 @@ export default function ExploreScreen() {
           snapToInterval={SCREEN_WIDTH - 60}
         >
           {FEATURED_ARTICLES.map((article) => (
-            <FeaturedArticleCard key={article.id} article={article} />
+            <FeaturedArticleCard key={article.id} article={article} themeColors={themeColors} />
           ))}
         </ScrollView>
 
         {/* Quick Tips */}
-        <SectionHeader title="Quick Tips" subtitle="Daily wellness reminders" />
+        <SectionHeader title="Quick Tips" subtitle="Daily wellness reminders" themeColors={themeColors} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tipsScroll}
         >
           {QUICK_TIPS.map((tip) => (
-            <QuickTipCard key={tip.id} tip={tip} />
+            <QuickTipCard key={tip.id} tip={tip} themeColors={themeColors} />
           ))}
         </ScrollView>
 
         {/* Categories Filter */}
-        <SectionHeader title="Browse by Topic" />
+        <SectionHeader title="Browse by Topic" themeColors={themeColors} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -408,6 +416,7 @@ export default function ExploreScreen() {
               category={category}
               isSelected={selectedCategory === category.id}
               onPress={() => setSelectedCategory(category.id)}
+              themeColors={themeColors}
             />
           ))}
         </ScrollView>
@@ -416,28 +425,28 @@ export default function ExploreScreen() {
         <View style={styles.articlesList}>
           {filteredArticles.length > 0 ? (
             filteredArticles.map((article) => (
-              <ArticleCard key={article.id} article={article} />
+              <ArticleCard key={article.id} article={article} themeColors={themeColors} />
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Icon name="file-text" size={48} color={colors.textTertiary} />
-              <Text style={styles.emptyStateText}>No articles in this category yet</Text>
+              <Icon name="file-text" size={48} color={themeColors.textTertiary} />
+              <Text style={[styles.emptyStateText, { color: themeColors.textTertiary }]}>No articles in this category yet</Text>
             </View>
           )}
         </View>
 
         {/* External Resources */}
-        <SectionHeader title="Helpful Resources" subtitle="Trusted external links" />
+        <SectionHeader title="Helpful Resources" subtitle="Trusted external links" themeColors={themeColors} />
         <View style={styles.resourcesList}>
           {RESOURCE_LINKS.map((resource) => (
-            <ResourceCard key={resource.id} resource={resource} />
+            <ResourceCard key={resource.id} resource={resource} themeColors={themeColors} />
           ))}
         </View>
 
         {/* Disclaimer */}
-        <View style={styles.disclaimer}>
-          <Icon name="info" size={16} color={colors.textTertiary} />
-          <Text style={styles.disclaimerText}>
+        <View style={[styles.disclaimer, { backgroundColor: themeColors.surface2 }]}>
+          <Icon name="info" size={16} color={themeColors.textTertiary} />
+          <Text style={[styles.disclaimerText, { color: themeColors.textTertiary }]}>
             This content is for informational purposes only and should not replace professional medical advice.
           </Text>
         </View>

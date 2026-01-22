@@ -109,22 +109,24 @@ function SectionHeader({
   subtitle,
   actionLabel,
   onAction,
+  themeColors,
 }: {
   title: string;
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
+  themeColors: ReturnType<typeof useTheme>['colors'];
 }) {
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionHeaderLeft}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+        <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+        {subtitle && <Text style={[styles.sectionSubtitle, { color: themeColors.textTertiary }]}>{subtitle}</Text>}
       </View>
       {actionLabel && onAction && (
-        <TouchableOpacity style={styles.sectionAction} onPress={onAction} activeOpacity={0.7}>
-          <Text style={styles.sectionActionText}>{actionLabel}</Text>
-          <AppIcon name="arrow-right" size={14} color={colors.accent} />
+        <TouchableOpacity style={[styles.sectionAction, { backgroundColor: themeColors.accentMuted }]} onPress={onAction} activeOpacity={0.7}>
+          <Text style={[styles.sectionActionText, { color: themeColors.accent }]}>{actionLabel}</Text>
+          <AppIcon name="arrow-right" size={14} color={themeColors.accent} />
         </TouchableOpacity>
       )}
     </View>
@@ -183,7 +185,7 @@ function EmergencyCard({ onPress }: { onPress: () => void }) {
 // QUICK SERVICE CARD
 // =============================================================================
 
-function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () => void }) {
+function QuickServiceCard({ item, onPress, themeColors }: { item: QuickPickItem; onPress: () => void; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   const iconName = SERVICE_ICONS[item.icon] || 'stethoscope';
   const iconColors = getIconColors(iconName);
 
@@ -199,7 +201,7 @@ function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () 
   };
 
   return (
-    <AnimatedPressable onPress={onPress} style={styles.quickServiceCard}>
+    <AnimatedPressable onPress={onPress} style={[styles.quickServiceCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       <IconContainer
         size="md"
         variant="soft"
@@ -209,8 +211,8 @@ function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () 
         <AppIcon name={iconName} size={22} color={iconColors.primary} fillOpacity={0.2} />
       </IconContainer>
 
-      <Text style={styles.quickServiceTitle} numberOfLines={1}>{item.title}</Text>
-      <Text style={styles.quickServiceSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+      <Text style={[styles.quickServiceTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+      <Text style={[styles.quickServiceSubtitle, { color: themeColors.textSecondary }]} numberOfLines={1}>{item.subtitle}</Text>
 
       <View style={styles.quickServiceMeta}>
         <DotBadge type={getBadgeType(item.tag)} label={item.tag} />
@@ -234,7 +236,7 @@ function QuickServiceCard({ item, onPress }: { item: QuickPickItem; onPress: () 
 // EQUIPMENT CARD
 // =============================================================================
 
-function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => void }) {
+function EquipmentCard({ item, onPress, themeColors }: { item: DeviceItem; onPress: () => void; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   const iconName = SERVICE_ICONS[item.icon] || 'oxygen_concentrator';
   const iconColors = getIconColors(iconName);
 
@@ -245,7 +247,7 @@ function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => voi
   };
 
   return (
-    <AnimatedPressable onPress={onPress} style={styles.equipmentCard}>
+    <AnimatedPressable onPress={onPress} style={[styles.equipmentCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       <View style={styles.equipmentIconWrap}>
         <IconContainer
           size="lg"
@@ -257,7 +259,7 @@ function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => voi
         </IconContainer>
       </View>
 
-      <Text style={styles.equipmentTitle} numberOfLines={2}>{item.title}</Text>
+      <Text style={[styles.equipmentTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>{item.title}</Text>
 
       <View style={styles.equipmentBadges}>
         {item.badges.slice(0, 2).map((badge, idx) => (
@@ -289,12 +291,12 @@ function EquipmentCard({ item, onPress }: { item: DeviceItem; onPress: () => voi
 // HEALTH PACKAGE CARD
 // =============================================================================
 
-function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => void }) {
+function PackageCard({ item, onPress, themeColors }: { item: CarePackageItem; onPress: () => void; themeColors: ReturnType<typeof useTheme>['colors'] }) {
   const iconName = SERVICE_ICONS[item.icon] || 'healthcheck';
   const iconColors = getIconColors(iconName);
 
   return (
-    <AnimatedPressable onPress={onPress} style={styles.packageCard}>
+    <AnimatedPressable onPress={onPress} style={[styles.packageCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       {item.popular && <PopularBadge />}
 
       <IconContainer
@@ -306,8 +308,8 @@ function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => 
         <AppIcon name={iconName} size={22} color={iconColors.primary} fillOpacity={0.2} />
       </IconContainer>
 
-      <Text style={styles.packageTitle} numberOfLines={1}>{item.title}</Text>
-      <Text style={styles.packageSubtitle}>{item.includedCount} tests included</Text>
+      <Text style={[styles.packageTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>{item.title}</Text>
+      <Text style={[styles.packageSubtitle, { color: themeColors.textSecondary }]}>{item.includedCount} tests included</Text>
 
       <View style={styles.packageIncludes}>
         {item.included.slice(0, 2).map((inc, idx) => (
@@ -332,11 +334,11 @@ function PackageCard({ item, onPress }: { item: CarePackageItem; onPress: () => 
 // APPOINTMENT CARD
 // =============================================================================
 
-function AppointmentCard() {
+function AppointmentCard({ themeColors }: { themeColors: ReturnType<typeof useTheme>['colors'] }) {
   const apt = mockUpcomingAppointment;
 
   return (
-    <View style={styles.appointmentCard}>
+    <View style={[styles.appointmentCard, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
       <View style={styles.appointmentHeader}>
         <View style={styles.appointmentLive}>
           <View style={styles.appointmentLiveDot} />
@@ -350,8 +352,8 @@ function AppointmentCard() {
         </View>
 
         <View style={styles.appointmentInfo}>
-          <Text style={styles.appointmentDoctor}>{apt.doctorName}</Text>
-          <Text style={styles.appointmentSpecialty}>{apt.specialty}</Text>
+          <Text style={[styles.appointmentDoctor, { color: themeColors.textPrimary }]}>{apt.doctorName}</Text>
+          <Text style={[styles.appointmentSpecialty, { color: themeColors.textSecondary }]}>{apt.specialty}</Text>
           <View style={styles.appointmentMeta}>
             <AppIcon name="calendar" size={12} color={colors.textTertiary} />
             <Text style={styles.appointmentMetaText}>{apt.date}</Text>
@@ -576,6 +578,7 @@ export default function TodayScreen() {
             subtitle="Book in minutes"
             actionLabel="See all"
             onAction={() => navigation.navigate('Services')}
+            themeColors={themeColors}
           />
           <View style={styles.quickServicesGrid}>
             {quickPickItems.map((item) => (
@@ -583,6 +586,7 @@ export default function TodayScreen() {
                 key={item.id}
                 item={item}
                 onPress={() => handleQuickPickPress(item)}
+                themeColors={themeColors}
               />
             ))}
           </View>
@@ -595,6 +599,7 @@ export default function TodayScreen() {
             subtitle="Rent or buy"
             actionLabel="View all"
             onAction={() => navigation.navigate('Services')}
+            themeColors={themeColors}
           />
           <ScrollView
             horizontal
@@ -608,6 +613,7 @@ export default function TodayScreen() {
                 key={item.id}
                 item={item}
                 onPress={() => handleDevicePress(item)}
+                themeColors={themeColors}
               />
             ))}
           </ScrollView>
@@ -620,6 +626,7 @@ export default function TodayScreen() {
             subtitle="Comprehensive checkups"
             actionLabel="Explore"
             onAction={() => navigation.navigate('Services')}
+            themeColors={themeColors}
           />
           <ScrollView
             horizontal
@@ -633,6 +640,7 @@ export default function TodayScreen() {
                 key={item.id}
                 item={item}
                 onPress={() => handlePackagePress(item)}
+                themeColors={themeColors}
               />
             ))}
           </ScrollView>
@@ -644,8 +652,9 @@ export default function TodayScreen() {
             title="Upcoming"
             actionLabel="View all"
             onAction={() => navigation.navigate('Schedule' as never)}
+            themeColors={themeColors}
           />
-          <AppointmentCard />
+          <AppointmentCard themeColors={themeColors} />
         </View>
 
         {/* Care Plans */}
@@ -655,6 +664,7 @@ export default function TodayScreen() {
             subtitle="Save with subscriptions"
             actionLabel="Compare"
             onAction={() => navigation.navigate('Services')}
+            themeColors={themeColors}
           />
           <ScrollView
             horizontal
@@ -675,7 +685,7 @@ export default function TodayScreen() {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <SectionHeader title="Quick Actions" />
+          <SectionHeader title="Quick Actions" themeColors={themeColors} />
           <QuickActions />
         </View>
       </ScrollView>
