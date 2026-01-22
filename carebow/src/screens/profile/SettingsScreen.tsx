@@ -18,10 +18,12 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useTranslation, LANGUAGES, type SupportedLanguage } from '../../localization';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { t, language, setLanguage, languages } = useTranslation();
 
   const appSettings = useProfileStore((state) => state.appSettings);
   const updateAppSettings = useProfileStore((state) => state.updateAppSettings);
@@ -34,7 +36,6 @@ export default function SettingsScreen() {
         onPress: () => {
           console.log('[Settings] Setting theme to light');
           updateAppSettings({ theme: 'light' });
-          Alert.alert('Theme Updated', 'Theme set to Light. Note: Full dark mode UI coming soon!');
         }
       },
       {
@@ -42,7 +43,6 @@ export default function SettingsScreen() {
         onPress: () => {
           console.log('[Settings] Setting theme to dark');
           updateAppSettings({ theme: 'dark' });
-          Alert.alert('Theme Updated', 'Theme set to Dark. Note: Full dark mode UI coming soon!');
         }
       },
       {
@@ -50,7 +50,6 @@ export default function SettingsScreen() {
         onPress: () => {
           console.log('[Settings] Setting theme to system');
           updateAppSettings({ theme: 'system' });
-          Alert.alert('Theme Updated', 'Theme set to System. Note: Full dark mode UI coming soon!');
         }
       },
       { text: 'Cancel', style: 'cancel' },
@@ -58,18 +57,20 @@ export default function SettingsScreen() {
   };
 
   const handleLanguageChange = () => {
-    Alert.alert('Select Language', 'Choose your preferred language', [
-      {
-        text: 'English',
+    const languageOptions = (Object.entries(languages) as [SupportedLanguage, typeof languages[SupportedLanguage]][]).map(
+      ([code, meta]) => ({
+        text: `${meta.nativeName} (${meta.name})`,
         onPress: () => {
-          console.log('[Settings] Setting language to English');
-          updateAppSettings({ language: 'en' });
-          Alert.alert('Language Updated', 'Language set to English');
-        }
-      },
-      { text: 'Spanish (Coming Soon)', style: 'cancel' },
-      { text: 'Hindi (Coming Soon)', style: 'cancel' },
-      { text: 'Cancel', style: 'cancel' },
+          console.log('[Settings] Setting language to', code);
+          setLanguage(code);
+          updateAppSettings({ language: code });
+        },
+      })
+    );
+
+    Alert.alert(t('settings.language'), 'Choose your preferred language', [
+      ...languageOptions,
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
@@ -122,16 +123,8 @@ export default function SettingsScreen() {
   };
 
   const getLanguageLabel = () => {
-    switch (appSettings.language) {
-      case 'en':
-        return 'English';
-      case 'es':
-        return 'Spanish';
-      case 'hi':
-        return 'Hindi';
-      default:
-        return 'English';
-    }
+    const langMeta = languages[language as SupportedLanguage];
+    return langMeta ? langMeta.nativeName : 'English';
   };
 
   return (

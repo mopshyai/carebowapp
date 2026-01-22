@@ -4,7 +4,22 @@
  */
 
 // =============================================================================
-// COLORS
+// THEME PROVIDER & HOOKS (Re-export)
+// =============================================================================
+
+export {
+  ThemeProvider,
+  useTheme,
+  useThemedStyles,
+  useCommonThemedStyles,
+  lightColors,
+  darkColors,
+  type ThemeMode,
+  type ThemeColors,
+} from './ThemeProvider';
+
+// =============================================================================
+// COLORS (Static - use useTheme() for dynamic colors)
 // =============================================================================
 
 export const colors = {

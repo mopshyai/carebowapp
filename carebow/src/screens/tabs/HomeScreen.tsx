@@ -4,7 +4,7 @@
  * Platform-specific polish for iOS and Android
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,8 +19,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../../navigation/types';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useDefaultMember } from '../../store/useProfileStore';
 
-import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { colors, spacing, radius, typography, shadows, useTheme } from '../../theme';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../../components/icons';
 import { StatusBadge, DotBadge, PopularBadge } from '../../components/ui/StatusBadge';
 import {
@@ -488,12 +490,40 @@ function QuickActions() {
 }
 
 // =============================================================================
+// GREETING HELPER
+// =============================================================================
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// =============================================================================
 // MAIN SCREEN
 // =============================================================================
 
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
+  const { colors: themeColors } = useTheme();
+
+  // Get user data from stores
+  const authUser = useAuthStore((state) => state.user);
+  const defaultMember = useDefaultMember();
+
+  // Derive display name and initial
+  const { displayName, initial } = useMemo(() => {
+    // Priority: auth user's first name > default member's first name > 'there'
+    const name = authUser?.firstName || defaultMember?.firstName || 'there';
+    return {
+      displayName: name,
+      initial: name.charAt(0).toUpperCase(),
+    };
+  }, [authUser?.firstName, defaultMember?.firstName]);
+
+  const greeting = getGreeting();
 
   const handleQuickPickPress = (item: QuickPickItem) => {
     navigation.navigate(item.screen, item.params);
@@ -508,7 +538,7 @@ export default function TodayScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.surface2 }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -520,15 +550,15 @@ export default function TodayScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Good morning</Text>
-            <Text style={styles.userName}>Sandeep</Text>
+            <Text style={[styles.greeting, { color: themeColors.textSecondary }]}>{greeting}</Text>
+            <Text style={[styles.userName, { color: themeColors.textPrimary }]}>{displayName}</Text>
           </View>
           <Pressable
             style={({ pressed }) => [styles.profileButton, pressed && styles.profilePressed]}
             onPress={() => navigation.navigate('Profile')}
           >
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileInitial}>S</Text>
+            <View style={[styles.profileAvatar, { backgroundColor: themeColors.accentSoft }]}>
+              <Text style={[styles.profileInitial, { color: themeColors.accent }]}>{initial}</Text>
             </View>
           </Pressable>
         </View>

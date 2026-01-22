@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { useProfileStore } from '@/store/useProfileStore';
 
 import {
   useSafetyStore,
@@ -55,6 +56,8 @@ export function SafetyHubScreen() {
   const events = allEvents.slice(0, 10); // Get last 10 events
   const primaryContact = usePrimaryContact();
   const hasCheckedInToday = useHasCheckedInToday();
+  const user = useProfileStore((state) => state.user);
+  const userName = user?.firstName || 'You';
 
   // Store actions
   const recordCheckIn = useSafetyStore((state) => state.recordCheckIn);
@@ -259,7 +262,7 @@ export function SafetyHubScreen() {
         contacts={contacts}
         primaryContact={primaryContact}
         shareLocationDefault={settings.shareLocationOnSOS}
-        userName="You" // TODO: Get from profile store
+        userName={userName}
       />
 
       {/* Missed Check-In Modal */}
@@ -270,7 +273,7 @@ export function SafetyHubScreen() {
         onNotifyContacts={handleMissedCheckInNotify}
         contacts={contacts}
         shareLocation={settings.shareLocationOnMissedCheckIn}
-        userName="You"
+        userName={userName}
       />
     </View>
   );

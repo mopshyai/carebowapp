@@ -83,12 +83,17 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
           ],
         }));
 
-        // Schedule notification (stub for now)
+        // Schedule notification via Notifee
         scheduleLocalNotification({
           id: followUp.id,
           title: 'CareBow Check-in',
           body: `How are you feeling? Time to check in on: ${episodeTitle}`,
           scheduledAt: new Date(followUp.followUpAt),
+          data: {
+            type: 'follow_up',
+            episodeId,
+            followUpId: followUp.id,
+          },
         });
 
         return followUp;

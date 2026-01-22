@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { StatusBar, useColorScheme, Linking, Alert } from 'react-native';
+import { Linking, Alert } from 'react-native';
 import {
   NavigationContainer,
   DarkTheme,
@@ -22,6 +22,7 @@ import { NetworkProvider } from './utils/NetworkProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { initializeSentry } from './services/monitoring/SentryService';
 import { useAuthStore } from './store/useAuthStore';
+import { ThemeProvider, useTheme } from './theme';
 
 // Initialize services on app load
 initializeSentry();
@@ -135,12 +136,11 @@ const handleAppError = (error: Error, errorInfo: React.ErrorInfo) => {
 };
 
 // ============================================
-// APP COMPONENT
+// APP CONTENT COMPONENT (uses theme context)
 // ============================================
 
-export default function App() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+function AppContent() {
+  const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
@@ -204,42 +204,51 @@ export default function App() {
   }, [isAppReady]);
 
   return (
+    <>
+      {/* Splash Screen */}
+      {showSplash && (
+        <SplashScreen
+          onAnimationComplete={handleSplashComplete}
+          isVisible={showSplash}
+        />
+      )}
+
+      {/* Main App */}
+      <NavigationContainer
+        ref={navigationRef}
+        theme={isDark ? DarkTheme : DefaultTheme}
+        linking={linking}
+        onStateChange={(state) => {
+          // Can be used for analytics screen tracking
+          if (__DEV__ && state) {
+            const currentRoute = state.routes[state.index];
+            console.log('[Navigation] Screen:', currentRoute?.name);
+          }
+        }}
+        fallback={null}
+      >
+        <RootNavigator />
+      </NavigationContainer>
+    </>
+  );
+}
+
+// ============================================
+// APP COMPONENT (root with providers)
+// ============================================
+
+export default function App() {
+  return (
     <ErrorBoundary onError={handleAppError}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <NetworkProvider>
-            <ToastProvider>
-              {/* Splash Screen */}
-              {showSplash && (
-                <SplashScreen
-                  onAnimationComplete={handleSplashComplete}
-                  isVisible={showSplash}
-                />
-              )}
-
-              {/* Main App */}
-              <NavigationContainer
-                ref={navigationRef}
-                theme={isDark ? DarkTheme : DefaultTheme}
-                linking={linking}
-                onStateChange={(state) => {
-                  // Can be used for analytics screen tracking
-                  if (__DEV__ && state) {
-                    const currentRoute = state.routes[state.index];
-                    console.log('[Navigation] Screen:', currentRoute?.name);
-                  }
-                }}
-                fallback={null}
-              >
-                <StatusBar
-                  barStyle={isDark ? 'light-content' : 'dark-content'}
-                  backgroundColor="transparent"
-                  translucent
-                />
-                <RootNavigator />
-              </NavigationContainer>
-            </ToastProvider>
-          </NetworkProvider>
+          <ThemeProvider>
+            <NetworkProvider>
+              <ToastProvider>
+                <AppContent />
+              </ToastProvider>
+            </NetworkProvider>
+          </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

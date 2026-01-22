@@ -36,6 +36,36 @@ type OrdersStore = {
 // Generate unique ID
 const generateId = () => `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+// Tax calculation constants
+const TAX_RATES = {
+  default: 0.18, // 18% GST (India default)
+  services: 0.18, // Healthcare services
+  medical: 0.05, // Medical equipment (reduced rate)
+  exempt: 0, // Exempt services
+};
+
+/**
+ * Calculate taxes based on service type and subtotal
+ * @param subtotal - Amount before taxes
+ * @param serviceType - Type of service for tax rate selection
+ * @returns Tax amount
+ */
+const calculateTaxes = (subtotal: number, serviceType?: string): number => {
+  // Determine tax rate based on service type
+  let rate = TAX_RATES.default;
+
+  if (serviceType) {
+    const lowerType = serviceType.toLowerCase();
+    if (lowerType.includes('medical') || lowerType.includes('equipment')) {
+      rate = TAX_RATES.medical;
+    } else if (lowerType.includes('consultation') || lowerType.includes('exempt')) {
+      rate = TAX_RATES.exempt;
+    }
+  }
+
+  return Math.round(subtotal * rate * 100) / 100; // Round to 2 decimal places
+};
+
 export const useOrdersStore = create<OrdersStore>()(
   persist(
     (set, get) => ({
@@ -44,6 +74,9 @@ export const useOrdersStore = create<OrdersStore>()(
   // Create order from cart item (after checkout)
   createOrderFromCart: (cartItem, payment) => {
     const now = new Date().toISOString();
+    const taxableAmount = cartItem.subtotal - (cartItem.discount || 0);
+    const taxes = calculateTaxes(taxableAmount, cartItem.serviceTitle);
+
     const newOrder: Order = {
       id: generateId(),
       serviceId: cartItem.serviceId,
@@ -64,8 +97,8 @@ export const useOrdersStore = create<OrdersStore>()(
         days: cartItem.days,
         subtotal: cartItem.subtotal,
         discount: cartItem.discount,
-        taxes: 0, // TODO: Calculate taxes
-        total: cartItem.total,
+        taxes,
+        total: taxableAmount + taxes,
         pricingLabel: cartItem.pricingLabel,
       },
       payment,
@@ -85,6 +118,9 @@ export const useOrdersStore = create<OrdersStore>()(
   // Create order from booking draft (direct checkout without cart)
   createOrderFromDraft: (draft, payment, status = 'paid') => {
     const now = new Date().toISOString();
+    const taxableAmount = draft.subtotal - (draft.discount || 0);
+    const taxes = calculateTaxes(taxableAmount, draft.serviceTitle);
+
     const newOrder: Order = {
       id: generateId(),
       serviceId: draft.serviceId,
@@ -105,8 +141,8 @@ export const useOrdersStore = create<OrdersStore>()(
         days: draft.days || undefined,
         subtotal: draft.subtotal,
         discount: draft.discount,
-        taxes: 0,
-        total: draft.total,
+        taxes,
+        total: taxableAmount + taxes,
         pricingLabel: draft.pricingLabel,
       },
       payment,
