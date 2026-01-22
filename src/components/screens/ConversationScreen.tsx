@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Heart, Sparkles, Send } from 'lucide-react';
+import { ActionBar } from '../ActionBar';
+import { getTriageLevel, TriageLevel } from '../../utils/triageCTAMapping';
 
 interface Message {
   id: string;
   type: 'carebow' | 'user';
   content: string;
   whyAsking?: string;
+  showActionBar?: boolean;
 }
 
 interface ConversationScreenProps {
@@ -20,6 +23,9 @@ export function ConversationScreen({ context, initialSymptom, onBack, onComplete
   const [currentStep, setCurrentStep] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [answers, setAnswers] = useState<any>({});
+  const [assessmentComplete, setAssessmentComplete] = useState(false);
+  const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
+  const [assessmentData, setAssessmentData] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const totalSteps = 5;
@@ -128,7 +134,7 @@ export function ConversationScreen({ context, initialSymptom, onBack, onComplete
       recommendation = 'video';
     }
 
-    onComplete({
+    const data = {
       context,
       symptom: initialSymptom,
       severity,
@@ -136,7 +142,42 @@ export function ConversationScreen({ context, initialSymptom, onBack, onComplete
       riskLevel,
       recommendation,
       answers: finalAnswers
-    });
+    };
+
+    // Calculate triage level
+    const triage = getTriageLevel(data);
+    setTriageLevel(triage);
+    setAssessmentData(data);
+
+    // Add final assessment message
+    const summaryMessage = getFinalMessage(triage, riskLevel, hasRedFlags);
+    const finalMessage: Message = {
+      id: 'assessment-complete',
+      type: 'carebow',
+      content: summaryMessage,
+      showActionBar: true
+    };
+    setMessages(prev => [...prev, finalMessage]);
+    setAssessmentComplete(true);
+  };
+
+  const getFinalMessage = (triage: TriageLevel, riskLevel: string, hasRedFlags: boolean): string => {
+    switch (triage) {
+      case 'emergency':
+        return `Based on what you've shared, I recommend seeking immediate medical attention. Please take action now.`;
+      case 'urgent':
+        return `I'd recommend speaking with a doctor today. Your symptoms warrant prompt attention.`;
+      case 'soon':
+        return `A consultation would be helpful. Consider scheduling one in the next day or two.`;
+      case 'self_care':
+        return `Your symptoms appear manageable with self-care. Monitor closely and reach out if things change.`;
+    }
+  };
+
+  const handleViewFullSummary = () => {
+    if (assessmentData) {
+      onComplete(assessmentData);
+    }
   };
 
   const currentQuestion = questions[currentStep - 1];
@@ -216,6 +257,19 @@ export function ConversationScreen({ context, initialSymptom, onBack, onComplete
                 </div>
               </div>
             )}
+
+            {/* ACTION BAR - After assessment message */}
+            {message.showActionBar && triageLevel && (
+              <div className="mt-4 ml-13">
+                <ActionBar triageLevel={triageLevel} />
+                <button
+                  onClick={handleViewFullSummary}
+                  className="w-full mt-2 text-xs text-purple-600 hover:text-purple-700 transition-colors"
+                >
+                  View full summary →
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
@@ -238,7 +292,7 @@ export function ConversationScreen({ context, initialSymptom, onBack, onComplete
       </div>
 
       {/* INPUT AREA */}
-      {currentStep > 0 && currentStep <= 4 && (!currentQuestion?.quickReplies || !showQuickReplies) && (
+      {currentStep > 0 && currentStep <= 4 && !assessmentComplete && (!currentQuestion?.quickReplies || !showQuickReplies) && (
         <div className="px-6 py-4 bg-white border-t border-gray-200 flex-shrink-0">
           <form onSubmit={(e) => {
             e.preventDefault();
