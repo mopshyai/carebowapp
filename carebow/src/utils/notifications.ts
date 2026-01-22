@@ -1,7 +1,16 @@
 /**
  * Notifications Utility
- * Stub functions for local notifications - to be implemented with expo-notifications or react-native-push-notification
+ * Re-exports from the new notification service for backward compatibility
+ *
+ * @deprecated Import from '@/services/notifications' instead
  */
+
+import {
+  NotificationService,
+  initializeNotifications,
+  type ScheduledNotification,
+  type NotificationPermissionStatus,
+} from '../services/notifications';
 
 export interface LocalNotification {
   id: string;
@@ -13,80 +22,60 @@ export interface LocalNotification {
 
 /**
  * Schedule a local notification
- * STUB: To be implemented with expo-notifications or react-native-push-notification
+ * @deprecated Use NotificationService.schedule() instead
  */
 export async function scheduleLocalNotification(
   notification: LocalNotification
 ): Promise<string | null> {
-  // TODO: Implement with actual notification library
-  // Example with expo-notifications:
-  // import * as Notifications from 'expo-notifications';
-  // const id = await Notifications.scheduleNotificationAsync({
-  //   content: {
-  //     title: notification.title,
-  //     body: notification.body,
-  //     data: notification.data,
-  //   },
-  //   trigger: {
-  //     date: notification.scheduledAt,
-  //   },
-  // });
-  // return id;
-
-  console.log('[Notifications] Scheduled (stub):', {
+  const result = await NotificationService.schedule({
     id: notification.id,
-    title: notification.title,
-    scheduledAt: notification.scheduledAt.toISOString(),
+    content: {
+      title: notification.title,
+      body: notification.body,
+      data: notification.data,
+    },
+    trigger: {
+      timestamp: notification.scheduledAt.getTime(),
+      repeatType: 'none',
+    },
   });
 
-  return notification.id;
+  return result;
 }
 
 /**
  * Cancel a scheduled local notification
- * STUB: To be implemented with actual notification library
+ * @deprecated Use NotificationService.cancel() instead
  */
 export async function cancelLocalNotification(notificationId: string): Promise<void> {
-  // TODO: Implement with actual notification library
-  // Example with expo-notifications:
-  // await Notifications.cancelScheduledNotificationAsync(notificationId);
-
-  console.log('[Notifications] Cancelled (stub):', notificationId);
+  await NotificationService.cancel(notificationId);
 }
 
 /**
  * Cancel all scheduled notifications
- * STUB: To be implemented with actual notification library
+ * @deprecated Use NotificationService.cancelAll() instead
  */
 export async function cancelAllNotifications(): Promise<void> {
-  // TODO: Implement with actual notification library
-  // await Notifications.cancelAllScheduledNotificationsAsync();
-
-  console.log('[Notifications] Cancelled all (stub)');
+  await NotificationService.cancelAll();
 }
 
 /**
  * Request notification permissions
- * STUB: To be implemented with actual notification library
+ * @deprecated Use NotificationService.requestPermissions() instead
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
-  // TODO: Implement with actual notification library
-  // const { status } = await Notifications.requestPermissionsAsync();
-  // return status === 'granted';
-
-  console.log('[Notifications] Permission requested (stub)');
-  return true;
+  const status = await NotificationService.requestPermissions();
+  return status.granted;
 }
 
 /**
  * Check if notifications are enabled
- * STUB: To be implemented with actual notification library
+ * @deprecated Use NotificationService.getPermissionStatus() instead
  */
 export async function areNotificationsEnabled(): Promise<boolean> {
-  // TODO: Implement with actual notification library
-  // const { status } = await Notifications.getPermissionsAsync();
-  // return status === 'granted';
-
-  console.log('[Notifications] Check enabled (stub)');
-  return true;
+  const status = await NotificationService.getPermissionStatus();
+  return status.granted;
 }
+
+// Re-export new service for migration
+export { NotificationService, initializeNotifications };
