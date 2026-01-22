@@ -29,20 +29,22 @@ interface ActionDetails {
 }
 
 const actionDetails: Record<string, ActionDetails> = {
+  // These actions are now implemented and should not show Coming Soon
+  // Kept here as fallback in case they're called with this component
   connect_doctor: {
     title: 'Connect to Doctor',
-    description: 'Video consultations with verified doctors will be available soon.',
+    description: 'Video consultations with verified doctors.',
     icon: 'videocam',
-  },
-  book_home_visit: {
-    title: 'Book Home Visit',
-    description: 'Schedule a healthcare professional to visit you at home.',
-    icon: 'home',
   },
   schedule_teleconsult: {
     title: 'Schedule Teleconsult',
     description: 'Book video appointments at your preferred time.',
     icon: 'calendar',
+  },
+  book_home_visit: {
+    title: 'Book Home Visit',
+    description: 'Schedule a healthcare professional to visit you at home.',
+    icon: 'home',
   },
   home_visit_options: {
     title: 'Home Visit Options',
@@ -54,15 +56,26 @@ const actionDetails: Record<string, ActionDetails> = {
     description: 'Get reminded to check your symptoms and follow up.',
     icon: 'notifications',
   },
+  // Actions still in development
   home_remedies: {
     title: 'Home Remedies Checklist',
-    description: 'Personalized self-care tips based on your symptoms.',
+    description: 'Personalized self-care tips based on your symptoms. AI-generated recommendations will be available soon.',
     icon: 'list',
   },
   save_share: {
     title: 'Save / Share Summary',
     description: 'Export your assessment to share with your doctor.',
     icon: 'share-social',
+  },
+  request_callback: {
+    title: 'Request Callback',
+    description: 'Have a care coordinator call you back to discuss your care options.',
+    icon: 'call',
+  },
+  find_pharmacy: {
+    title: 'Find Pharmacy',
+    description: 'Locate nearby pharmacies for your prescriptions.',
+    icon: 'medical',
   },
 };
 

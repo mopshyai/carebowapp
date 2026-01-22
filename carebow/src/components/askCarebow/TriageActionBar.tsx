@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import {
@@ -24,18 +25,23 @@ import {
   EMERGENCY_NOTE,
 } from '../../utils/triageCTAMapping';
 import { ComingSoonSheet } from './ComingSoonSheet';
-import type { AppNavigationProp } from '../../navigation/types';
+import { HomeRemediesSheet } from './HomeRemediesSheet';
+import type { RootStackParamList } from '../../navigation/types';
+import { scheduleFollowUpReminder } from '../../services/notifications';
 
 interface TriageActionBarProps {
   triageLevel: TriageLevel;
   episodeId?: string;
+  /** Symptoms for home remedies recommendations */
+  symptoms?: string[];
   onAction?: (action: string) => void;
 }
 
-export function TriageActionBar({ triageLevel, episodeId, onAction }: TriageActionBarProps) {
-  const navigation = useNavigation() as AppNavigationProp;
+export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onAction }: TriageActionBarProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonAction, setComingSoonAction] = useState('');
+  const [showHomeRemedies, setShowHomeRemedies] = useState(false);
 
   const config = getCTAConfig(triageLevel);
   const tertiary = getTertiaryAction();
@@ -51,13 +57,71 @@ export function TriageActionBar({ triageLevel, episodeId, onAction }: TriageActi
       case 'save_share':
         handleSaveShare();
         break;
+      case 'connect_doctor':
+      case 'schedule_teleconsult':
+        handleScheduleTeleconsult();
+        break;
+      case 'set_reminder':
+        handleSetReminder();
+        break;
+      case 'book_home_visit':
+      case 'home_visit_options':
+        handleBookHomeVisit();
+        break;
+      case 'home_remedies':
+        setShowHomeRemedies(true);
+        break;
       default:
-        // Show coming soon sheet for stub actions
+        // Show coming soon sheet for remaining stub actions
         setComingSoonAction(action);
         setShowComingSoon(true);
     }
 
     onAction?.(action);
+  };
+
+  const handleScheduleTeleconsult = () => {
+    navigation.navigate('TelemedicineBooking', {});
+  };
+
+  const handleSetReminder = () => {
+    Alert.alert(
+      'Set Reminder',
+      'When would you like to be reminded to check your symptoms?',
+      [
+        {
+          text: 'In 1 hour',
+          onPress: () => scheduleReminderWithDelay(60),
+        },
+        {
+          text: 'In 4 hours',
+          onPress: () => scheduleReminderWithDelay(240),
+        },
+        {
+          text: 'Tomorrow',
+          onPress: () => scheduleReminderWithDelay(24 * 60),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const scheduleReminderWithDelay = async (minutes: number) => {
+    try {
+      await scheduleFollowUpReminder(
+        episodeId || 'general',
+        new Date(Date.now() + minutes * 60 * 1000),
+        'Symptom Check-in',
+        'Time to check on your symptoms. How are you feeling?'
+      );
+      Alert.alert('Reminder Set', `We'll remind you in ${minutes >= 60 ? Math.round(minutes / 60) + ' hour(s)' : minutes + ' minutes'}.`);
+    } catch {
+      Alert.alert('Unable to Set Reminder', 'Please ensure notifications are enabled in your settings.');
+    }
+  };
+
+  const handleBookHomeVisit = () => {
+    navigation.navigate('Services', { category: 'home_care' });
   };
 
   const handleSaveShare = () => {
@@ -235,6 +299,14 @@ export function TriageActionBar({ triageLevel, episodeId, onAction }: TriageActi
         visible={showComingSoon}
         onClose={() => setShowComingSoon(false)}
         action={comingSoonAction}
+      />
+
+      {/* Home Remedies Sheet */}
+      <HomeRemediesSheet
+        visible={showHomeRemedies}
+        onClose={() => setShowHomeRemedies(false)}
+        symptoms={symptoms}
+        triageLevel={triageLevel}
       />
     </View>
   );

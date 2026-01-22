@@ -28,3 +28,15 @@ export { ComingSoonSheet } from './ComingSoonSheet';
 export { FollowUpCheckIn } from './FollowUpCheckIn';
 export { StillNeedCard } from './StillNeedCard';
 export { FeedbackButtons } from './FeedbackButtons';
+
+// Enhanced Guidance Components (India-specific)
+export { HomeRemedyCard } from './HomeRemedyCard';
+export type { HomeRemedyData } from './HomeRemedyCard';
+export { AyurvedicRecommendationCard } from './AyurvedicRecommendationCard';
+export type { AyurvedicFormulationData } from './AyurvedicRecommendationCard';
+export { OTCSuggestionCard } from './OTCSuggestionCard';
+export type { OTCMedicationData } from './OTCSuggestionCard';
+export { CarePathwayCard, CarePathwayList } from './CarePathwayCard';
+export type { ServiceRecommendationData, ServiceType } from './CarePathwayCard';
+export { EnhancedGuidanceDisplay, QuickGuidanceCard } from './EnhancedGuidanceDisplay';
+export type { EnhancedGuidanceData } from './EnhancedGuidanceDisplay';

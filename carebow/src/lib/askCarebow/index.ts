@@ -11,6 +11,12 @@ export * from './guidanceBuilder';
 export * from './contextLoader';
 export * from './actionIntegration';
 
+// Enhanced Guidance Generator (combines all databases)
+export * from './enhancedGuidanceGenerator';
+
+// India-specific Databases
+export * from './databases';
+
 // Export triage level mapping utilities (P0-2 fix)
 export {
   mapToExternalTriageLevel,
