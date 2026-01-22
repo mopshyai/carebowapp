@@ -6,9 +6,43 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
+import type { UserRole } from '@/store/useAuthStore';
+
+// ============================================
+// AUTH STACK
+// ============================================
+
+export type AuthStackParamList = {
+  Welcome: undefined;
+  Login: undefined;
+  Signup: undefined;
+  VerifyEmail: { email: string };
+  ForgotPassword: undefined;
+  ResetPassword: { token: string };
+};
+
+// ============================================
+// ONBOARDING STACK
+// ============================================
+
+export type OnboardingStackParamList = {
+  OnboardingSlides: undefined;
+  RoleSelection: undefined;
+  CreateProfile: { role: UserRole };
+  OnboardingComplete: undefined;
+};
+
+// ============================================
+// ROOT STACK
+// ============================================
 
 // Root Stack Navigator
 export type RootStackParamList = {
+  // Auth & Onboarding
+  Auth: NavigatorScreenParams<AuthStackParamList>;
+  Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
+
+  // Main App
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   Conversation: {
     symptom: string;
@@ -36,6 +70,9 @@ export type RootStackParamList = {
   // New screens
   HealthMemory: undefined;
   EpisodeSummary: { episodeId: string };
+  // Telemedicine
+  TelemedicineBooking: { doctorId?: string } | undefined;
+  VideoCall: { appointmentId: string; doctorName: string; doctorSpecialty?: string };
 };
 
 // Main Tab Navigator
@@ -73,6 +110,12 @@ export type SafetyStackParamList = {
 // Screen Props Types
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
   NativeStackScreenProps<RootStackParamList, T>;
+
+export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
+  NativeStackScreenProps<AuthStackParamList, T>;
+
+export type OnboardingStackScreenProps<T extends keyof OnboardingStackParamList> =
+  NativeStackScreenProps<OnboardingStackParamList, T>;
 
 export type MainTabScreenProps<T extends keyof MainTabParamList> =
   CompositeScreenProps<

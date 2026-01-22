@@ -2,6 +2,7 @@
  * Store exports
  */
 
+export { useAuthStore } from './useAuthStore';
 export { useCartStore } from './useCartStore';
 export { useOrdersStore } from './useOrdersStore';
 export { useServiceRequestStore } from './useServiceRequestStore';

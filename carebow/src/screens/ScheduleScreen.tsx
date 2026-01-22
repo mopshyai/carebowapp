@@ -8,6 +8,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
@@ -60,10 +62,22 @@ const pastAppointments = [
 
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const appointments = activeTab === 'upcoming' ? upcomingAppointments : pastAppointments;
+
+  const handleBookAppointment = () => {
+    navigation.navigate('TelemedicineBooking', {});
+  };
+
+  const handleJoinCall = (appointment: typeof upcomingAppointments[0]) => {
+    navigation.navigate('VideoCall', {
+      appointmentId: appointment.id,
+      doctorName: appointment.doctor,
+      doctorSpecialty: appointment.specialty,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -73,7 +87,7 @@ export default function ScheduleScreen() {
           <Icon name="arrow-back" size={24} color={Colors.gray[900]} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Schedule</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={handleBookAppointment}>
           <Icon name="add" size={24} color={Colors.purple[600]} />
         </TouchableOpacity>
       </View>
@@ -173,7 +187,10 @@ export default function ScheduleScreen() {
                       <Text style={styles.rescheduleButtonText}>Reschedule</Text>
                     </TouchableOpacity>
                     {appointment.type === 'video' && (
-                      <TouchableOpacity style={styles.joinButton}>
+                      <TouchableOpacity
+                        style={styles.joinButton}
+                        onPress={() => handleJoinCall(appointment)}
+                      >
                         <Icon name="videocam" size={16} color={Colors.white} />
                         <Text style={styles.joinButtonText}>Join Call</Text>
                       </TouchableOpacity>
@@ -211,7 +228,7 @@ export default function ScheduleScreen() {
 
       {/* Book Appointment Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity style={styles.bookButton}>
+        <TouchableOpacity style={styles.bookButton} onPress={handleBookAppointment}>
           <Icon name="add-circle" size={20} color={Colors.white} />
           <Text style={styles.bookButtonText}>Book Appointment</Text>
         </TouchableOpacity>

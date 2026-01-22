@@ -1,6 +1,6 @@
 /**
  * Health Records Screen
- * Upload and manage health records (placeholder for file uploads)
+ * Upload and manage health records with file attachment support
  */
 
 import React, { useState } from 'react';
@@ -25,6 +25,7 @@ import {
   HealthRecordType,
   HEALTH_RECORD_TYPE_LABELS,
 } from '../../types/profile';
+import { FileUpload, type SelectedFile } from '../../components/ui';
 
 const RECORD_TYPE_OPTIONS: { value: HealthRecordType; label: string; icon: string }[] = [
   { value: 'lab_result', label: 'Lab Result', icon: 'flask' },
@@ -51,6 +52,7 @@ export default function HealthRecordsScreen() {
   const [date, setDate] = useState('');
   const [providerName, setProviderName] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
 
   const memberId = selectedMemberId || members[0]?.id || '';
   const memberRecords = healthRecords.filter((r) => r.memberId === memberId);
@@ -61,6 +63,7 @@ export default function HealthRecordsScreen() {
     setDate('');
     setProviderName('');
     setNotes('');
+    setSelectedFiles([]);
   };
 
   const handleAddRecord = () => {
@@ -73,6 +76,9 @@ export default function HealthRecordsScreen() {
       return;
     }
 
+    // Get file info if a file was selected
+    const file = selectedFiles[0];
+
     addHealthRecord({
       memberId,
       title: title.trim(),
@@ -80,6 +86,9 @@ export default function HealthRecordsScreen() {
       date: date || new Date().toISOString().split('T')[0],
       providerName: providerName.trim() || undefined,
       notes: notes.trim() || undefined,
+      fileUrl: file?.uri,
+      fileName: file?.name,
+      fileSize: file?.size,
     });
 
     setShowModal(false);
@@ -137,8 +146,7 @@ export default function HealthRecordsScreen() {
         <View style={styles.infoCard}>
           <Icon name="folder" size={20} color={colors.accent} />
           <Text style={styles.infoText}>
-            Store important health documents for quick access during care visits. File uploads
-            coming soon.
+            Store important health documents for quick access during care visits. Attach PDFs, images, and documents to your records.
           </Text>
         </View>
 
@@ -171,8 +179,16 @@ export default function HealthRecordsScreen() {
                     <Icon name="trash-outline" size={20} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
+                {record.fileName && (
+                  <View style={styles.recordFile}>
+                    <Icon name="attach" size={14} color={colors.accent} />
+                    <Text style={styles.recordFileText} numberOfLines={1}>
+                      {record.fileName}
+                    </Text>
+                  </View>
+                )}
                 {record.notes && (
-                  <View style={styles.recordNotes}>
+                  <View style={[styles.recordNotes, record.fileName && styles.recordNotesNoTop]}>
                     <Text style={styles.recordNotesText}>{record.notes}</Text>
                   </View>
                 )}
@@ -293,11 +309,16 @@ export default function HealthRecordsScreen() {
                 />
               </View>
 
-              {/* Upload Placeholder */}
-              <View style={styles.uploadPlaceholder}>
-                <Icon name="cloud-upload-outline" size={32} color={colors.textTertiary} />
-                <Text style={styles.uploadText}>File upload coming soon</Text>
-              </View>
+              {/* File Upload */}
+              <FileUpload
+                label="Attach Document (optional)"
+                files={selectedFiles}
+                onFilesSelected={setSelectedFiles}
+                acceptedTypes={['pdf', 'image', 'document']}
+                maxFileSize={10 * 1024 * 1024}
+                helper="Upload PDF, images, or documents up to 10MB"
+                compact
+              />
             </View>
           </ScrollView>
         </View>
@@ -390,11 +411,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  recordFile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  recordFileText: {
+    ...typography.caption,
+    color: colors.accent,
+    flex: 1,
+  },
   recordNotes: {
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
+  },
+  recordNotesNoTop: {
+    borderTopWidth: 0,
+    paddingTop: 0,
   },
   recordNotesText: {
     ...typography.bodySmall,
@@ -514,19 +553,5 @@ const styles = StyleSheet.create({
   },
   typeOptionTextSelected: {
     color: colors.accent,
-  },
-  uploadPlaceholder: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface,
-  },
-  uploadText: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
   },
 });

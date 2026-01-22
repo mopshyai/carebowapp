@@ -3,7 +3,7 @@
  * Displays a shareable summary of a health episode
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,11 @@ import {
   TouchableOpacity,
   Share,
   Alert,
+  Modal,
+  Pressable,
+  Platform,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -30,6 +34,8 @@ export default function EpisodeSummaryScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const params = route.params as { episodeId: string } | undefined;
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const episodeId = params?.episodeId;
   const { getEpisode, getMessages } = useEpisodeStore();
@@ -43,24 +49,65 @@ export default function EpisodeSummaryScreen() {
     return buildEpisodeSummary(episode, messages);
   }, [episode, messages]);
 
-  // Handle share
+  // Handle share via system share sheet
   const handleShare = async () => {
     if (!summary) return;
+    setShowShareOptions(false);
 
     try {
       await Share.share({
         message: summary.shareableText,
         title: `CareBow Summary: ${summary.title}`,
       });
-    } catch (error) {
+    } catch {
       Alert.alert('Share Error', 'Unable to share the summary. Please try again.');
     }
   };
 
-  // Handle copy
+  // Handle copy to clipboard
   const handleCopy = () => {
-    // Note: In production, use Clipboard from @react-native-clipboard/clipboard
-    Alert.alert('Copied', 'Summary copied to clipboard');
+    if (!summary) return;
+    setShowShareOptions(false);
+
+    try {
+      Clipboard.setString(summary.shareableText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      Alert.alert('Copy Error', 'Unable to copy to clipboard. Please try again.');
+    }
+  };
+
+  // Handle email share
+  const handleEmailShare = async () => {
+    if (!summary) return;
+    setShowShareOptions(false);
+
+    const subject = encodeURIComponent(`CareBow Health Summary: ${summary.title}`);
+    const body = encodeURIComponent(summary.shareableText);
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+
+    try {
+      const { Linking } = require('react-native');
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        Alert.alert('Email Not Available', 'No email app is configured on this device.');
+      }
+    } catch {
+      Alert.alert('Email Error', 'Unable to open email app. Please try again.');
+    }
+  };
+
+  // Handle print/PDF (placeholder - would need a PDF library in production)
+  const handlePrint = () => {
+    setShowShareOptions(false);
+    Alert.alert(
+      'Print Summary',
+      'PDF export feature coming soon. For now, you can share or copy the summary.',
+      [{ text: 'OK' }]
+    );
   };
 
   if (!episode || !summary) {
@@ -208,11 +255,98 @@ export default function EpisodeSummaryScreen() {
 
       {/* Bottom Action Bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity style={styles.shareMainButton} onPress={handleShare}>
-          <Icon name="share-social" size={20} color={colors.textInverse} />
-          <Text style={styles.shareMainButtonText}>Share Summary</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomButtonRow}>
+          <TouchableOpacity
+            style={styles.copyButton}
+            onPress={handleCopy}
+            accessibilityLabel="Copy summary to clipboard"
+            accessibilityRole="button"
+          >
+            <Icon
+              name={isCopied ? 'checkmark-circle' : 'copy-outline'}
+              size={20}
+              color={isCopied ? colors.success : colors.accent}
+            />
+            <Text style={[styles.copyButtonText, isCopied && { color: colors.success }]}>
+              {isCopied ? 'Copied!' : 'Copy'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareMainButton}
+            onPress={() => setShowShareOptions(true)}
+            accessibilityLabel="Share summary"
+            accessibilityRole="button"
+          >
+            <Icon name="share-social" size={20} color={colors.textInverse} />
+            <Text style={styles.shareMainButtonText}>Share</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Share Options Modal */}
+      <Modal
+        visible={showShareOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowShareOptions(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowShareOptions(false)}>
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Share Summary</Text>
+            <Text style={styles.modalSubtitle}>
+              Choose how you'd like to share your health summary
+            </Text>
+
+            <View style={styles.shareOptionsGrid}>
+              <TouchableOpacity style={styles.shareOption} onPress={handleShare}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: colors.accentMuted }]}>
+                  <Icon name="share-outline" size={24} color={colors.accent} />
+                </View>
+                <Text style={styles.shareOptionLabel}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.shareOption} onPress={handleCopy}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#E0F2FE' }]}>
+                  <Icon name="copy-outline" size={24} color="#0284C7" />
+                </View>
+                <Text style={styles.shareOptionLabel}>Copy</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.shareOption} onPress={handleEmailShare}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#FEF3C7' }]}>
+                  <Icon name="mail-outline" size={24} color="#D97706" />
+                </View>
+                <Text style={styles.shareOptionLabel}>Email</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.shareOption} onPress={handlePrint}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#F3E8FF' }]}>
+                  <Icon name="print-outline" size={24} color="#7C3AED" />
+                </View>
+                <Text style={styles.shareOptionLabel}>Print</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalNote}>
+              <Icon name="shield-checkmark-outline" size={14} color={colors.textTertiary} />
+              <Text style={styles.modalNoteText}>
+                Your health information is only shared with people you choose
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowShareOptions(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -463,7 +597,28 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  bottomButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  copyButtonText: {
+    ...typography.label,
+    color: colors.accent,
+  },
   shareMainButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -476,5 +631,77 @@ const styles = StyleSheet.create({
   shareMainButtonText: {
     ...typography.labelLarge,
     color: colors.textInverse,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.xxs,
+    marginBottom: spacing.lg,
+  },
+  shareOptionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: spacing.lg,
+  },
+  shareOption: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  shareOptionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareOptionLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  modalNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  modalNoteText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  modalCancelButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  modalCancelText: {
+    ...typography.label,
+    color: colors.textTertiary,
   },
 });
