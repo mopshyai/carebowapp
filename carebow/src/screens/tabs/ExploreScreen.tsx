@@ -19,7 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
-import { useTheme } from '@/providers/ThemeProvider';
+import { useTheme } from '@/theme/ThemeProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

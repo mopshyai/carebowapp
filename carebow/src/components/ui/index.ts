@@ -60,18 +60,18 @@ export {
 } from './LoadingSpinner';
 
 // Data Display Components
-export { default as StatusBadge } from './StatusBadge';
-export { default as PriceText } from './PriceText';
-export { default as StarRating } from './StarRating';
-export { default as PressableCard } from './PressableCard';
-export { default as BadgeRow } from './BadgeRow';
+export { StatusBadge, DotBadge, DiscountBadge, PopularBadge } from './StatusBadge';
+export { PriceText, PriceRow } from './PriceText';
+export { StarRating } from './StarRating';
+export { PressableCard, PressableGridItem, PressableScrollItem } from './PressableCard';
+export { BadgeRow, Badge } from './BadgeRow';
 
 // Form Components
-export { default as HorizontalDatePicker } from './HorizontalDatePicker';
-export { default as TimePicker } from './TimePicker';
-export { default as QuantityStepper } from './QuantityStepper';
-export { default as MemberPicker } from './MemberPicker';
-export { default as RequestTextArea } from './RequestTextArea';
+export { HorizontalDatePicker } from './HorizontalDatePicker';
+export { TimePicker } from './TimePicker';
+export { QuantityStepper } from './QuantityStepper';
+export { MemberPicker } from './MemberPicker';
+export { RequestTextArea } from './RequestTextArea';
 export {
   FileUpload,
   type FileUploadProps,
@@ -81,14 +81,14 @@ export {
 export { FormInput, type FormInputProps } from './FormInput';
 
 // Service Components
-export { default as CategorySection } from './CategorySection';
-export { default as ServiceRowCard } from './ServiceRowCard';
-export { default as PackageSelectorList } from './PackageSelectorList';
-export { default as SubscriptionPlanCard } from './SubscriptionPlanCard';
-export { default as StickyCheckoutBar } from './StickyCheckoutBar';
+export { CategorySection } from './CategorySection';
+export { ServiceRowCard } from './ServiceRowCard';
+export { PackageSelectorList } from './PackageSelectorList';
+export { SubscriptionPlanCard } from './SubscriptionPlanCard';
+export { StickyCheckoutBar } from './StickyCheckoutBar';
 
 // Layout Components
-export { default as Collapsible } from './collapsible';
+export { Collapsible } from './collapsible';
 
 // Feedback Components
 export {

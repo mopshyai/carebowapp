@@ -110,9 +110,8 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
     try {
       await scheduleFollowUpReminder(
         episodeId || 'general',
-        new Date(Date.now() + minutes * 60 * 1000),
         'Symptom Check-in',
-        'Time to check on your symptoms. How are you feeling?'
+        new Date(Date.now() + minutes * 60 * 1000)
       );
       Alert.alert('Reminder Set', `We'll remind you in ${minutes >= 60 ? Math.round(minutes / 60) + ' hour(s)' : minutes + ' minutes'}.`);
     } catch {

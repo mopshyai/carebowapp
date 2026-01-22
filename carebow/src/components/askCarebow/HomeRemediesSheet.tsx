@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import type { TriageLevel } from '../../utils/triageCTAMapping';
 
 // ============================================
 // TYPES
@@ -35,7 +36,7 @@ interface HomeRemediesSheetProps {
   visible: boolean;
   onClose: () => void;
   symptoms?: string[];
-  triageLevel?: 'low' | 'moderate' | 'high' | 'emergency';
+  triageLevel?: TriageLevel;
 }
 
 // ============================================
@@ -254,7 +255,7 @@ export function HomeRemediesSheet({
   visible,
   onClose,
   symptoms = [],
-  triageLevel = 'low',
+  triageLevel = 'self_care',
 }: HomeRemediesSheetProps) {
   const insets = useSafeAreaInsets();
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
