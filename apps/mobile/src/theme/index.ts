@@ -4,6 +4,26 @@
  */
 
 // =============================================================================
+// MEDICAL-GRADE TOKENS (NEW)
+// =============================================================================
+
+export {
+  palette,
+  colors as medicalColors,
+  spacing as medicalSpacing,
+  space,
+  radius as medicalRadius,
+  typography as medicalTypography,
+  shadows as medicalShadows,
+  componentStyles,
+  layout as medicalLayout,
+  animation as medicalAnimation,
+} from './tokens';
+
+// Re-export tokens as default for easy import
+export { default as tokens } from './tokens';
+
+// =============================================================================
 // THEME PROVIDER & HOOKS (Re-export)
 // =============================================================================
 

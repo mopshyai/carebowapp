@@ -1,0 +1,12 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "@sentry/cli"
+  - "@swc/core"
+  - esbuild
+  - hyochan-welcome
+  - prisma
+  - sharp
