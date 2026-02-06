@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question
+    url: https://github.com/mopshyai/carebowapp/discussions/new?category=q-a
+    about: Ask questions and get help from the community
+  - name: Feature Discussion
+    url: https://github.com/mopshyai/carebowapp/discussions/new?category=ideas
+    about: Discuss ideas before opening a feature request
+  - name: Security Issue
+    url: https://github.com/mopshyai/carebowapp/security/policy
+    about: Report security vulnerabilities privately

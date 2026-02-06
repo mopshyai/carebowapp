@@ -1,0 +1,20 @@
+# Default owners for everything in the repo
+* @mopshyai/core-team
+
+# Mobile app
+/apps/mobile/ @mopshyai/mobile-team
+
+# Backend API
+/apps/api/ @mopshyai/backend-team
+
+# Shared packages
+/packages/ @mopshyai/core-team
+
+# CI/CD and infrastructure
+/.github/ @mopshyai/devops-team
+/docker/ @mopshyai/devops-team
+Dockerfile @mopshyai/devops-team
+
+# Documentation
+*.md @mopshyai/docs-team
+/docs/ @mopshyai/docs-team
