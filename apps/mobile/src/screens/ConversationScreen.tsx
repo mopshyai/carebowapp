@@ -521,7 +521,7 @@ export default function ConversationScreen() {
           <SubscriptionGate
             freeQuestionsUsed={freeQuestionsUsed}
             maxFreeQuestions={maxFreeQuestions}
-            onSubscribe={() => navigation.navigate('PlanDetails' as never, { id: 'ask-carebow' })}
+            onSubscribe={() => navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)}
             onViewPlans={() => navigation.navigate('Services')}
           />
         )}

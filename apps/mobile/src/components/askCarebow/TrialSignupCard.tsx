@@ -1,6 +1,6 @@
 /**
  * Trial Signup Card Component
- * Prompts user to start their 3-day free trial
+ * Prompts user to start their 7-day free trial
  */
 
 import React from 'react';
@@ -44,7 +44,7 @@ export function TrialSignupCard({ onTrialStart, compact = false }: TrialSignupCa
         </View>
         <View style={styles.compactContent}>
           <Text style={styles.compactTitle}>Try Premium Free</Text>
-          <Text style={styles.compactSubtitle}>3 days unlimited access</Text>
+          <Text style={styles.compactSubtitle}>7 days unlimited access</Text>
         </View>
         <Icon name="arrow-forward" size={16} color={colors.accent} />
       </TouchableOpacity>
@@ -61,7 +61,7 @@ export function TrialSignupCard({ onTrialStart, compact = false }: TrialSignupCa
       </View>
 
       <Text style={styles.description}>
-        Get 3 days of unlimited access to:
+        Get 7 days of unlimited access to:
       </Text>
 
       <View style={styles.features}>
@@ -84,7 +84,7 @@ export function TrialSignupCard({ onTrialStart, compact = false }: TrialSignupCa
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleStartTrial}>
-        <Text style={styles.buttonText}>Start Free Trial - 3 Days</Text>
+        <Text style={styles.buttonText}>Start 7-Day Free Trial</Text>
       </TouchableOpacity>
 
       <Text style={styles.disclaimer}>No credit card required</Text>
@@ -145,7 +145,7 @@ export function TrialExpiredCard() {
       </TouchableOpacity>
 
       <Text style={styles.paywallNote}>
-        You can still ask 1 basic question per day for free
+        You can still ask up to 3 free questions
       </Text>
     </View>
   );

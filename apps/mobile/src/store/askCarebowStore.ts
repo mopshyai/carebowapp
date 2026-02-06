@@ -35,7 +35,7 @@ import {
 
 type TrialState = {
   trialStartDate: string | null;  // ISO date - set when user clicks "Start Trial"
-  trialEndDate: string | null;    // ISO date (startDate + 3 days)
+  trialEndDate: string | null;    // ISO date (startDate + 7 days)
   hasUsedTrial: boolean;          // true once trial started (can't restart)
 };
 
@@ -577,7 +577,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
         const now = new Date();
         const endDate = new Date(now);
-        endDate.setDate(endDate.getDate() + 3); // 3 days from now
+        endDate.setDate(endDate.getDate() + 7); // 7 days from now
 
         set({
           trial: {
