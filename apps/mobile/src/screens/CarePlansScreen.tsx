@@ -25,6 +25,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'react-native-haptic-feedback';
 import { useCurrencyStore } from '@/store';
+import { AppIcon } from '@/components/icons/AppIcon';
+import type { IconName } from '@/components/icons/iconMap';
 import { colors, spacing, radius, shadows, typography } from '@/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,7 +43,6 @@ const CARE_PLANS = [
     priceUSD: 30,
     originalPriceUSD: null,
     billingPeriod: 'month',
-    pricePerDayUSD: 1.0,
     discount: 0,
     description: 'Perfect for those looking for immediate and short-term care solutions.',
     features: [
@@ -60,7 +61,7 @@ const CARE_PLANS = [
     hasCoordinator: true,
     color: '#0D4F52',
     colorSoft: '#CCFBF1',
-    icon: '📅',
+    iconName: 'calendar' as IconName,
   },
   {
     id: 'half_yearly',
@@ -69,7 +70,6 @@ const CARE_PLANS = [
     priceUSD: 150,
     originalPriceUSD: 180,
     billingPeriod: '6 months',
-    pricePerDayUSD: 0.83,
     discount: 17,
     isPopular: true,
     description: 'Perfect for families seeking consistent care and exclusive health access.',
@@ -90,7 +90,7 @@ const CARE_PLANS = [
     hasCoordinator: true,
     color: '#8B5CF6',
     colorSoft: '#EDE9FE',
-    icon: '⭐',
+    iconName: 'star-filled' as IconName,
   },
   {
     id: 'yearly',
@@ -99,7 +99,6 @@ const CARE_PLANS = [
     priceUSD: 300,
     originalPriceUSD: 360,
     billingPeriod: 'year',
-    pricePerDayUSD: 0.82,
     discount: 17,
     isBestValue: true,
     description: 'Ideal for families seeking comprehensive, long-term support.',
@@ -117,7 +116,7 @@ const CARE_PLANS = [
     hasCoordinator: true,
     color: '#EA580C',
     colorSoft: '#FFEDD5',
-    icon: '👑',
+    iconName: 'trophy' as IconName,
   },
 ];
 
@@ -223,9 +222,8 @@ const HeroSection = ({ formatPrice }: { formatPrice: (amount: number) => string 
 const ValueProposition = ({ formatPrice }: { formatPrice: (amount: number) => string }) => (
   <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.valueProp}>
     <Text style={styles.valuePropText}>
-      For just{' '}
-      <Text style={styles.valuePropHighlight}>{formatPrice(1)}/day</Text>
-      ,{'\n'}keep your worries at bay!
+      Plans starting at{' '}
+      <Text style={styles.valuePropHighlight}>{formatPrice(30)}/month</Text>
     </Text>
   </Animated.View>
 );
@@ -272,7 +270,7 @@ const PlanCard = ({
       {/* Plan header */}
       <View style={styles.planHeader}>
         <View style={[styles.planIconContainer, { backgroundColor: plan.colorSoft }]}>
-          <Text style={styles.planIcon}>{plan.icon}</Text>
+          <AppIcon name={plan.iconName} size={28} color={plan.color} />
         </View>
         <View style={styles.planTitleContainer}>
           <Text style={styles.planName}>{plan.name}</Text>
@@ -291,7 +289,6 @@ const PlanCard = ({
           </Text>
           <Text style={styles.pricePeriod}>/{plan.billingPeriod}</Text>
         </View>
-        <Text style={styles.perDay}>~{formatPrice(plan.pricePerDayUSD)}/day</Text>
       </View>
 
       {/* Description */}
@@ -331,20 +328,28 @@ const CustomPlanCard = ({ onPress, delay }: { onPress: () => void; delay: number
         {/* Icon */}
         <View style={styles.customPlanIconRow}>
           <View style={styles.customPlanIcon}>
-            <Text style={styles.customPlanIconEmoji}>⚙️</Text>
+            <AppIcon name="settings" size={26} color={colors.accent} />
           </View>
         </View>
 
         <Text style={styles.customPlanTitle}>Customize Your Plan</Text>
         <Text style={styles.customPlanDescription}>
-          Create a plan that matches your family's exact needs — choose services,
-          frequency, and budget.
+          Create a plan that matches your family's exact needs — tailored services,
+          personalized schedule, and flexible billing.
         </Text>
 
         <View style={styles.customFeatures}>
           <View style={styles.customFeatureRow}>
             <Text style={styles.customFeatureCheck}>✓</Text>
-            <Text style={styles.customFeatureText}>Pick & mix services</Text>
+            <Text style={styles.customFeatureText}>Tailored services based on health condition</Text>
+          </View>
+          <View style={styles.customFeatureRow}>
+            <Text style={styles.customFeatureCheck}>✓</Text>
+            <Text style={styles.customFeatureText}>Personalized care schedule</Text>
+          </View>
+          <View style={styles.customFeatureRow}>
+            <Text style={styles.customFeatureCheck}>✓</Text>
+            <Text style={styles.customFeatureText}>Condition-specific caregiver matching</Text>
           </View>
           <View style={styles.customFeatureRow}>
             <Text style={styles.customFeatureCheck}>✓</Text>
@@ -352,16 +357,12 @@ const CustomPlanCard = ({ onPress, delay }: { onPress: () => void; delay: number
           </View>
           <View style={styles.customFeatureRow}>
             <Text style={styles.customFeatureCheck}>✓</Text>
-            <Text style={styles.customFeatureText}>Condition-specific support</Text>
-          </View>
-          <View style={styles.customFeatureRow}>
-            <Text style={styles.customFeatureCheck}>✓</Text>
-            <Text style={styles.customFeatureText}>Trial period available</Text>
+            <Text style={styles.customFeatureText}>Choose your own check-in frequency</Text>
           </View>
         </View>
 
         <Pressable style={styles.customCtaButton} onPress={onPress}>
-          <Text style={styles.customCtaText}>Create Custom Plan</Text>
+          <Text style={styles.customCtaText}>Talk to Care Expert</Text>
           <Text style={styles.customCtaArrow}>→</Text>
         </Pressable>
       </View>
@@ -675,9 +676,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  planIcon: {
-    fontSize: 28,
-  },
   planTitleContainer: {
     flex: 1,
   },
@@ -713,12 +711,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: 4,
   },
-  perDay: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-
   // Description
   planDescription: {
     ...typography.bodySmall,
@@ -788,9 +780,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentMuted,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  customPlanIconEmoji: {
-    fontSize: 26,
   },
   customPlanTitle: {
     ...typography.h3,

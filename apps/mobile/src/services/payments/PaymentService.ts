@@ -76,7 +76,9 @@ class PaymentServiceImpl implements IPaymentService {
       }
 
       this.initialized = true;
-      console.log('[PaymentService] Initialized');
+      if (__DEV__) {
+        console.log('[PaymentService] Initialized');
+      }
 
       // TODO: When integrating with Stripe:
       // import { initStripe } from '@stripe/stripe-react-native';
@@ -89,7 +91,9 @@ class PaymentServiceImpl implements IPaymentService {
       // import RazorpayCheckout from 'react-native-razorpay';
       // (Razorpay is initialized per-payment, no global init needed)
     } catch (error) {
-      console.error('[PaymentService] Initialization failed:', error);
+      if (__DEV__) {
+        console.error('[PaymentService] Initialization failed:', error);
+      }
     }
   }
 
@@ -98,11 +102,13 @@ class PaymentServiceImpl implements IPaymentService {
   // ========================================
 
   async processPayment(request: PaymentRequest): Promise<PaymentResponse> {
-    console.log('[PaymentService] Processing payment:', {
-      orderId: request.orderId,
-      amount: request.amount,
-      method: request.method.type,
-    });
+    if (__DEV__) {
+      console.log('[PaymentService] Processing payment:', {
+        orderId: request.orderId,
+        amount: request.amount,
+        method: request.method.type,
+      });
+    }
 
     // Simulate network delay
     await this.simulateDelay(1500);
@@ -203,7 +209,9 @@ class PaymentServiceImpl implements IPaymentService {
   // ========================================
 
   async requestRefund(request: RefundRequest): Promise<RefundResponse> {
-    console.log('[PaymentService] Processing refund:', request);
+    if (__DEV__) {
+      console.log('[PaymentService] Processing refund:', request);
+    }
 
     await this.simulateDelay(1000);
 
@@ -289,7 +297,9 @@ class PaymentServiceImpl implements IPaymentService {
   // ========================================
 
   async createSubscription(request: SubscriptionRequest): Promise<Subscription> {
-    console.log('[PaymentService] Creating subscription:', request);
+    if (__DEV__) {
+      console.log('[PaymentService] Creating subscription:', request);
+    }
 
     await this.simulateDelay(1500);
 
@@ -376,7 +386,9 @@ class PaymentServiceImpl implements IPaymentService {
       });
       await AsyncStorage.setItem(STORAGE_KEYS.SAVED_UPI, JSON.stringify(upiObj));
     } catch (error) {
-      console.error('[PaymentService] Failed to persist payment methods:', error);
+      if (__DEV__) {
+        console.error('[PaymentService] Failed to persist payment methods:', error);
+      }
     }
   }
 }

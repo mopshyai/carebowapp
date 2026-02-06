@@ -75,7 +75,7 @@ export function CarePathwayCard({ service, onBook, isPrimary = false }: CarePath
       return service.estimatedPrice;
     }
     if (service.priceRange) {
-      return `₹${service.priceRange.min} - ₹${service.priceRange.max}`;
+      return `$${service.priceRange.min} - $${service.priceRange.max}`;
     }
     return null;
   };

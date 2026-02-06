@@ -65,12 +65,16 @@ class ApiClientImpl {
       this.refreshToken = refreshToken;
       this.tokenExpiry = expiry ? parseInt(expiry, 10) : 0;
 
-      console.log('[ApiClient] Initialized', {
-        hasAccessToken: !!this.accessToken,
-        hasRefreshToken: !!this.refreshToken,
-      });
+      if (__DEV__) {
+        console.log('[ApiClient] Initialized', {
+          hasAccessToken: !!this.accessToken,
+          hasRefreshToken: !!this.refreshToken,
+        });
+      }
     } catch (error) {
-      console.error('[ApiClient] Failed to initialize:', error);
+      if (__DEV__) {
+        console.error('[ApiClient] Failed to initialize:', error);
+      }
     }
   }
 
@@ -153,7 +157,9 @@ class ApiClientImpl {
       await this.setTokens(data.tokens);
       return true;
     } catch (error) {
-      console.error('[ApiClient] Token refresh failed:', error);
+      if (__DEV__) {
+        console.error('[ApiClient] Token refresh failed:', error);
+      }
       await this.clearTokens();
       return false;
     }

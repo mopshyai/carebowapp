@@ -271,7 +271,7 @@ export function formatAmount(amount: number, currency: 'USD' | 'INR'): string {
   const symbol = currency === 'INR' ? '₹' : '$';
   const value = amount / divisor;
 
-  return `${symbol}${value.toLocaleString('en-IN', {
+  return `${symbol}${value.toLocaleString('en-US', {
     minimumFractionDigits: value % 1 !== 0 ? 2 : 0,
     maximumFractionDigits: 2,
   })}`;

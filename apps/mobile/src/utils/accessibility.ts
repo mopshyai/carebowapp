@@ -236,8 +236,8 @@ export function countLabel(label: string, count: number): string {
 /**
  * Generate accessibility label for a price
  */
-export function priceLabel(amount: number, currency: string = 'INR'): string {
-  const formatter = new Intl.NumberFormat('en-IN', {
+export function priceLabel(amount: number, currency: string = 'USD'): string {
+  const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
   });

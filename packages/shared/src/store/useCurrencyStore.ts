@@ -12,7 +12,7 @@ interface CurrencyConfig {
 }
 
 const CURRENCIES: Record<CurrencyCode, CurrencyConfig> = {
-  USD: { code: 'USD', symbol: '$', locale: 'en-US', exchangeRate: 1, decimals: 2 },
+  USD: { code: 'USD', symbol: '$', locale: 'en-US', exchangeRate: 1, decimals: 0 },
   INR: { code: 'INR', symbol: '₹', locale: 'en-IN', exchangeRate: 83, decimals: 0 },
   GBP: { code: 'GBP', symbol: '£', locale: 'en-GB', exchangeRate: 0.79, decimals: 2 },
   EUR: { code: 'EUR', symbol: '€', locale: 'de-DE', exchangeRate: 0.92, decimals: 2 },

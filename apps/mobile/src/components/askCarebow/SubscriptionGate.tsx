@@ -45,10 +45,11 @@ export function SubscriptionGate({
         <Text style={styles.price}>$20</Text>
         <Text style={styles.pricePeriod}>/month</Text>
       </View>
+      <Text style={styles.freeTrialText}>7-day free trial included</Text>
 
       <TouchableOpacity style={styles.subscribeButton} onPress={onSubscribe} activeOpacity={0.8}>
         <Icon name="sparkles" size={20} color={colors.textInverse} />
-        <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
+        <Text style={styles.subscribeButtonText}>Start Free Trial</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.viewPlansButton} onPress={onViewPlans} activeOpacity={0.7}>
@@ -142,6 +143,12 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     marginLeft: spacing.xxs,
+  },
+  freeTrialText: {
+    ...typography.bodySmall,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: spacing.md,
   },
   subscribeButton: {
     flexDirection: 'row',

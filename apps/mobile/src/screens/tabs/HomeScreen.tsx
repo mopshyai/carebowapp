@@ -18,7 +18,6 @@ import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   FadeInDown,
-  FadeInRight,
   useSharedValue,
   useAnimatedStyle,
   withSpring,
@@ -26,6 +25,8 @@ import Animated, {
 import * as Haptics from 'react-native-haptic-feedback';
 import type { MainTabScreenProps } from '@/navigation/types';
 import { CareBowLogoAccurate } from '@/components/icons/CareBowLogo';
+import { AppIcon } from '@/components/icons/AppIcon';
+import type { IconName } from '@/components/icons/iconMap';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -134,7 +135,7 @@ const Header = ({ navigation }: { navigation: any }) => {
       <View style={styles.headerRight}>
         <Pressable style={styles.notificationBtn} onPress={handleNotificationPress}>
           <View style={styles.notificationDot} />
-          <Text style={{ fontSize: 20 }}>🔔</Text>
+          <AppIcon name="bell" size={22} color={colors.textPrimary} />
         </Pressable>
         <Pressable style={styles.avatarContainer} onPress={handleProfilePress}>
           <LinearGradient colors={[colors.accentLight, colors.accent]} style={styles.avatarGradient}>
@@ -184,17 +185,17 @@ const AIHeroCard = ({ navigation }: { navigation: any }) => (
         {/* Illustration */}
         <View style={styles.heroIllustration}>
           <View style={styles.illustrationCircle}>
-            <Text style={{ fontSize: 40 }}>👨‍⚕️</Text>
+            <AppIcon name="doctor" size={40} color="#FFFFFF" />
           </View>
           {/* Floating badges - positioned relative to illustration */}
           <View style={[styles.floatingBadge, styles.floatingBadgeTop]}>
-            <Text style={{ fontSize: 14 }}>💊</Text>
+            <AppIcon name="medicine_delivery" size={14} color={colors.accent} />
           </View>
           <View style={[styles.floatingBadge, styles.floatingBadgeLeft]}>
-            <Text style={{ fontSize: 14 }}>🩺</Text>
+            <AppIcon name="stethoscope" size={14} color={colors.accent} />
           </View>
           <View style={[styles.floatingBadge, styles.floatingBadgeRight]}>
-            <Text style={{ fontSize: 14 }}>❤️</Text>
+            <AppIcon name="heart-filled" size={14} color="#EF4444" />
           </View>
         </View>
       </View>
@@ -218,7 +219,7 @@ const EmergencyBanner = ({ navigation }: { navigation: any }) => (
   >
     <View style={styles.emergencyGradientFallback}>
       <View style={styles.emergencyIconBg}>
-        <Text style={{ fontSize: 22 }}>🛡️</Text>
+        <AppIcon name="shield" size={22} color="#EF4444" />
       </View>
       <View style={styles.emergencyContent}>
         <Text style={styles.emergencyTitle}>Emergency & Safety</Text>
@@ -232,14 +233,14 @@ const EmergencyBanner = ({ navigation }: { navigation: any }) => (
 // ============================================
 // SECTION HEADER
 // ============================================
-const SectionHeader = ({ title, subtitle, action, delay = 0 }: any) => (
+const SectionHeader = ({ title, subtitle, action, onPress, delay = 0 }: any) => (
   <Animated.View entering={FadeInDown.delay(delay).springify()} style={styles.sectionHeader}>
     <View>
       <Text style={styles.sectionTitle}>{title}</Text>
       {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
     </View>
     {action && (
-      <Pressable hitSlop={8}>
+      <Pressable hitSlop={8} onPress={onPress}>
         <Text style={styles.sectionAction}>{action} →</Text>
       </Pressable>
     )}
@@ -247,106 +248,48 @@ const SectionHeader = ({ title, subtitle, action, delay = 0 }: any) => (
 );
 
 // ============================================
-// SERVICE CARD - Premium Design
+// EXPLORE SERVICES CARD - Entry point to ServicesScreen
 // ============================================
-const ServiceCard = ({ icon, title, subtitle, price, priceUnit, status, statusColor, accentColor, delay }: any) => (
-  <Animated.View entering={FadeInRight.delay(delay).springify()}>
-    <AnimatedPressable style={styles.serviceCard}>
-      {/* Top accent line */}
-      <View style={[styles.serviceAccent, { backgroundColor: accentColor }]} />
+const ExploreServicesCard = ({ navigation }: { navigation: any }) => {
+  const services: { iconName: IconName; label: string; color: string }[] = [
+    { iconName: 'doctor', label: 'Doctor Visit', color: colors.accent },
+    { iconName: 'lab', label: 'Lab Tests', color: colors.blue },
+    { iconName: 'nurse', label: 'Nursing', color: colors.coral },
+    { iconName: 'oxygen_concentrator', label: 'Equipment', color: colors.purple },
+  ];
 
-      {/* Icon */}
-      <View style={[styles.serviceIcon, { backgroundColor: accentColor + '15' }]}>
-        <Text style={{ fontSize: 26 }}>{icon}</Text>
-      </View>
-
-      <Text style={styles.serviceTitle}>{title}</Text>
-      <Text style={styles.serviceSubtitle}>{subtitle}</Text>
-
-      {/* Status Badge */}
-      <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
-        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-        <Text style={[styles.statusText, { color: statusColor }]}>{status}</Text>
-      </View>
-
-      {/* Price */}
-      <View style={styles.priceRow}>
-        <Text style={styles.priceAmount}>₹{price.toLocaleString('en-IN')}</Text>
-        <Text style={styles.priceUnit}>/{priceUnit}</Text>
-      </View>
-    </AnimatedPressable>
-  </Animated.View>
-);
-
-// ============================================
-// EQUIPMENT CARD
-// ============================================
-const EquipmentCard = ({ icon, name, price, tags, delivery, delay }: any) => (
-  <Animated.View entering={FadeInRight.delay(delay).springify()}>
-    <AnimatedPressable style={styles.equipmentCard}>
-      <View style={styles.equipmentIcon}>
-        <Text style={{ fontSize: 28 }}>{icon}</Text>
-      </View>
-
-      <Text style={styles.equipmentName}>{name}</Text>
-
-      <View style={styles.tagsRow}>
-        {tags.map((tag: string, i: number) => (
-          <View key={i} style={styles.tag}>
-            <Text style={styles.tagText}>{tag}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.equipmentPriceRow}>
-        <Text style={styles.equipmentPrice}>₹{price.toLocaleString('en-IN')}</Text>
-        <Text style={styles.equipmentUnit}>/month</Text>
-      </View>
-
-      <View style={styles.deliveryBadge}>
-        <Text style={{ fontSize: 12 }}>⚡</Text>
-        <Text style={styles.deliveryText}>{delivery}</Text>
-      </View>
-    </AnimatedPressable>
-  </Animated.View>
-);
-
-// ============================================
-// HEALTH PACKAGE CARD
-// ============================================
-const PackageCard = ({ icon, name, testsCount, tests, price, originalPrice, isPopular, color, delay }: any) => (
-  <Animated.View entering={FadeInRight.delay(delay).springify()}>
-    <AnimatedPressable style={styles.packageCard}>
-      {isPopular && (
-        <View style={styles.popularBadge}>
-          <Text style={styles.popularText}>⭐ POPULAR</Text>
+  return (
+    <AnimatedPressable
+      delay={400}
+      style={styles.exploreCard}
+      onPress={() => {
+        Haptics.trigger('impactLight');
+        navigation.navigate('Services' as never);
+      }}
+    >
+      <View style={styles.exploreTop}>
+        <View>
+          <Text style={styles.exploreTitle}>Healthcare Services</Text>
+          <Text style={styles.exploreSubtitle}>Doctor visits, lab tests, nursing, equipment & more</Text>
         </View>
-      )}
-
-      <View style={[styles.packageIcon, { backgroundColor: color + '15' }]}>
-        <Text style={{ fontSize: 26 }}>{icon}</Text>
+        <View style={styles.exploreArrow}>
+          <Text style={styles.exploreArrowText}>→</Text>
+        </View>
       </View>
 
-      <Text style={styles.packageName}>{name}</Text>
-      <Text style={styles.packageTestCount}>{testsCount} tests included</Text>
-
-      <View style={styles.testsList}>
-        {tests.slice(0, 2).map((test: string, i: number) => (
-          <View key={i} style={styles.testItem}>
-            <Text style={[styles.testCheck, { color }]}>✓</Text>
-            <Text style={styles.testName}>{test}</Text>
+      <View style={styles.exploreIcons}>
+        {services.map((s, i) => (
+          <View key={i} style={styles.exploreIconItem}>
+            <View style={[styles.exploreIconCircle, { backgroundColor: s.color + '15' }]}>
+              <AppIcon name={s.iconName} size={22} color={s.color} />
+            </View>
+            <Text style={styles.exploreIconLabel}>{s.label}</Text>
           </View>
         ))}
       </View>
-
-      <View style={styles.packagePriceRow}>
-        <Text style={styles.packagePriceLabel}>From</Text>
-        <Text style={styles.packageOriginalPrice}>₹{originalPrice.toLocaleString('en-IN')}</Text>
-        <Text style={[styles.packagePrice, { color }]}>₹{price.toLocaleString('en-IN')}</Text>
-      </View>
     </AnimatedPressable>
-  </Animated.View>
-);
+  );
+};
 
 // ============================================
 // UPCOMING APPOINTMENT CARD
@@ -368,13 +311,18 @@ const UpcomingCard = () => (
           <Text style={styles.upcomingName}>Dr. Sarah Chen</Text>
           <Text style={styles.upcomingSpecialty}>General Physician</Text>
           <View style={styles.upcomingTimeRow}>
-            <Text style={styles.upcomingTime}>📅 Jan 5, 2026 • 🕐 2:00 PM</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <AppIcon name="calendar" size={12} color={colors.textTertiary} />
+              <Text style={styles.upcomingTime}>Jan 5, 2026 • </Text>
+              <AppIcon name="time" size={12} color={colors.textTertiary} />
+              <Text style={styles.upcomingTime}>2:00 PM</Text>
+            </View>
           </View>
         </View>
 
         <Pressable style={styles.joinButton}>
           <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.joinGradient}>
-            <Text style={styles.joinIcon}>📹</Text>
+            <AppIcon name="video" size={14} color={colors.textInverse} />
             <Text style={styles.joinText}>Join</Text>
           </LinearGradient>
         </Pressable>
@@ -384,34 +332,44 @@ const UpcomingCard = () => (
 );
 
 // ============================================
-// CARE PLAN CARD
+// CARE PLAN CARD - Full Width
 // ============================================
-const CarePlanCard = ({ tagline, price, originalPrice, discount, rating, reviews, color, colorSoft, icon, delay }: any) => (
-  <Animated.View entering={FadeInRight.delay(delay).springify()}>
-    <AnimatedPressable style={styles.carePlanCard}>
-      <View style={[styles.carePlanBadge, { backgroundColor: color }]}>
-        <Text style={styles.carePlanBadgeText}>{tagline}</Text>
+const CarePlanCard = ({ name, tagline, price, originalPrice, discount, benefits, color, colorSoft, iconName, onPress, delay }: any) => (
+  <Animated.View entering={FadeInDown.delay(delay).springify()}>
+    <AnimatedPressable style={styles.carePlanCard} onPress={onPress}>
+      <View style={styles.carePlanHeader}>
+        <View style={[styles.carePlanIcon, { backgroundColor: colorSoft }]}>
+          <AppIcon name={iconName} size={24} color={color} />
+        </View>
+        <View style={styles.carePlanHeaderText}>
+          <Text style={styles.carePlanName}>{name}</Text>
+          <Text style={styles.carePlanTagline}>{tagline}</Text>
+        </View>
+        <View style={styles.carePlanPriceBlock}>
+          <View style={styles.carePlanPriceRow}>
+            <Text style={[styles.carePlanPrice, { color }]}>${price}</Text>
+            {originalPrice && originalPrice > price ? (
+              <Text style={styles.carePlanOriginal}>${originalPrice}</Text>
+            ) : null}
+          </View>
+          {discount > 0 && (
+            <View style={[styles.discountBadge, { backgroundColor: color + '15' }]}>
+              <Text style={[styles.discountText, { color }]}>Save {discount}%</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <View style={[styles.carePlanIcon, { backgroundColor: colorSoft }]}>
-        <Text style={{ fontSize: 28 }}>{icon}</Text>
-      </View>
-
-      <Text style={[styles.carePlanName, { color }]}>Monthly</Text>
-
-      <View style={styles.carePlanPriceRow}>
-        <Text style={[styles.carePlanPrice, { color }]}>₹{price.toLocaleString('en-IN')}</Text>
-        <Text style={styles.carePlanOriginal}>₹{originalPrice.toLocaleString('en-IN')}</Text>
-      </View>
-
-      <View style={styles.ratingRow}>
-        <Text style={styles.ratingStars}>★★★★☆</Text>
-        <Text style={styles.ratingCount}>({reviews})</Text>
-      </View>
-
-      <View style={styles.discountBadge}>
-        <Text style={styles.discountText}>Save {discount}%</Text>
-      </View>
+      {benefits && benefits.length > 0 && (
+        <View style={styles.carePlanBenefits}>
+          {benefits.slice(0, 3).map((b: string, i: number) => (
+            <View key={i} style={styles.carePlanBenefitItem}>
+              <AppIcon name="check" size={14} color={color} />
+              <Text style={styles.carePlanBenefitText}>{b}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </AnimatedPressable>
   </Animated.View>
 );
@@ -420,11 +378,11 @@ const CarePlanCard = ({ tagline, price, originalPrice, discount, rating, reviews
 // QUICK ACTIONS
 // ============================================
 const QuickActions = ({ navigation }: { navigation: any }) => {
-  const actions = [
-    { icon: '📋', label: 'Orders', color: colors.blueSoft, screen: 'Orders' },
-    { icon: '📝', label: 'Requests', color: colors.purpleSoft, screen: 'Requests' },
-    { icon: '📁', label: 'Records', color: colors.accentSoft, screen: 'Profile', nestedScreen: 'HealthRecords' },
-    { icon: '💬', label: 'Support', color: colors.orangeSoft, screen: 'Profile', nestedScreen: 'Help' },
+  const actions: { iconName: IconName; label: string; color: string; iconColor: string; screen: string; nestedScreen?: string }[] = [
+    { iconName: 'receipt', label: 'Orders', color: colors.blueSoft, iconColor: colors.blue, screen: 'Orders' },
+    { iconName: 'document', label: 'Requests', color: colors.purpleSoft, iconColor: colors.purple, screen: 'Requests' },
+    { iconName: 'folder', label: 'Records', color: colors.accentSoft, iconColor: colors.accent, screen: 'Profile', nestedScreen: 'HealthRecords' },
+    { iconName: 'help', label: 'Support', color: colors.orangeSoft, iconColor: colors.orange, screen: 'Profile', nestedScreen: 'Help' },
   ];
 
   const handlePress = (item: typeof actions[0]) => {
@@ -441,12 +399,12 @@ const QuickActions = ({ navigation }: { navigation: any }) => {
       {actions.map((item, index) => (
         <AnimatedPressable
           key={item.label}
-          delay={900 + index * 50}
+          delay={950 + index * 50}
           style={styles.quickAction}
           onPress={() => handlePress(item)}
         >
           <View style={[styles.quickActionIcon, { backgroundColor: item.color }]}>
-            <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+            <AppIcon name={item.iconName} size={24} color={item.iconColor} />
           </View>
           <Text style={styles.quickActionLabel}>{item.label}</Text>
         </AnimatedPressable>
@@ -477,160 +435,76 @@ export default function HomeScreen() {
           <EmergencyBanner navigation={navigation} />
         </View>
 
-        {/* Quick Services */}
-        <SectionHeader title="Quick Services" subtitle="Book in minutes" action="See all" delay={400} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-          <ServiceCard
-            icon="🩺"
-            title="Doctor Visit"
-            subtitle="At-home consultation"
-            price={799}
-            priceUnit="visit"
-            status="Available"
-            statusColor={colors.success}
-            accentColor={colors.accent}
-            delay={450}
-          />
-          <ServiceCard
-            icon="🧪"
-            title="Lab Tests"
-            subtitle="Home sample collection"
-            price={399}
-            priceUnit="test"
-            status="Popular"
-            statusColor={colors.blue}
-            accentColor={colors.blue}
-            delay={500}
-          />
-          <ServiceCard
-            icon="💗"
-            title="Nursing Care"
-            subtitle="Professional nurses"
-            price={500}
-            priceUnit="4hr"
-            status="24/7"
-            statusColor={colors.coral}
-            accentColor={colors.coral}
-            delay={550}
-          />
-        </ScrollView>
-
-        {/* Medical Equipment */}
-        <SectionHeader title="Medical Equipment" subtitle="Rent or buy" action="View all" delay={600} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-          <EquipmentCard
-            icon="🫁"
-            name="Oxygen Concentrator"
-            price={4500}
-            tags={['Free delivery', 'Setup included']}
-            delivery="Same day"
-            delay={650}
-          />
-          <EquipmentCard
-            icon="😮‍💨"
-            name="BiPAP Machine"
-            price={5500}
-            tags={['Free delivery', 'Training']}
-            delivery="Next day"
-            delay={700}
-          />
-          <EquipmentCard
-            icon="🛏️"
-            name="Hospital Bed"
-            price={3500}
-            tags={['Free delivery', 'Setup']}
-            delivery="Same day"
-            delay={750}
-          />
-        </ScrollView>
-
-        {/* Health Packages */}
-        <SectionHeader title="Health Packages" subtitle="Comprehensive checkups" action="Explore" delay={800} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-          <PackageCard
-            icon="❤️"
-            name="Cardiac Package"
-            testsCount={12}
-            tests={['ECG', 'Lipid Profile']}
-            price={2499}
-            originalPrice={3500}
-            isPopular={true}
-            color={colors.coral}
-            delay={850}
-          />
-          <PackageCard
-            icon="🏥"
-            name="Full Body Checkup"
-            testsCount={78}
-            tests={['CBC, LFT, KFT', 'Thyroid Profile']}
-            price={1999}
-            originalPrice={3000}
-            isPopular={false}
-            color={colors.accent}
-            delay={900}
-          />
-          <PackageCard
-            icon="💉"
-            name="Diabetes Package"
-            testsCount={15}
-            tests={['HbA1c', 'Fasting Sugar']}
-            price={1499}
-            originalPrice={2200}
-            isPopular={false}
-            color={colors.blue}
-            delay={950}
-          />
-        </ScrollView>
+        {/* Explore Services — single entry point */}
+        <View style={styles.section}>
+          <ExploreServicesCard navigation={navigation} />
+        </View>
 
         {/* Upcoming */}
-        <SectionHeader title="Upcoming" action="View all" delay={1000} />
+        <SectionHeader title="Upcoming" action="View all" delay={500} />
         <View style={styles.section}>
           <UpcomingCard />
         </View>
 
-        {/* Care Plans */}
-        <SectionHeader title="Care Plans" subtitle="Save with subscriptions" action="Compare" delay={1100} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+        {/* Care Plans — full-width, prominent */}
+        <SectionHeader title="Care Plans" subtitle="Save with subscriptions" action="Compare" onPress={() => navigation.navigate('CarePlans' as never)} delay={600} />
+        <View style={styles.section}>
           <CarePlanCard
-            tagline="AI POWERED"
-            price={999}
-            originalPrice={1499}
+            name="Ask CareBow"
+            tagline="AI Assistant · $20/mo"
+            price={20}
+            originalPrice={30}
             discount={33}
-            rating={4.2}
-            reviews={12}
+            benefits={['Unlimited AI symptom checks', '24/7 health guidance', 'Personalized care recommendations']}
             color={colors.purple}
             colorSoft={colors.purpleSoft}
-            icon="✨"
-            delay={1150}
+            iconName="sparkles"
+            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)}
+            delay={650}
           />
           <CarePlanCard
-            tagline="FLEXIBLE"
-            price={1499}
-            originalPrice={2499}
-            discount={40}
-            rating={4.5}
-            reviews={4}
+            name="Monthly Plan"
+            tagline="Short-term care · $30/mo"
+            price={30}
+            originalPrice={null}
+            discount={0}
+            benefits={['Weekly check-in calls', 'Medication reminders', 'Dedicated CareBow coordinator']}
             color={colors.accent}
             colorSoft={colors.accentSoft}
-            icon="📅"
-            delay={1200}
+            iconName="calendar"
+            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'monthly' } as never)}
+            delay={700}
           />
           <CarePlanCard
-            tagline="BEST VALUE"
-            price={2999}
-            originalPrice={4999}
-            discount={40}
-            rating={4.8}
-            reviews={8}
+            name="6-Month Plan"
+            tagline="Most popular · $150/6mo"
+            price={150}
+            originalPrice={180}
+            discount={17}
+            benefits={['Twice a week check-ins', 'Priority doctor visits', '24/7 care support']}
             color={colors.secondary}
             colorSoft={colors.secondarySoft}
-            icon="👑"
-            delay={1250}
+            iconName="leaf"
+            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'half_yearly' } as never)}
+            delay={750}
           />
-        </ScrollView>
+          <CarePlanCard
+            name="Yearly Plan"
+            tagline="Best value · $300/yr"
+            price={300}
+            originalPrice={360}
+            discount={17}
+            benefits={['Daily check-in calls', 'Daily family updates', 'Priority emergency support']}
+            color={colors.orange}
+            colorSoft={colors.orangeSoft}
+            iconName="trophy"
+            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'yearly' } as never)}
+            delay={800}
+          />
+        </View>
 
         {/* Quick Actions */}
-        <SectionHeader title="Quick Actions" delay={1300} />
+        <SectionHeader title="Quick Actions" delay={900} />
         <QuickActions navigation={navigation} />
 
         <View style={{ height: 100 }} />
@@ -652,10 +526,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: spacing.lg,
-  },
-  horizontalScroll: {
-    paddingRight: spacing.xl,
-    paddingBottom: spacing.sm,
   },
 
   // Header
@@ -695,11 +565,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   notificationDot: {
     position: 'absolute',
@@ -816,11 +692,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textInverse,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   floatingBadgeTop: {
     top: -5,
@@ -900,230 +782,72 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  // Service Card
-  serviceCard: {
-    width: 160,
+  // Explore Services Card
+  exploreCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginRight: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    overflow: 'hidden',
+    padding: spacing.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  serviceAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-  },
-  serviceIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    justifyContent: 'center',
+  exploreTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
-  serviceTitle: {
-    fontSize: 16,
+  exploreTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 4,
   },
-  serviceSubtitle: {
-    fontSize: 12,
+  exploreSubtitle: {
+    fontSize: 13,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  priceAmount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.accent,
-  },
-  priceUnit: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-
-  // Equipment Card
-  equipmentCard: {
-    width: 170,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginRight: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  equipmentIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+  exploreArrow: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.accentSoft,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
   },
-  equipmentName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  tag: {
-    backgroundColor: colors.accentMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  tagText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.accent,
-  },
-  equipmentPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: spacing.sm,
-  },
-  equipmentPrice: {
+  exploreArrowText: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.accent,
   },
-  equipmentUnit: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  deliveryBadge: {
+  exploreIcons: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  exploreIconItem: {
     alignItems: 'center',
-    gap: spacing.xs,
+    flex: 1,
   },
-  deliveryText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.success,
-  },
-
-  // Package Card
-  packageCard: {
-    width: 180,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginRight: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    position: 'relative',
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.orange,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  popularText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.textInverse,
-  },
-  packageIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+  exploreIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
   },
-  packageName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  packageTestCount: {
-    fontSize: 12,
+  exploreIconLabel: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.textSecondary,
-    marginBottom: spacing.md,
-  },
-  testsList: {
-    marginBottom: spacing.md,
-  },
-  testItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: 4,
-  },
-  testCheck: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  testName: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  packagePriceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.xs,
-  },
-  packagePriceLabel: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  packageOriginalPrice: {
-    fontSize: 12,
-    color: colors.textTertiary,
-    textDecorationLine: 'line-through',
-  },
-  packagePrice: {
-    fontSize: 20,
-    fontWeight: '700',
   },
 
   // Upcoming Card
@@ -1131,11 +855,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   upcomingBadge: {
     flexDirection: 'row',
@@ -1208,92 +938,98 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.xs,
   },
-  joinIcon: {
-    fontSize: 14,
-  },
   joinText: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.textInverse,
   },
 
-  // Care Plan Card
+  // Care Plan Card — Full Width
   carePlanCard: {
-    width: 160,
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    marginRight: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    alignItems: 'center',
-  },
-  carePlanBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
     marginBottom: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  carePlanBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textInverse,
+  carePlanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   carePlanIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginRight: spacing.md,
+  },
+  carePlanHeaderText: {
+    flex: 1,
   },
   carePlanName: {
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: spacing.sm,
+    color: colors.textPrimary,
+  },
+  carePlanTagline: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  carePlanPriceBlock: {
+    alignItems: 'flex-end',
   },
   carePlanPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.xs,
-    marginBottom: spacing.sm,
   },
   carePlanPrice: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
   },
   carePlanOriginal: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textTertiary,
     textDecorationLine: 'line-through',
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  ratingStars: {
-    fontSize: 12,
-    color: colors.orange,
-  },
-  ratingCount: {
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
   discountBadge: {
-    backgroundColor: colors.successSoft,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    marginTop: 4,
   },
   discountText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: colors.success,
+  },
+  carePlanBenefits: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
+  },
+  carePlanBenefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 6,
+  },
+  carePlanBenefitText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    flex: 1,
   },
 
   // Quick Actions
