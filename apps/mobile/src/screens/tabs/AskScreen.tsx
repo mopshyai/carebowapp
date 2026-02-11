@@ -9,49 +9,34 @@
  * - Health Memory entry point
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import Voice from '@react-native-voice/voice';
+import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  Alert,
+  PermissionsAndroid,
+  Platform,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { AppNavigationProp } from '../../navigation/types';
+import Tts from 'react-native-tts';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  colors as themeColors,
-  spacing as themeSpacing,
-  radius as themeRadius,
-  typography as themeTypography,
-  shadows as themeShadows,
-} from '../../theme';
-import {
-  colors,
-  space,
-  radius,
-  typography,
-  shadows,
-  componentStyles,
-  layout,
-} from '../../theme/tokens';
-import {
-  useAskCarebowStore,
-  useIsTrialActive,
-  useTrialDaysRemaining,
-  useTrialState,
-  useCanAccessPremiumFeatures,
-} from '../../store/askCarebowStore';
-import { useHealthMemoryStore, useMemoryCount } from '../../store/healthMemoryStore';
-import { TrialSignupCard, TrialBanner } from '../../components/askCarebow/TrialSignupCard';
-import { VoiceInput } from '../../components/askCarebow/VoiceInput';
-import { ImageUploadBottomSheet, ImageAttachment } from '../../components/askCarebow/ImageUploadBottomSheet';
 import { ImageThumbnailRow } from '../../components/askCarebow/ImageThumbnailRow';
+import {
+  ImageAttachment,
+  ImageUploadBottomSheet,
+} from '../../components/askCarebow/ImageUploadBottomSheet';
 import { RedFlagWarning, detectRedFlags } from '../../components/askCarebow/RedFlagWarning';
-
+import { TrialBanner, TrialSignupCard } from '../../components/askCarebow/TrialSignupCard';
+import type { AppNavigationProp } from '../../navigation/types';
+import { useAskCarebowStore, useIsTrialActive, useTrialState } from '../../store/askCarebowStore';
+import { useMemoryCount } from '../../store/healthMemoryStore';
+import { colors, radius, shadows, spacing, typography } from '../../theme';
 const relationships = [
   { value: '', label: 'Select relationship...' },
   { value: 'father', label: 'Father' },
@@ -81,6 +66,17 @@ export default function AskCareBowScreen() {
   const [symptomInput, setSymptomInput] = useState('');
   const [showRelationshipPicker, setShowRelationshipPicker] = useState(false);
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+  const [isListening, setIsListening] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [, setBaseText] = useState(''); // Text before voice recognition started
+  const symptomInputRef = useRef(symptomInput);
+  const baseTextRef = useRef('');
+  const inputModeRef = useRef(inputMode);
+
+  useEffect(() => {
+    symptomInputRef.current = symptomInput;
+    inputModeRef.current = inputMode;
+  }, [symptomInput, inputMode]);
 
   // New state for image upload
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
@@ -89,10 +85,161 @@ export default function AskCareBowScreen() {
   // Get subscription and trial status from store
   const { hasSubscription, clearCurrentSession } = useAskCarebowStore();
   const isTrialActive = useIsTrialActive();
-  const trialDaysRemaining = useTrialDaysRemaining();
   const trialState = useTrialState();
-  const canAccessPremium = useCanAccessPremiumFeatures();
+  useEffect(() => {
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = onSpeechError;
+    Voice.onSpeechPartialResults = onSpeechPartialResults;
 
+    return () => {
+      Voice.destroy()
+        .then(() => {
+          Voice.removeAllListeners();
+        })
+        .catch(() => {});
+    };
+  }, []);
+
+  const onSpeechStart = (e: any) => {
+    console.log('onSpeechStart:', e);
+    setIsListening(true);
+    setRecognizedText('');
+    // In text mode only: save existing input as base to append speech-to-text
+    if (inputModeRef.current === 'text') {
+      const current = symptomInputRef.current.trim();
+      baseTextRef.current = current;
+      setBaseText(current);
+    } else {
+      baseTextRef.current = '';
+    }
+  };
+
+  const onSpeechEnd = (e: any) => {
+    console.log('onSpeechEnd:', e);
+    setIsListening(false);
+    setRecognizedText('');
+    setBaseText('');
+    // Don't clear baseTextRef here — onSpeechResults may fire after onSpeechEnd,
+    // and it needs baseTextRef to append correctly. It gets overwritten on next start.
+  };
+
+  const onSpeechResults = (e: any) => {
+    console.log('onSpeechResults:', e);
+    if (e.value && e.value.length > 0) {
+      const text = e.value[0];
+      const trimmedNew = text.trim();
+      if (inputModeRef.current === 'text') {
+        // Text mode: append to input field only
+        const base = baseTextRef.current;
+        const newText = base ? `${base} ${trimmedNew}` : trimmedNew;
+        setSymptomInput(newText);
+      } else {
+        // Voice mode: update recognized text only (for "You said" display)
+        setRecognizedText(trimmedNew);
+        handleVoice(text);
+      }
+    }
+  };
+
+  const onSpeechPartialResults = (e: any) => {
+    console.log('onSpeechPartialResults:', e);
+    if (e.value && e.value.length > 0) {
+      const partialText = e.value[0];
+      const trimmedPartial = partialText.trim();
+      if (inputModeRef.current === 'text') {
+        // Text mode: append to input field only
+        const base = baseTextRef.current;
+        const newText = base ? `${base} ${trimmedPartial}` : trimmedPartial;
+        setSymptomInput(newText);
+      } else {
+        // Voice mode: update recognized text only
+        setRecognizedText(trimmedPartial);
+      }
+    }
+  };
+
+  const onSpeechError = (e: any) => {
+    console.log('onSpeechError:', e);
+    setIsListening(false);
+  };
+
+  const requestMicrophonePermission = async (): Promise<boolean> => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Microphone Permission',
+            message: 'CareBow needs access to your microphone for voice input.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          return true;
+        } else {
+          Alert.alert(
+            'Permission Required',
+            'Microphone permission is needed for voice input. Please enable it in your device settings.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      } catch (err) {
+        console.warn('Permission request error:', err);
+        return false;
+      }
+    }
+    // iOS permissions are handled via Info.plist
+    return true;
+  };
+  const handleVoice = (text: any) => {
+    const normalizedText = text.toLowerCase().trim();
+    if (normalizedText === 'what is your name') {
+      Tts.speak('I am Carebow');
+    } else if (normalizedText === 'how are you') {
+      Tts.speak('I am functioning normally.');
+    } else if (normalizedText === 'what can you do') {
+      Tts.speak('I can answer all your questions for testing.');
+    } else {
+      Tts.speak('Sorry, I did not understand that.');
+    }
+  };
+  const startRecognizing = async () => {
+    try {
+      setRecognizedText('');
+
+      // Request permissions first
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        return;
+      }
+
+      // Check if speech recognition is available
+      const isAvailable = await Voice.isAvailable();
+      if (!isAvailable) {
+        return;
+      }
+
+      await Voice.start('en-US');
+    } catch (error: any) {
+      console.log('startRecognizing error:', error);
+      setIsListening(false);
+    }
+  };
+
+  const stopRecognizing = async () => {
+    try {
+      await Voice.stop();
+      setIsListening(false);
+    } catch (error: any) {
+      console.log('stopRecognizing error:', error);
+    }
+  };
   // Health memory
   const memoryCount = useMemoryCount();
 
@@ -102,10 +249,21 @@ export default function AskCareBowScreen() {
   }, [symptomInput]);
 
   // Emotional keyword detection for reassurance message
-  const EMOTIONAL_KEYWORDS = ['worried', 'scared', 'anxious', 'stressed', 'nervous', 'afraid', 'frightened', 'panicking', 'overwhelmed', 'terrified'];
+  const EMOTIONAL_KEYWORDS = [
+    'worried',
+    'scared',
+    'anxious',
+    'stressed',
+    'nervous',
+    'afraid',
+    'frightened',
+    'panicking',
+    'overwhelmed',
+    'terrified',
+  ];
   const showEmotionalReassurance = useMemo(() => {
     const lowerInput = symptomInput.toLowerCase();
-    return EMOTIONAL_KEYWORDS.some(keyword => lowerInput.includes(keyword));
+    return EMOTIONAL_KEYWORDS.some((keyword) => lowerInput.includes(keyword));
   }, [symptomInput]);
 
   // Image handlers
@@ -117,21 +275,16 @@ export default function AskCareBowScreen() {
     setAttachedImages((prev) => prev.filter((img) => img.id !== id));
   }, []);
 
-  // Handle voice transcription completion
-  const handleTranscriptionComplete = (text: string) => {
-    setSymptomInput(text);
-    setInputMode('text'); // Switch back to text mode to show the transcript
-  };
-
   const handleStart = () => {
-    if (!symptomInput.trim()) return;
+    const symptom = inputMode === 'voice' ? recognizedText : symptomInput;
+    if (!symptom.trim()) return;
 
     // Clear any existing session before starting a new one
     clearCurrentSession();
 
     // Navigate with all context including images
     navigation.navigate('Conversation' as never, {
-      symptom: symptomInput,
+      symptom,
       context: contextType,
       relation: familyRelation,
       age: familyAge,
@@ -148,9 +301,9 @@ export default function AskCareBowScreen() {
     navigation.navigate('HealthMemory' as never);
   };
 
+  const effectiveSymptom = inputMode === 'voice' ? recognizedText : symptomInput;
   const canStart =
-    symptomInput.trim().length > 0 &&
-    (contextType === 'me' || (familyRelation && familyAge));
+    effectiveSymptom.trim().length > 0 && (contextType === 'me' || (familyRelation && familyAge));
 
   return (
     <View style={styles.container}>
@@ -158,7 +311,7 @@ export default function AskCareBowScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + space.xl, paddingBottom: 96 + insets.bottom },
+          { paddingTop: insets.top + spacing.xl, paddingBottom: 96 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -167,7 +320,7 @@ export default function AskCareBowScreen() {
         <View style={styles.headerRow}>
           <View style={styles.header}>
             <View style={styles.headerIcon}>
-              <Icon name="heart" size={26} color={colors.text.inverse} />
+              <Icon name="heart" size={28} color={colors.textInverse} />
             </View>
             <View>
               <Text style={styles.headerTitle}>Ask CareBow</Text>
@@ -175,11 +328,8 @@ export default function AskCareBowScreen() {
             </View>
           </View>
           {/* Health Memory Entry Point */}
-          <TouchableOpacity
-            style={styles.memoryButton}
-            onPress={handleOpenHealthMemory}
-          >
-            <Icon name="leaf" size={18} color={colors.primary.default} />
+          <TouchableOpacity style={styles.memoryButton} onPress={handleOpenHealthMemory}>
+            <Icon name="leaf" size={18} color={colors.accent} />
             {memoryCount > 0 && (
               <View style={styles.memoryBadge}>
                 <Text style={styles.memoryBadgeText}>{memoryCount}</Text>
@@ -190,11 +340,8 @@ export default function AskCareBowScreen() {
         <Text style={styles.headerSubtitle}>
           I'll help you understand your symptoms and guide you to the right care.
         </Text>
-
         {/* Trial Banner - shown during active trial */}
-        {isTrialActive && (
-          <TrialBanner />
-        )}
+        {isTrialActive && <TrialBanner />}
 
         {/* Trial Signup Card - shown if trial not started */}
         {!hasSubscription && !trialState.hasUsedTrial && (
@@ -206,7 +353,7 @@ export default function AskCareBowScreen() {
         {/* Premium Badge - shown for subscribers */}
         {hasSubscription && (
           <View style={styles.premiumBadge}>
-            <Icon name="diamond" size={16} color={colors.primary.default} />
+            <Icon name="diamond" size={16} color={colors.accent} />
             <Text style={styles.premiumBadgeText}>Premium Member</Text>
           </View>
         )}
@@ -225,11 +372,14 @@ export default function AskCareBowScreen() {
                 <Icon
                   name="person"
                   size={24}
-                  color={contextType === 'me' ? colors.primary.default : colors.text.tertiary}
+                  color={contextType === 'me' ? colors.accent : colors.textTertiary}
                 />
               </View>
               <Text
-                style={[styles.contextCardText, contextType === 'me' && styles.contextCardTextActive]}
+                style={[
+                  styles.contextCardText,
+                  contextType === 'me' && styles.contextCardTextActive,
+                ]}
               >
                 For me
               </Text>
@@ -238,11 +388,13 @@ export default function AskCareBowScreen() {
               style={[styles.contextCard, contextType === 'family' && styles.contextCardActive]}
               onPress={() => setContextType('family')}
             >
-              <View style={[styles.contextIcon, contextType === 'family' && styles.contextIconActive]}>
+              <View
+                style={[styles.contextIcon, contextType === 'family' && styles.contextIconActive]}
+              >
                 <Icon
                   name="people"
                   size={24}
-                  color={contextType === 'family' ? colors.primary.default : colors.text.tertiary}
+                  color={contextType === 'family' ? colors.accent : colors.textTertiary}
                 />
               </View>
               <Text
@@ -278,7 +430,7 @@ export default function AskCareBowScreen() {
                     ? relationships.find((r) => r.value === familyRelation)?.label
                     : 'Select relationship...'}
                 </Text>
-                <Icon name="chevron-down" size={20} color={colors.text.tertiary} />
+                <Icon name="chevron-down" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
               {showRelationshipPicker && (
                 <View style={styles.pickerDropdown}>
@@ -315,7 +467,7 @@ export default function AskCareBowScreen() {
               <TextInput
                 style={styles.ageInput}
                 placeholder="Enter their age"
-                placeholderTextColor={colors.text.tertiary}
+                placeholderTextColor={colors.textTertiary}
                 value={familyAge}
                 onChangeText={setFamilyAge}
                 keyboardType="numeric"
@@ -328,16 +480,13 @@ export default function AskCareBowScreen() {
               <Text style={styles.fieldLabel}>Are you with them right now?</Text>
               <View style={styles.presenceToggle}>
                 <TouchableOpacity
-                  style={[
-                    styles.presenceOption,
-                    caregiverPresent && styles.presenceOptionActive,
-                  ]}
+                  style={[styles.presenceOption, caregiverPresent && styles.presenceOptionActive]}
                   onPress={() => setCaregiverPresent(true)}
                 >
                   <Icon
                     name="checkmark-circle"
                     size={16}
-                    color={caregiverPresent ? colors.primary.default : colors.text.tertiary}
+                    color={caregiverPresent ? colors.accent : colors.textTertiary}
                   />
                   <Text
                     style={[
@@ -349,16 +498,13 @@ export default function AskCareBowScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.presenceOption,
-                    !caregiverPresent && styles.presenceOptionActive,
-                  ]}
+                  style={[styles.presenceOption, !caregiverPresent && styles.presenceOptionActive]}
                   onPress={() => setCaregiverPresent(false)}
                 >
                   <Icon
                     name="call"
                     size={16}
-                    color={!caregiverPresent ? colors.primary.default : colors.text.tertiary}
+                    color={!caregiverPresent ? colors.accent : colors.textTertiary}
                   />
                   <Text
                     style={[
@@ -373,7 +519,7 @@ export default function AskCareBowScreen() {
             </View>
 
             <View style={styles.infoBox}>
-              <Icon name="information-circle" size={16} color={colors.info.default} />
+              <Icon name="information-circle" size={16} color={colors.accent} />
               <Text style={styles.infoText}>
                 Age helps me provide safer guidance, especially for children and older adults.
               </Text>
@@ -396,7 +542,7 @@ export default function AskCareBowScreen() {
                 <Icon
                   name="create-outline"
                   size={16}
-                  color={inputMode === 'text' ? colors.primary.default : colors.text.tertiary}
+                  color={inputMode === 'text' ? colors.accent : colors.textTertiary}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -406,17 +552,14 @@ export default function AskCareBowScreen() {
                 <Icon
                   name="mic-outline"
                   size={16}
-                  color={inputMode === 'voice' ? colors.primary.default : colors.text.tertiary}
+                  color={inputMode === 'voice' ? colors.accent : colors.textTertiary}
                 />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modeButton}
-                onPress={() => setShowImageSheet(true)}
-              >
+              <TouchableOpacity style={styles.modeButton} onPress={() => setShowImageSheet(true)}>
                 <Icon
                   name="camera-outline"
                   size={16}
-                  color={attachedImages.length > 0 ? colors.primary.default : colors.text.tertiary}
+                  color={attachedImages.length > 0 ? colors.accent : colors.textTertiary}
                 />
                 {attachedImages.length > 0 && (
                   <View style={styles.imageCountBadge}>
@@ -434,7 +577,8 @@ export default function AskCareBowScreen() {
 
           {/* Image Permission Clarity */}
           <Text style={styles.imagePermissionText}>
-            You can safely share photos (like rashes, swelling, or wounds) if that helps explain things.
+            You can safely share photos (like rashes, swelling, or wounds) if that helps explain
+            things.
           </Text>
 
           {inputMode === 'text' ? (
@@ -442,7 +586,7 @@ export default function AskCareBowScreen() {
               {/* Emotional Acknowledgement (shown ABOVE input when emotional keywords detected) */}
               {showEmotionalReassurance && (
                 <View style={styles.emotionalReassurance}>
-                  <Icon name="heart" size={14} color={colors.primary.default} />
+                  <Icon name="heart" size={14} color={colors.accent} />
                   <Text style={styles.emotionalReassuranceText}>
                     Thanks for telling me — I'm here with you. We'll take this one step at a time.
                   </Text>
@@ -467,13 +611,24 @@ export default function AskCareBowScreen() {
                       ? "Describe what you're experiencing..."
                       : "Describe what they're experiencing..."
                   }
-                  placeholderTextColor={colors.text.tertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={symptomInput}
                   onChangeText={setSymptomInput}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
                 />
+                <TouchableOpacity
+                  style={[styles.voiceInputButton, isListening && styles.voiceInputButtonActive]}
+                  onPress={isListening ? stopRecognizing : startRecognizing}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name={isListening ? 'stop-circle' : 'mic'}
+                    size={20}
+                    color={isListening ? colors.error : colors.accent}
+                  />
+                </TouchableOpacity>
               </View>
 
               {/* Red Flag Warning (inline, below input) */}
@@ -481,7 +636,8 @@ export default function AskCareBowScreen() {
 
               {/* Safe Space + Memory Signal */}
               <Text style={styles.safeSpaceSignal}>
-                Private • Judgment-free • I remember helpful details (like allergies or past issues) to personalize care — you can edit or delete them anytime.
+                Private • Judgment-free • I remember helpful details (like allergies or past issues)
+                to personalize care — you can edit or delete them anytime.
               </Text>
 
               <Text style={styles.inputHint}>
@@ -490,10 +646,47 @@ export default function AskCareBowScreen() {
               </Text>
             </>
           ) : (
-            <VoiceInput
-              onTranscriptionComplete={handleTranscriptionComplete}
-              useMock={true} // Set to false and provide apiKey for real transcription
-            />
+            <View style={styles.voiceInputContainer}>
+              {/* Real-time speech recognition display */}
+              {isListening && (
+                <View style={styles.listeningIndicator}>
+                  <View style={styles.listeningDot} />
+                  <Text style={styles.listeningText}>Listening... Speak now</Text>
+                </View>
+              )}
+
+              {/* Display recognized text in real-time */}
+              {recognizedText ? (
+                <View style={styles.recognizedTextContainer}>
+                  <Text style={styles.recognizedTextLabel}>You said:</Text>
+                  <Text style={styles.recognizedText}>{recognizedText}</Text>
+                </View>
+              ) : isListening ? (
+                <Text style={styles.waitingText}>Waiting for speech...</Text>
+              ) : null}
+
+              {/* Alternative: Use VoiceInput component */}
+              <View style={styles.voiceInputDivider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <TouchableOpacity
+                style={styles.micContainer}
+                onPress={isListening ? stopRecognizing : startRecognizing}
+              >
+                <Icon
+                  name={isListening ? 'stop-circle' : 'mic'}
+                  size={20}
+                  color={isListening ? colors.error : colors.accent}
+                />
+                <Text style={styles.dividerText}>Press To Speak</Text>
+              </TouchableOpacity>
+              {/* <VoiceInput
+                onTranscriptionComplete={(text) => { setSymptomInput(text); setInputMode('text'); }}
+                useMock={true} // Set to false and provide apiKey for real transcription
+              /> */}
+            </View>
           )}
         </View>
 
@@ -518,7 +711,7 @@ export default function AskCareBowScreen() {
                 style={styles.exampleChip}
                 onPress={() => setSymptomInput(prompt.text)}
               >
-                <Icon name={prompt.icon} size={12} color={colors.text.tertiary} />
+                <Icon name={prompt.icon} size={12} color={colors.textTertiary} />
                 <Text style={styles.exampleChipText}>{prompt.text}</Text>
               </TouchableOpacity>
             ))}
@@ -534,7 +727,7 @@ export default function AskCareBowScreen() {
           <Icon
             name="chatbubbles"
             size={20}
-            color={canStart ? colors.text.inverse : colors.text.tertiary}
+            color={canStart ? colors.textInverse : colors.textTertiary}
           />
           <Text style={[styles.ctaButtonText, !canStart && styles.ctaButtonTextDisabled]}>
             Start Conversation
@@ -543,7 +736,7 @@ export default function AskCareBowScreen() {
 
         {/* Disclaimer */}
         <View style={styles.disclaimer}>
-          <Icon name="warning" size={16} color={colors.warning.default} />
+          <Icon name="warning" size={16} color={colors.warning} />
           <Text style={styles.disclaimerText}>
             For emergencies, call <Text style={styles.disclaimerBold}>911</Text> immediately.
             CareBow is not a substitute for emergency services or professional medical advice.
@@ -566,30 +759,30 @@ export default function AskCareBowScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface2,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: layout.screenPaddingHorizontal,
+    paddingHorizontal: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: space.sm,
+    marginBottom: spacing.sm,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
+    gap: spacing.sm,
   },
   memoryButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.accentMuted,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -601,80 +794,80 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.primary.default,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.surface2,
   },
   memoryBadgeText: {
+    ...typography.tiny,
+    color: colors.textInverse,
     fontSize: 10,
-    fontWeight: '600',
-    color: colors.text.inverse,
   },
   headerIcon: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: radius.lg,
-    backgroundColor: colors.primary.default,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.primaryButton,
+    ...shadows.button,
   },
   headerTitle: {
-    ...typography.screenTitle,
-    color: colors.text.primary,
+    ...typography.h1,
+    color: colors.textPrimary,
   },
   headerBadge: {
-    ...typography.captionSmall,
-    color: colors.primary.default,
-    marginTop: 2,
+    ...typography.caption,
+    color: colors.accent,
+    marginTop: spacing.xxs,
   },
   headerSubtitle: {
-    ...typography.bodySmall,
-    color: colors.text.secondary,
-    marginBottom: space.md,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
   trialSection: {
-    marginBottom: space.lg,
+    marginBottom: spacing.lg,
   },
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.xs,
-    backgroundColor: colors.primary.muted,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
+    gap: spacing.xs,
+    backgroundColor: colors.accentMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radius.full,
     alignSelf: 'flex-start',
-    marginBottom: space.lg,
+    marginBottom: spacing.lg,
   },
   premiumBadgeText: {
     ...typography.labelSmall,
-    color: colors.primary.default,
+    color: colors.accent,
   },
   labelRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: space.sm,
+    marginBottom: spacing.sm,
   },
   inputModeToggle: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border,
     padding: 2,
   },
   modeButton: {
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radius.full,
     position: 'relative',
   },
   modeButtonActive: {
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.accentMuted,
   },
   imageCountBadge: {
     position: 'absolute',
@@ -683,327 +876,418 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: colors.primary.default,
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
   imageCountText: {
+    ...typography.tiny,
+    color: colors.textInverse,
     fontSize: 9,
-    fontWeight: '600',
-    color: colors.text.inverse,
   },
   section: {
-    marginBottom: space.lg,
+    marginBottom: spacing.lg,
   },
   label: {
     ...typography.label,
-    color: colors.text.primary,
-    marginBottom: space.sm,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   labelNoMargin: {
     ...typography.label,
-    color: colors.text.primary,
+    color: colors.textPrimary,
   },
   required: {
-    color: colors.error.default,
+    color: colors.error,
   },
   contextGrid: {
     flexDirection: 'row',
-    gap: space.sm,
+    gap: spacing.sm,
   },
   contextCard: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.xl,
-    padding: space.md,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
     alignItems: 'center',
-    gap: space.xs,
+    gap: spacing.xs,
     backgroundColor: colors.surface,
   },
   contextCardActive: {
-    borderColor: colors.primary.default,
-    backgroundColor: colors.primary.muted,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
     ...shadows.card,
   },
   contextIcon: {
     width: 48,
     height: 48,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.surface2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   contextIconActive: {
-    backgroundColor: colors.primary.soft,
+    backgroundColor: colors.accentSoft,
   },
   contextCardText: {
     ...typography.label,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   contextCardTextActive: {
-    color: colors.primary.default,
+    color: colors.accent,
   },
   familySection: {
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.accentMuted,
     borderWidth: 1,
-    borderColor: colors.primary.soft,
-    borderRadius: radius.xl,
-    padding: space.md,
-    marginBottom: space.lg,
-    gap: space.md,
+    borderColor: colors.accentSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
   fieldContainer: {
-    gap: space.xs,
+    gap: spacing.xs,
   },
   fieldLabel: {
     ...typography.label,
-    color: colors.text.primary,
+    color: colors.textPrimary,
   },
   selectButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   selectButtonText: {
     ...typography.body,
-    color: colors.text.primary,
+    color: colors.textPrimary,
   },
   selectButtonPlaceholder: {
-    color: colors.text.tertiary,
+    color: colors.textTertiary,
   },
   pickerDropdown: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.lg,
-    marginTop: space.xxs,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    marginTop: spacing.xxs,
     overflow: 'hidden',
-    ...shadows.elevated,
+    ...shadows.cardElevated,
   },
   pickerOption: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
+    borderBottomColor: colors.borderLight,
   },
   pickerOptionActive: {
-    backgroundColor: colors.primary.muted,
+    backgroundColor: colors.accentMuted,
   },
   pickerOptionText: {
     ...typography.body,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
   },
   pickerOptionTextActive: {
-    color: colors.primary.default,
+    color: colors.accent,
     fontWeight: '500',
   },
   ageInput: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     ...typography.body,
-    color: colors.text.primary,
-    height: 52,
+    color: colors.textPrimary,
   },
   presenceToggle: {
     flexDirection: 'row',
-    gap: space.xs,
+    gap: spacing.xs,
   },
   presenceOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: space.xxs,
+    gap: spacing.xxs,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.sm,
-    minHeight: 44,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   presenceOptionActive: {
-    backgroundColor: colors.primary.muted,
-    borderColor: colors.primary.default,
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.accent,
   },
   presenceOptionText: {
-    ...typography.captionSmall,
-    color: colors.text.secondary,
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   presenceOptionTextActive: {
-    color: colors.primary.default,
+    color: colors.accent,
     fontWeight: '500',
   },
   infoBox: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.info.soft,
-    borderRadius: radius.lg,
-    padding: space.sm,
+    borderColor: colors.accentSoft,
+    borderRadius: radius.md,
+    padding: spacing.sm,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: space.xs,
+    gap: spacing.xs,
   },
   infoText: {
     flex: 1,
     ...typography.caption,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
   },
   inputContainer: {
     position: 'relative',
-    marginBottom: space.xs,
+    marginBottom: spacing.xs,
   },
   textInput: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: radius.xl,
-    paddingHorizontal: space.md,
-    paddingTop: space.md,
-    paddingBottom: space.md,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md + 40, // Extra padding for voice button
+    paddingRight: spacing.md + 50, // Extra padding on right for voice button
     ...typography.body,
-    color: colors.text.primary,
+    color: colors.textPrimary,
     minHeight: 140,
+  },
+  voiceInputButton: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    right: spacing.sm,
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.accent,
+    ...shadows.button,
+  },
+  voiceInputButtonActive: {
+    backgroundColor: colors.errorSoft,
+    borderColor: colors.error,
   },
   inputHint: {
     ...typography.caption,
-    color: colors.text.tertiary,
+    color: colors.textTertiary,
   },
   inputHelperText: {
     ...typography.caption,
-    color: colors.text.secondary,
-    marginBottom: space.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
     fontStyle: 'italic',
   },
   imagePermissionText: {
-    ...typography.captionSmall,
-    color: colors.text.tertiary,
-    marginBottom: space.sm,
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
   },
   safeSpaceSignal: {
-    ...typography.captionSmall,
-    color: colors.text.tertiary,
+    ...typography.tiny,
+    color: colors.textTertiary,
     textAlign: 'center',
-    marginTop: space.sm,
-    marginBottom: space.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
     lineHeight: 16,
   },
   emotionalReassurance: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.xs,
-    backgroundColor: colors.primary.muted,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    marginTop: space.xs,
+    gap: spacing.xs,
+    backgroundColor: colors.accentMuted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
   },
   emotionalReassuranceText: {
     ...typography.caption,
-    color: colors.primary.default,
+    color: colors.accent,
     flex: 1,
   },
   imageInvitationSection: {
-    marginBottom: space.md,
+    marginBottom: spacing.md,
   },
   imageInvitationTitle: {
     ...typography.labelSmall,
-    color: colors.text.tertiary,
-    marginBottom: space.xs,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
   },
   imageInvitationList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: space.sm,
+    gap: spacing.sm,
   },
   imageInvitationItem: {
     ...typography.caption,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
   },
   examplesSection: {
-    marginBottom: space.lg,
+    marginBottom: spacing.lg,
   },
   examplesTitle: {
     ...typography.labelSmall,
-    color: colors.text.tertiary,
-    marginBottom: space.xs,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
   },
   examplesList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: space.xs,
+    gap: spacing.xs,
   },
   exampleChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.xxs,
+    gap: spacing.xxs,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border,
     borderRadius: radius.full,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   exampleChipText: {
     ...typography.caption,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
   },
   ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary.default,
+    backgroundColor: colors.accent,
     borderRadius: radius.lg,
-    paddingVertical: space.md,
-    marginBottom: space.md,
-    gap: space.xs,
-    height: 52,
-    ...shadows.primaryButton,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+    ...shadows.button,
   },
   ctaButtonDisabled: {
-    backgroundColor: colors.surfaceSecondary,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border,
     shadowOpacity: 0,
     elevation: 0,
   },
   ctaButtonText: {
-    ...typography.buttonLarge,
-    color: colors.text.inverse,
+    ...typography.labelLarge,
+    color: colors.textInverse,
   },
   ctaButtonTextDisabled: {
-    color: colors.text.tertiary,
+    color: colors.textTertiary,
   },
   disclaimer: {
-    backgroundColor: colors.warning.muted,
+    backgroundColor: colors.warningSoft,
     borderWidth: 1,
-    borderColor: colors.warning.default,
-    borderRadius: radius.lg,
-    padding: space.md,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: space.xs,
+    gap: spacing.xs,
   },
   disclaimerText: {
     flex: 1,
     ...typography.caption,
-    color: colors.text.secondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   disclaimerBold: {
     fontWeight: '700',
-    color: colors.text.primary,
+    color: colors.textPrimary,
+  },
+  voiceInputContainer: {
+    gap: spacing.md,
+  },
+  listeningIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.errorSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  listeningDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.error,
+  },
+  listeningText: {
+    ...typography.label,
+    color: colors.error,
+    fontWeight: '600',
+  },
+  recognizedTextContainer: {
+    backgroundColor: colors.accentMuted,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  recognizedTextLabel: {
+    ...typography.caption,
+    color: colors.accent,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  recognizedText: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontStyle: 'italic',
+  },
+  waitingText: {
+    ...typography.body,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingVertical: spacing.sm,
+  },
+  voiceInputDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  micContainer: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
   },
 });
