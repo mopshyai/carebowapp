@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -71,7 +65,7 @@ export default function ScheduleScreen() {
     navigation.navigate('TelemedicineBooking', {});
   };
 
-  const handleJoinCall = (appointment: typeof upcomingAppointments[0]) => {
+  const handleJoinCall = (appointment: (typeof upcomingAppointments)[0]) => {
     navigation.navigate('VideoCall', {
       appointmentId: appointment.id,
       doctorName: appointment.doctor,
@@ -88,7 +82,7 @@ export default function ScheduleScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Schedule</Text>
         <TouchableOpacity style={styles.addButton} onPress={handleBookAppointment}>
-          <Icon name="add" size={24} color={Colors.purple[600]} />
+          <Icon name="add" size={24} color={Colors.primary[600]} />
         </TouchableOpacity>
       </View>
 
@@ -106,25 +100,20 @@ export default function ScheduleScreen() {
           style={[styles.tab, activeTab === 'past' && styles.tabActive]}
           onPress={() => setActiveTab('past')}
         >
-          <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>
-            Past
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'past' && styles.tabTextActive]}>Past</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 32 + insets.bottom },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Info Banner */}
         {activeTab === 'upcoming' && (
           <View style={styles.infoBanner}>
             <View style={styles.infoBannerIcon}>
-              <Icon name="heart" size={20} color={Colors.purple[600]} />
+              <Icon name="heart" size={20} color={Colors.primary[600]} />
             </View>
             <View style={styles.infoBannerContent}>
               <Text style={styles.infoBannerTitle}>Need care guidance?</Text>
@@ -151,18 +140,22 @@ export default function ScheduleScreen() {
                   <View
                     style={[
                       styles.typeBadge,
-                      appointment.type === 'video' ? styles.typeBadgeVideo : styles.typeBadgeInPerson,
+                      appointment.type === 'video'
+                        ? styles.typeBadgeVideo
+                        : styles.typeBadgeInPerson,
                     ]}
                   >
                     <Icon
                       name={appointment.type === 'video' ? 'videocam' : 'location'}
                       size={12}
-                      color={appointment.type === 'video' ? Colors.purple[700] : Colors.blue[700]}
+                      color={appointment.type === 'video' ? Colors.primary[700] : Colors.blue[700]}
                     />
                     <Text
                       style={[
                         styles.typeBadgeText,
-                        appointment.type === 'video' ? styles.typeBadgeTextVideo : styles.typeBadgeTextInPerson,
+                        appointment.type === 'video'
+                          ? styles.typeBadgeTextVideo
+                          : styles.typeBadgeTextInPerson,
                       ]}
                     >
                       {appointment.typeLabel}
@@ -284,7 +277,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[100],
   },
   tabActive: {
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
   },
   tabText: {
     fontSize: 14,
@@ -301,9 +294,9 @@ const styles = StyleSheet.create({
     padding: Spacing[6],
   },
   infoBanner: {
-    backgroundColor: Colors.purple[50],
+    backgroundColor: Colors.primary[50],
     borderWidth: 1,
-    borderColor: Colors.purple[200],
+    borderColor: Colors.primary[200],
     borderRadius: BorderRadius['2xl'],
     padding: Spacing[4],
     flexDirection: 'row',
@@ -325,12 +318,12 @@ const styles = StyleSheet.create({
   infoBannerTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.purple[900],
+    color: Colors.primary[900],
     marginBottom: Spacing[1],
   },
   infoBannerText: {
     fontSize: 12,
-    color: Colors.purple[700],
+    color: Colors.primary[700],
     lineHeight: 18,
   },
   appointmentsList: {
@@ -351,7 +344,7 @@ const styles = StyleSheet.create({
   doctorAvatar: {
     width: 48,
     height: 48,
-    backgroundColor: Colors.purple[100],
+    backgroundColor: Colors.primary[100],
     borderRadius: BorderRadius.xl,
     justifyContent: 'center',
     alignItems: 'center',
@@ -381,7 +374,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   typeBadgeVideo: {
-    backgroundColor: Colors.purple[50],
+    backgroundColor: Colors.primary[50],
   },
   typeBadgeInPerson: {
     backgroundColor: Colors.blue[50],
@@ -391,7 +384,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   typeBadgeTextVideo: {
-    color: Colors.purple[700],
+    color: Colors.primary[700],
   },
   typeBadgeTextInPerson: {
     color: Colors.blue[700],
@@ -438,7 +431,7 @@ const styles = StyleSheet.create({
     gap: Spacing[2],
     paddingVertical: Spacing[3],
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
   },
   joinButtonText: {
     fontSize: 14,
@@ -462,13 +455,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: Spacing[3],
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.purple[100],
+    backgroundColor: Colors.primary[100],
     alignItems: 'center',
   },
   bookAgainButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.purple[700],
+    color: Colors.primary[700],
   },
   emptyState: {
     alignItems: 'center',
@@ -508,7 +501,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing[2],
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
     borderRadius: BorderRadius['2xl'],
     paddingVertical: Spacing[4],
     ...Shadow.md,

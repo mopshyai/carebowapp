@@ -15,30 +15,53 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
 
-const conversationsData: Record<string, {
-  name: string;
-  initials: string;
-  role: string;
-  online: boolean;
-  avatarColor: string;
-  messages: Array<{
-    id: string;
-    type: 'sent' | 'received';
-    content: string;
-    timestamp: string;
-  }>;
-}> = {
+const conversationsData: Record<
+  string,
+  {
+    name: string;
+    initials: string;
+    role: string;
+    online: boolean;
+    avatarColor: string;
+    messages: Array<{
+      id: string;
+      type: 'sent' | 'received';
+      content: string;
+      timestamp: string;
+    }>;
+  }
+> = {
   '1': {
     name: 'Dr. Sarah Chen',
     initials: 'SC',
     role: 'General Practitioner',
     online: true,
-    avatarColor: Colors.purple[500],
+    avatarColor: Colors.primary[500],
     messages: [
-      { id: '1', type: 'received', content: 'Hello! How can I help you today?', timestamp: '9:30 AM' },
-      { id: '2', type: 'sent', content: 'Hi Dr. Chen, I wanted to ask about my recent test results.', timestamp: '9:32 AM' },
-      { id: '3', type: 'received', content: 'Of course! I reviewed your results this morning. Everything looks good overall.', timestamp: '9:35 AM' },
-      { id: '4', type: 'received', content: 'Your test results look good. Continue with the prescribed medication.', timestamp: '9:36 AM' },
+      {
+        id: '1',
+        type: 'received',
+        content: 'Hello! How can I help you today?',
+        timestamp: '9:30 AM',
+      },
+      {
+        id: '2',
+        type: 'sent',
+        content: 'Hi Dr. Chen, I wanted to ask about my recent test results.',
+        timestamp: '9:32 AM',
+      },
+      {
+        id: '3',
+        type: 'received',
+        content: 'Of course! I reviewed your results this morning. Everything looks good overall.',
+        timestamp: '9:35 AM',
+      },
+      {
+        id: '4',
+        type: 'received',
+        content: 'Your test results look good. Continue with the prescribed medication.',
+        timestamp: '9:36 AM',
+      },
     ],
   },
   '2': {
@@ -48,9 +71,24 @@ const conversationsData: Record<string, {
     online: false,
     avatarColor: Colors.blue[500],
     messages: [
-      { id: '1', type: 'received', content: 'Your cardiac assessment was successful.', timestamp: 'Yesterday' },
-      { id: '2', type: 'sent', content: 'Thank you, Doctor. When should I schedule my follow-up?', timestamp: 'Yesterday' },
-      { id: '3', type: 'received', content: 'Please schedule a follow-up in 2 weeks.', timestamp: 'Yesterday' },
+      {
+        id: '1',
+        type: 'received',
+        content: 'Your cardiac assessment was successful.',
+        timestamp: 'Yesterday',
+      },
+      {
+        id: '2',
+        type: 'sent',
+        content: 'Thank you, Doctor. When should I schedule my follow-up?',
+        timestamp: 'Yesterday',
+      },
+      {
+        id: '3',
+        type: 'received',
+        content: 'Please schedule a follow-up in 2 weeks.',
+        timestamp: 'Yesterday',
+      },
     ],
   },
   '3': {
@@ -60,7 +98,12 @@ const conversationsData: Record<string, {
     online: true,
     avatarColor: Colors.pink[600],
     messages: [
-      { id: '1', type: 'received', content: 'Welcome to CareBow! We\'re here to help you with any questions.', timestamp: '2 days ago' },
+      {
+        id: '1',
+        type: 'received',
+        content: "Welcome to CareBow! We're here to help you with any questions.",
+        timestamp: '2 days ago',
+      },
       { id: '2', type: 'received', content: 'How can we help you today?', timestamp: 'Yesterday' },
     ],
   },
@@ -193,11 +236,7 @@ export default function ThreadScreen() {
           onPress={handleSend}
           disabled={!inputText.trim()}
         >
-          <Icon
-            name="send"
-            size={20}
-            color={inputText.trim() ? Colors.white : Colors.gray[400]}
-          />
+          <Icon name="send" size={20} color={inputText.trim() ? Colors.white : Colors.gray[400]} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -284,7 +323,7 @@ const styles = StyleSheet.create({
   },
   sentBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
     borderBottomRightRadius: BorderRadius.sm,
   },
   receivedBubble: {
@@ -308,7 +347,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing[1],
   },
   sentTime: {
-    color: Colors.purple[200],
+    color: Colors.primary[200],
     textAlign: 'right',
   },
   receivedTime: {
@@ -352,6 +391,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendButtonActive: {
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
   },
 });
