@@ -25,6 +25,8 @@
 		4DC449113EA54CD9B9213398 /* MaterialCommunityIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4DF54B09C556421D8C8DBFCA /* MaterialCommunityIcons.ttf */; };
 		57AC3147E09B4FD784EDCE71 /* FontAwesome6_Solid.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9094D2725F8049318C7A51ED /* FontAwesome6_Solid.ttf */; };
 		57BD08FC58834F96941B0FD5 /* MaterialIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1B26C16081BA4F758EB812C0 /* MaterialIcons.ttf */; };
+		5C6F55253073D233340BAF94 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 628C230BC61A9D6E97B26C0D /* Swift.swift */; };
+		5DF6364E0EEA10F0B50AB634 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 659A0C91290CF597F04711B9 /* Swift.swift */; };
 		7046C234B56D1DD323B95A15 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C7A16CA9142767FDE1454E8 /* Swift.swift */; };
 		762ED66AE6FADE09EB23AE43 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D802E42089CD639008AD809 /* Swift.swift */; };
 		7782EC143B0AF1F3EA2232FF /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0AD14BD34A69D2F5B5365C /* Swift.swift */; };
@@ -42,6 +44,7 @@
 		B364607FAE9A43E8AC37ACAC /* EvilIcons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BD9D049C692D44859067AD3A /* EvilIcons.ttf */; };
 		B5F677B45D0E42279CFDD980 /* Feather.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 055D60135E7A44DF97FD4D4F /* Feather.ttf */; };
 		B922FB152A454169941ED108 /* FontAwesome5_Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1FD5D49A80F1412BA95D370A /* FontAwesome5_Regular.ttf */; };
+		BB68A3102965C11810F8D5FE /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6349B98D3699D723C7FD080C /* Swift.swift */; };
 		C2FD685F41F595671EDCA030 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1318BA6DCB8C25EE98E11DA /* Swift.swift */; };
 		C485269740ED4A43BF9C60CB /* FontAwesome6_Brands.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B6F702B758E94EA99ADE95E5 /* FontAwesome6_Brands.ttf */; };
 		C6D5D11C270A364E8A189FB6 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B31E93B5411768F1C4EF699 /* Swift.swift */; };
@@ -51,8 +54,10 @@
 		E10A8A18E7BE4685879387BD /* FontAwesome5_Solid.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C419321158B64D22ABFF94C8 /* FontAwesome5_Solid.ttf */; };
 		E20C81846AB5A54232A2806B /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE03E63BACD388179E16FEF4 /* Swift.swift */; };
 		E21A6B1C80C64C19B4371F55 /* Foundation.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5E2BD0900D8F4A1CB0239DF0 /* Foundation.ttf */; };
+		E283FBA6D906A281E03966EE /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6788FD3377AECAF25E300909 /* Swift.swift */; };
 		E65DC79E046C1AB445041D20 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3AEF9FE509404BB0CC0869 /* Swift.swift */; };
 		EC8DBC82231C90566CC622F9 /* libPods-CareBow.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 48D9700C43C3306537261940 /* libPods-CareBow.a */; };
+		F65AAE1DB8AA05A06D5F6605 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9A63EE7BF99D0CE4E273EE /* Swift.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +92,7 @@
 		1FD5D49A80F1412BA95D370A /* FontAwesome5_Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = FontAwesome5_Regular.ttf; path = "../node_modules/react-native-vector-icons/Fonts/FontAwesome5_Regular.ttf"; sourceTree = "<group>"; };
 		269B3E79F5BAC5BE1BC4B99A /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		292F7BE0D8394224ABD104FF /* AntDesign.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = AntDesign.ttf; path = "../node_modules/react-native-vector-icons/Fonts/AntDesign.ttf"; sourceTree = "<group>"; };
+		2C9A63EE7BF99D0CE4E273EE /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		2E14A84E9BC6427AAE93741A /* Octicons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Octicons.ttf; path = "../node_modules/react-native-vector-icons/Fonts/Octicons.ttf"; sourceTree = "<group>"; };
 		3035D1EF00DDD34ABC27AC65 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		344CE220CDE9E52667274669 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
@@ -102,6 +108,10 @@
 		5B31E93B5411768F1C4EF699 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		5B7EB9410499542E8C5724F5 /* Pods-CareBow-CareBowTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CareBow-CareBowTests.debug.xcconfig"; path = "Target Support Files/Pods-CareBow-CareBowTests/Pods-CareBow-CareBowTests.debug.xcconfig"; sourceTree = "<group>"; };
 		5E2BD0900D8F4A1CB0239DF0 /* Foundation.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Foundation.ttf; path = "../node_modules/react-native-vector-icons/Fonts/Foundation.ttf"; sourceTree = "<group>"; };
+		628C230BC61A9D6E97B26C0D /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
+		6349B98D3699D723C7FD080C /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
+		659A0C91290CF597F04711B9 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
+		6788FD3377AECAF25E300909 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		7A780396E442281BD83AE5C4 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CareBow/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89856C5FE98F435EA95982FA /* Ionicons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Ionicons.ttf; path = "../node_modules/react-native-vector-icons/Fonts/Ionicons.ttf"; sourceTree = "<group>"; };
@@ -217,6 +227,11 @@
 				438C40D2B22F357C4EDCCDC5 /* Swift.swift */,
 				3035D1EF00DDD34ABC27AC65 /* Swift.swift */,
 				0C7A16CA9142767FDE1454E8 /* Swift.swift */,
+				2C9A63EE7BF99D0CE4E273EE /* Swift.swift */,
+				659A0C91290CF597F04711B9 /* Swift.swift */,
+				6788FD3377AECAF25E300909 /* Swift.swift */,
+				6349B98D3699D723C7FD080C /* Swift.swift */,
+				628C230BC61A9D6E97B26C0D /* Swift.swift */,
 			);
 			name = CareBow;
 			sourceTree = "<group>";
@@ -559,6 +574,11 @@
 				7ABEBF0D8C1FEA847C9CB9A1 /* Swift.swift in Sources */,
 				29E781C726FC805EC2DB4D06 /* Swift.swift in Sources */,
 				7046C234B56D1DD323B95A15 /* Swift.swift in Sources */,
+				F65AAE1DB8AA05A06D5F6605 /* Swift.swift in Sources */,
+				5DF6364E0EEA10F0B50AB634 /* Swift.swift in Sources */,
+				E283FBA6D906A281E03966EE /* Swift.swift in Sources */,
+				BB68A3102965C11810F8D5FE /* Swift.swift in Sources */,
+				5C6F55253073D233340BAF94 /* Swift.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
