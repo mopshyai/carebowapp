@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   labelRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
@@ -896,6 +896,8 @@ const styles = StyleSheet.create({
   labelNoMargin: {
     ...typography.label,
     color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.sm,
   },
   required: {
     color: colors.error,
