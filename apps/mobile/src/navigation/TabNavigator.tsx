@@ -5,21 +5,13 @@
  */
 
 import React from 'react';
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-  Platform,
-  Animated,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MainTabParamList } from './types';
 import { colors, shadows } from '../theme';
-
-// Temporarily use emoji instead of AppIcon to debug
-type IconName = 'home' | 'home-filled' | 'sparkles' | 'messages' | 'messages-filled';
+import { AppIcon } from '../components/icons/AppIcon';
+import type { IconName } from '../components/icons/iconMap';
 
 // Screen imports
 import HomeScreen from '../screens/tabs/HomeScreen';
@@ -29,12 +21,15 @@ import MessagesScreen from '../screens/tabs/MessagesScreen';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Tab configuration with icon mapping
-const TAB_CONFIG: Record<string, {
-  icon: IconName;
-  iconFilled: IconName;
-  label: string;
-  isSpecial?: boolean;
-}> = {
+const TAB_CONFIG: Record<
+  string,
+  {
+    icon: IconName;
+    iconFilled: IconName;
+    label: string;
+    isSpecial?: boolean;
+  }
+> = {
   Home: {
     icon: 'home',
     iconFilled: 'home-filled',
@@ -86,8 +81,12 @@ function TabButton({
 
   const iconName = isFocused ? config.iconFilled : config.icon;
   const iconColor = config.isSpecial
-    ? (isFocused ? colors.textInverse : colors.accent)
-    : (isFocused ? colors.accent : colors.textTertiary);
+    ? isFocused
+      ? colors.textInverse
+      : colors.accent
+    : isFocused
+      ? colors.accent
+      : colors.textTertiary;
   const iconSize = config.isSpecial ? 20 : 22;
 
   return (
@@ -103,28 +102,23 @@ function TabButton({
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         {config.isSpecial ? (
-          <View style={[
-            styles.specialIconWrap,
-            isFocused && styles.specialIconWrapActive,
-            Platform.OS === 'ios' && styles.specialIconWrapIOS,
-            Platform.OS === 'android' && styles.specialIconWrapAndroid,
-          ]}>
-            <Text style={{ fontSize: iconSize, color: iconColor }}>✨</Text>
+          <View
+            style={[
+              styles.specialIconWrap,
+              isFocused && styles.specialIconWrapActive,
+              Platform.OS === 'ios' && styles.specialIconWrapIOS,
+              Platform.OS === 'android' && styles.specialIconWrapAndroid,
+            ]}
+          >
+            <AppIcon name={iconName} size={iconSize} color={iconColor} />
           </View>
         ) : (
           <View style={styles.iconWrap}>
-            <Text style={{ fontSize: iconSize, color: iconColor }}>
-              {routeName === 'Home' ? '🏠' : '💬'}
-            </Text>
+            <AppIcon name={iconName} size={iconSize} color={iconColor} />
           </View>
         )}
       </Animated.View>
-      <Text style={[
-        styles.tabLabel,
-        isFocused && styles.tabLabelActive,
-      ]}>
-        {config.label}
-      </Text>
+      <Text style={[styles.tabLabel, isFocused && styles.tabLabelActive]}>{config.label}</Text>
     </TouchableOpacity>
   );
 }
@@ -134,12 +128,14 @@ function CustomTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[
-      styles.tabBar,
-      Platform.OS === 'ios' && styles.tabBarIOS,
-      Platform.OS === 'android' && styles.tabBarAndroid,
-      { paddingBottom: Math.max(insets.bottom, 8) },
-    ]}>
+    <View
+      style={[
+        styles.tabBar,
+        Platform.OS === 'ios' && styles.tabBarIOS,
+        Platform.OS === 'android' && styles.tabBarAndroid,
+        { paddingBottom: Math.max(insets.bottom, 8) },
+      ]}
+    >
       <View style={styles.tabBarInner}>
         {state.routes.map((route: any, index: number) => {
           const isFocused = state.index === index;
@@ -178,21 +174,9 @@ export default function TabNavigator() {
         headerShown: false,
       }}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ title: 'Home' }}
-      />
-      <Tab.Screen
-        name="Ask"
-        component={AskScreen}
-        options={{ title: 'Ask AI' }}
-      />
-      <Tab.Screen
-        name="Messages"
-        component={MessagesScreen}
-        options={{ title: 'Messages' }}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+      <Tab.Screen name="Ask" component={AskScreen} options={{ title: 'Ask AI' }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
     </Tab.Navigator>
   );
 }
