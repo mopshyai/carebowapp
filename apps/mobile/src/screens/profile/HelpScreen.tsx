@@ -146,10 +146,7 @@ export default function HelpScreen() {
             {FAQ_ITEMS.map((item, index) => (
               <Pressable
                 key={item.id}
-                style={[
-                  styles.faqItem,
-                  index < FAQ_ITEMS.length - 1 && styles.faqItemBorder,
-                ]}
+                style={[styles.faqItem, index < FAQ_ITEMS.length - 1 && styles.faqItemBorder]}
                 onPress={() => toggleFaq(item.id)}
               >
                 <View style={styles.faqQuestion}>
@@ -160,9 +157,7 @@ export default function HelpScreen() {
                     color={colors.textTertiary}
                   />
                 </View>
-                {expandedFaq === item.id && (
-                  <Text style={styles.faqAnswer}>{item.answer}</Text>
-                )}
+                {expandedFaq === item.id && <Text style={styles.faqAnswer}>{item.answer}</Text>}
               </Pressable>
             ))}
           </View>
@@ -210,7 +205,7 @@ export default function HelpScreen() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appVersion}>CareBow v1.0.0</Text>
-          <Text style={styles.appCopyright}>2024 CareBow Healthcare</Text>
+          <Text style={styles.appCopyright}>© {new Date().getFullYear()} CareBow Healthcare</Text>
         </View>
       </ScrollView>
     </View>
