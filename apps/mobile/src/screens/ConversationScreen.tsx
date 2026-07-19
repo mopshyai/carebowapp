@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     ...shadows.button,
   },
   headerTitle: {
-    ...typography.label,
+    ...typography.h3,
     color: colors.textPrimary,
   },
   headerSubtitle: {

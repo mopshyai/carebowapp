@@ -93,7 +93,7 @@ export default function AssessmentScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing[3] }]}>
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => navigation.navigate('MainTabs')}
@@ -214,7 +214,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '600',
     color: Colors.gray[900],
   },

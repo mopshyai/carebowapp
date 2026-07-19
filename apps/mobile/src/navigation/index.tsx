@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import TabNavigator from './TabNavigator';
+import MemberTabNavigator from './MemberTabNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SafetyStackNavigator from './SafetyStackNavigator';
 
@@ -45,6 +46,20 @@ import NewEntryScreen from '../screens/entries/NewEntryScreen';
 import AssessmentResultScreen from '../screens/entries/AssessmentResultScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/**
+ * MainTabs router — picks the tab experience by authenticated user type.
+ * Customers get the original consumer TabNavigator (route name kept stable so
+ * existing navigate('MainTabs') calls still land correctly). The 3 provider
+ * types get the shared MemberTabNavigator.
+ */
+function MainTabsRouter() {
+  const userType = useAuthStore((state) => state.userType);
+  if (userType === 'healthcare_provider' || userType === 'service_provider' || userType === 'service_partner') {
+    return <MemberTabNavigator />;
+  }
+  return <TabNavigator />;
+}
 
 /**
  * Loading screen shown during hydration
@@ -105,8 +120,9 @@ export default function RootNavigator() {
             />
           )}
 
-          {/* Main App - shown when authenticated and onboarding complete */}
-          <Stack.Screen name="MainTabs" component={TabNavigator} />
+          {/* Main App - shown when authenticated and onboarding complete.
+              Routes to customer tabs or provider tabs based on user type. */}
+          <Stack.Screen name="MainTabs" component={MainTabsRouter} />
 
           {/* Symptom Entry Flow (PRD V1) */}
           <Stack.Screen

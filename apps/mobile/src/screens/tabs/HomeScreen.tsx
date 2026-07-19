@@ -27,6 +27,7 @@ import type { MainTabScreenProps } from '@/navigation/types';
 import { CareBowLogoAccurate } from '@/components/icons/CareBowLogo';
 import { AppIcon } from '@/components/icons/AppIcon';
 import type { IconName } from '@/components/icons/iconMap';
+import { useCareReadiness } from '@/store/useProfileStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -219,7 +220,7 @@ const EmergencyBanner = ({ navigation }: { navigation: any }) => (
   >
     <View style={styles.emergencyGradientFallback}>
       <View style={styles.emergencyIconBg}>
-        <AppIcon name="shield" size={22} color="#EF4444" />
+        <AppIcon name="shield" size={22} color={colors.secondary} />
       </View>
       <View style={styles.emergencyContent}>
         <Text style={styles.emergencyTitle}>Emergency & Safety</Text>
@@ -414,6 +415,46 @@ const QuickActions = ({ navigation }: { navigation: any }) => {
 };
 
 // ============================================
+// CARE READINESS — PEAK MOMENT (personalized insight)
+// ============================================
+const CareReadinessCard = ({ navigation }: { navigation: any }) => {
+  const careReadiness = useCareReadiness();
+  const topMissing = careReadiness.missingItems[0];
+
+  if (!topMissing) {
+    return (
+      <AnimatedPressable delay={1050} style={styles.readinessCard}>
+        <Text style={styles.readinessAllSetText}>🎉 Your care profile is fully set up</Text>
+      </AnimatedPressable>
+    );
+  }
+
+  return (
+    <AnimatedPressable
+      delay={1050}
+      style={styles.readinessCard}
+      onPress={() => {
+        Haptics.trigger('impactLight');
+        navigation.navigate('Profile', { screen: topMissing.screen, params: topMissing.params });
+      }}
+    >
+      <View style={styles.readinessHeader}>
+        <View style={styles.readinessTextBlock}>
+          <Text style={styles.readinessTitle}>Your care profile is {careReadiness.score}% ready</Text>
+          <Text style={styles.readinessHint}>{topMissing.label} to personalize your care →</Text>
+        </View>
+        <View style={styles.readinessRing}>
+          <Text style={styles.readinessRingText}>{careReadiness.score}%</Text>
+        </View>
+      </View>
+      <View style={styles.readinessBar}>
+        <View style={[styles.readinessFill, { width: `${careReadiness.score}%` }]} />
+      </View>
+    </AnimatedPressable>
+  );
+};
+
+// ============================================
 // MAIN HOME SCREEN
 // ============================================
 export default function HomeScreen() {
@@ -507,7 +548,15 @@ export default function HomeScreen() {
         <SectionHeader title="Quick Actions" delay={900} />
         <QuickActions navigation={navigation} />
 
-        <View style={{ height: 100 }} />
+        {/* Care Readiness — personalized insight (peak moment) */}
+        <View style={styles.section}>
+          <CareReadinessCard navigation={navigation} />
+        </View>
+
+        {/* Closing note */}
+        <Text style={styles.closingNote}>That's everything for now — take care 👋</Text>
+
+        <View style={{ height: spacing.xxl }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -546,7 +595,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   userName: {
     fontSize: 24,
@@ -567,7 +616,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
@@ -579,8 +628,8 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
@@ -634,12 +683,13 @@ const styles = StyleSheet.create({
   },
   heroBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textInverse,
   },
   heroTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
     color: colors.textInverse,
     marginBottom: spacing.xs,
   },
@@ -665,7 +715,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   heroButtonArrow: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.accent,
   },
   heroIllustration: {
@@ -674,6 +724,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: spacing.md,
+    marginLeft: spacing.sm,
     position: 'relative',
   },
   illustrationCircle: {
@@ -694,7 +745,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -710,11 +761,11 @@ const styles = StyleSheet.create({
   },
   floatingBadgeLeft: {
     bottom: 5,
-    left: -5,
+    left: 0,
   },
   floatingBadgeRight: {
     top: 35,
-    right: -5,
+    right: 0,
   },
 
   // Emergency Banner
@@ -725,7 +776,7 @@ const styles = StyleSheet.create({
   emergencyGradientFallback: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.secondarySoft,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: radius.xl,
@@ -734,7 +785,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FECACA',
+    backgroundColor: colors.secondary + '20',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -744,18 +795,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   emergencyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#1E293B',
   },
   emergencySubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 4,
   },
   emergencyArrowText: {
-    fontSize: 22,
-    color: '#EF4444',
+    fontSize: 24,
+    color: colors.secondary,
   },
 
   // Section Header
@@ -767,18 +818,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   sectionSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textTertiary,
-    marginTop: 2,
+    marginTop: 4,
   },
   sectionAction: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.accent,
   },
 
@@ -789,7 +840,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
@@ -812,7 +863,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   exploreSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   exploreArrow: {
@@ -845,8 +896,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   exploreIconLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textSecondary,
   },
 
@@ -857,7 +908,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
@@ -886,7 +937,7 @@ const styles = StyleSheet.create({
   },
   upcomingBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.accent,
   },
   upcomingContent: {
@@ -911,12 +962,12 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   upcomingName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   upcomingSpecialty: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
@@ -952,7 +1003,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
@@ -978,7 +1029,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   carePlanName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
@@ -996,22 +1047,22 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   carePlanPrice: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '700',
   },
   carePlanOriginal: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textTertiary,
     textDecorationLine: 'line-through',
   },
   discountBadge: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: radius.sm,
     marginTop: 4,
   },
   discountText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   carePlanBenefits: {
@@ -1024,10 +1075,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   carePlanBenefitText: {
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textSecondary,
     flex: 1,
   },
@@ -1051,7 +1102,72 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textSecondary,
+  },
+
+  // Care Readiness — peak moment card
+  readinessCard: {
+    backgroundColor: colors.accentMuted,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  readinessHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  readinessTextBlock: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  readinessTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  readinessHint: {
+    fontSize: 12,
+    color: colors.accentDark,
+    marginTop: 4,
+  },
+  readinessRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  readinessRingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  readinessBar: {
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  readinessFill: {
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
+  },
+  readinessAllSetText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.accentDark,
+    textAlign: 'center',
+  },
+
+  // Closing note
+  closingNote: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.xl,
   },
 });

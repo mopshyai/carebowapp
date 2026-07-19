@@ -74,6 +74,9 @@ export class ApiError extends Error {
 
     let code: ApiErrorCode;
     switch (status) {
+      case 400:
+        code = 'VALIDATION_ERROR';
+        break;
       case 401:
         code = 'UNAUTHORIZED';
         break;
@@ -118,44 +121,78 @@ export interface AuthTokens {
   expiresAt: number; // Unix timestamp
 }
 
+/**
+ * The 4 app-facing user types (main type USER; admin is not exposed in the app).
+ * Verified live: all four return 200 from GET /auth/enabled-methods.
+ */
+export type UserTypeSlug =
+  | 'customer'
+  | 'healthcare_provider'
+  | 'service_provider'
+  | 'service_partner';
+
+/** Signup/login methods accepted by the backend (from live validation error enum). */
+export type AuthMethod = 'email-password' | 'email-otp' | 'mobile-otp' | 'magic-link';
+
 export interface LoginRequest {
+  method: AuthMethod;
   email: string;
   password: string;
+  userTypeSlug: UserTypeSlug;
 }
 
-export interface LoginResponse {
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    phone?: string;
-    avatarUrl?: string;
-  };
-  tokens: AuthTokens;
-}
+export type LoginResponse = AuthEnvelope;
 
 export interface SignupRequest {
+  method: AuthMethod;
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  userTypeSlug: UserTypeSlug;
+  /** Role within the user type, when applicable (enabled-methods returns the list). */
+  userRoleSlug?: string;
+  firstName?: string;
+  lastName?: string;
   phone?: string;
 }
 
-export interface SignupResponse {
-  message: string;
-  requiresVerification: boolean;
+/**
+ * The backend wraps responses in a {success, error?} envelope. Success payload
+ * shapes are not fully documented, so these fields are optional/tolerant —
+ * use the normalizers in endpoints/auth.ts rather than reading fields directly.
+ */
+export interface AuthEnvelope {
+  success: boolean;
+  error?: string;
+  message?: string;
+  user?: Record<string, unknown>;
+  tokens?: Partial<AuthTokens> & { expiresIn?: number };
+  accessToken?: string;
+  refreshToken?: string;
+  data?: {
+    user?: Record<string, unknown>;
+    tokens?: Partial<AuthTokens> & { expiresIn?: number };
+  };
 }
+
+export type SignupResponse = AuthEnvelope;
 
 export interface VerifyEmailRequest {
-  email: string;
-  code: string;
+  /** The OTP from the verification email. */
+  token: string;
 }
 
-export interface VerifyEmailResponse {
-  user: LoginResponse['user'];
-  tokens: AuthTokens;
+export type VerifyEmailResponse = AuthEnvelope;
+
+export interface EnabledMethodDescriptor {
+  title: string;
+  icon: string;
+  description: string;
+}
+
+export interface EnabledMethodsResponse {
+  success: boolean;
+  methods: Record<string, EnabledMethodDescriptor>;
+  roles: Array<{ slug: string; title?: string }> | string[];
 }
 
 export interface RefreshTokenRequest {

@@ -40,7 +40,7 @@ export default function ServicesScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}

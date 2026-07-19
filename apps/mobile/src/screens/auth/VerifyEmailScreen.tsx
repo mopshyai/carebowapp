@@ -13,6 +13,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -30,13 +32,32 @@ const CODE_LENGTH = 6;
 export default function VerifyEmailScreen() {
   const navigation = useNavigation<VerifyEmailScreenNavigationProp>();
   const route = useRoute<VerifyEmailScreenRouteProp>();
-  const { verifyEmail, sendVerificationCode, isLoading, error, clearError } = useAuthStore();
+  const { verifyEmail, completeVerifiedLogin, sendVerificationCode, isLoading, error, clearError } = useAuthStore();
 
-  const email = route.params?.email || '';
+  const email = route.params?.email || useAuthStore.getState().pendingVerificationEmail || '';
+  const deepLinkToken = route.params?.token;
 
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  // Deep link path: the emailed verification link opened the app with ?token=...
+  // Verify it immediately — no manual input needed.
+  useEffect(() => {
+    if (deepLinkToken) {
+      (async () => {
+        const ok = await verifyEmail(deepLinkToken);
+        // Verified but no session (cold start — signup password gone):
+        // send them to Login. When a session was issued, RootNavigator
+        // switches stacks automatically.
+        if (ok && !useAuthStore.getState().isAuthenticated) {
+          Alert.alert('Email verified', 'Your email is verified. Please sign in.');
+          navigation.replace('Login');
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkToken]);
 
   // Start cooldown timer on mount
   useEffect(() => {
@@ -140,7 +161,11 @@ export default function VerifyEmailScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <Pressable
             style={styles.backButton}
@@ -155,12 +180,33 @@ export default function VerifyEmailScreen() {
             </View>
             <Text style={styles.title}>Verify your email</Text>
             <Text style={styles.subtitle}>
-              We've sent a 6-digit code to{'\n'}
+              We've sent a verification link to{'\n'}
               <Text style={styles.emailText}>{email}</Text>
+            </Text>
+            <Text style={styles.linkInstruction}>
+              Open the email and tap the link, then come back here.
             </Text>
           </View>
 
-          {/* Code Input */}
+          {/* Primary path: user tapped the emailed link */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.verifyButton,
+              pressed && styles.buttonPressed,
+              isLoading && styles.buttonDisabled,
+            ]}
+            onPress={() => completeVerifiedLogin()}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={colors.textInverse} />
+            ) : (
+              <Text style={styles.verifyButtonText}>I've verified — Continue</Text>
+            )}
+          </Pressable>
+
+          {/* Fallback: email templates that include a 6-digit code */}
+          <Text style={styles.codeFallbackLabel}>Have a code instead? Enter it below</Text>
           <View style={styles.codeContainer}>
             {code.map((digit, index) => (
               <TextInput
@@ -220,7 +266,7 @@ export default function VerifyEmailScreen() {
               </Pressable>
             )}
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -235,7 +281,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
@@ -272,6 +318,19 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  linkInstruction: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  codeFallbackLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
   emailText: {
     color: colors.textPrimary,

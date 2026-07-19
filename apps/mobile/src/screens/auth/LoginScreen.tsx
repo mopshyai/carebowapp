@@ -92,6 +92,8 @@ export default function LoginScreen() {
           <Pressable
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>

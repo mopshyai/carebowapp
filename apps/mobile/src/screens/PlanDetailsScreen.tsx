@@ -276,8 +276,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    ...typography.h3,
     color: colors.textPrimary,
   },
   placeholder: {
@@ -350,11 +349,13 @@ const styles = StyleSheet.create({
   },
   periodLabel: {
     fontSize: 24,
+    lineHeight: 28,
     fontWeight: '800',
     letterSpacing: 1,
   },
   subscriptionText: {
     fontSize: 11,
+    lineHeight: 14,
     fontWeight: '600',
     letterSpacing: 2,
     marginTop: 4,

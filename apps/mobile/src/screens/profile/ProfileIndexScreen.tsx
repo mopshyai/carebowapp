@@ -18,6 +18,7 @@ import type { AppNavigationProp } from '../../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore, useCareReadiness, useSelectedMember } from '../../store/useProfileStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 type MenuItemId = 'personal' | 'family' | 'addresses' | 'history' | 'records' | 'insurance' | 'notifications' | 'privacy' | 'help';
 
@@ -55,7 +56,9 @@ export default function ProfileIndexScreen() {
   const user = useProfileStore((state) => state.user);
   const members = useProfileStore((state) => state.members);
   const emergencyContacts = useProfileStore((state) => state.emergencyContacts);
-  const logout = useProfileStore((state) => state.logout);
+  // Use the auth-store logout: clears JWT + SecureStorage and flips
+  // isAuthenticated (returns to login). It also clears the profile store.
+  const logout = useAuthStore((state) => state.logout);
 
   const selectedMember = useSelectedMember();
   const careReadiness = useCareReadiness();
@@ -128,7 +131,7 @@ export default function ProfileIndexScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -294,7 +297,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...typography.h4,
+    ...typography.h3,
   },
   settingsButton: {
     width: 44,

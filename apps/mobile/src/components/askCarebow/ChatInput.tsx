@@ -63,6 +63,9 @@ export function ChatInput({
             onPress={handleSend}
             disabled={!canSend}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Icon
               name="send"

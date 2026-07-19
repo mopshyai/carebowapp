@@ -3,7 +3,7 @@
  * FAQ and contact options
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -91,6 +91,8 @@ export default function HelpScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const faqSectionY = useRef(0);
 
   const toggleFaq = (id: string) => {
     setExpandedFaq(expandedFaq === id ? null : id);
@@ -107,7 +109,7 @@ export default function HelpScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -116,6 +118,7 @@ export default function HelpScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
       >
@@ -140,7 +143,12 @@ export default function HelpScreen() {
         </View>
 
         {/* FAQ Section */}
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(e) => {
+            faqSectionY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
           <View style={styles.faqList}>
             {FAQ_ITEMS.map((item, index) => (
@@ -167,35 +175,16 @@ export default function HelpScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Resources</Text>
           <View style={styles.resourceList}>
-            <TouchableOpacity style={styles.resourceItem}>
+            <TouchableOpacity
+              style={styles.resourceItem}
+              onPress={() => scrollViewRef.current?.scrollTo({ y: faqSectionY.current, animated: true })}
+            >
               <View style={styles.resourceIcon}>
                 <Icon name="book-outline" size={20} color={colors.accent} />
               </View>
               <View style={styles.resourceInfo}>
                 <Text style={styles.resourceTitle}>User Guide</Text>
                 <Text style={styles.resourceSubtitle}>Learn how to use CareBow</Text>
-              </View>
-              <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.resourceItem}>
-              <View style={styles.resourceIcon}>
-                <Icon name="play-circle-outline" size={20} color={colors.accent} />
-              </View>
-              <View style={styles.resourceInfo}>
-                <Text style={styles.resourceTitle}>Video Tutorials</Text>
-                <Text style={styles.resourceSubtitle}>Step-by-step guides</Text>
-              </View>
-              <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.resourceItem}>
-              <View style={styles.resourceIcon}>
-                <Icon name="newspaper-outline" size={20} color={colors.accent} />
-              </View>
-              <View style={styles.resourceInfo}>
-                <Text style={styles.resourceTitle}>Health Blog</Text>
-                <Text style={styles.resourceSubtitle}>Tips and health information</Text>
               </View>
               <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
@@ -234,7 +223,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...typography.h4,
+    ...typography.h3,
   },
   scrollView: {
     flex: 1,

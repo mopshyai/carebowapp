@@ -20,14 +20,14 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useAuthStore, USER_TYPES } from '@/store/useAuthStore';
 import type { AuthStackParamList } from '@/navigation/types';
 
 type SignupScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Signup'>;
 
 export default function SignupScreen() {
   const navigation = useNavigation<SignupScreenNavigationProp>();
-  const { signup, isLoading, error, clearError } = useAuthStore();
+  const { signup, isLoading, error, clearError, userType, setUserType } = useAuthStore();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -126,6 +126,36 @@ export default function SignupScreen() {
 
           {/* Form */}
           <View style={styles.formContainer}>
+            {/* User Type */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>I am a</Text>
+              <View style={styles.userTypeGrid}>
+                {USER_TYPES.map((type) => {
+                  const selected = userType === type.slug;
+                  return (
+                    <Pressable
+                      key={type.slug}
+                      style={[styles.userTypeCard, selected && styles.userTypeCardSelected]}
+                      onPress={() => setUserType(type.slug)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={type.title}
+                    >
+                      <Text
+                        style={[styles.userTypeTitle, selected && styles.userTypeTitleSelected]}
+                        numberOfLines={1}
+                      >
+                        {type.title}
+                      </Text>
+                      <Text style={styles.userTypeDescription} numberOfLines={2}>
+                        {type.description}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Name Row */}
             <View style={styles.nameRow}>
               <View style={[styles.inputGroup, styles.halfWidth]}>
@@ -375,6 +405,37 @@ const styles = StyleSheet.create({
   // Form
   formContainer: {
     gap: spacing.md,
+  },
+  userTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  userTypeCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    padding: spacing.md,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  userTypeCardSelected: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  userTypeTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+  },
+  userTypeTitleSelected: {
+    color: colors.accent,
+  },
+  userTypeDescription: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   nameRow: {
     flexDirection: 'row',

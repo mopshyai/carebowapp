@@ -132,6 +132,9 @@ export function FeedbackButtons({
             selectedRating === 'helpful' && styles.feedbackButtonSelected,
           ]}
           onPress={() => handleRating('helpful')}
+          accessibilityRole="button"
+          accessibilityLabel="Helpful"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Icon
             name="thumbs-up-outline"
@@ -145,6 +148,9 @@ export function FeedbackButtons({
             selectedRating === 'not_helpful' && styles.feedbackButtonSelected,
           ]}
           onPress={() => handleRating('not_helpful')}
+          accessibilityRole="button"
+          accessibilityLabel="Not helpful"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Icon
             name="thumbs-down-outline"

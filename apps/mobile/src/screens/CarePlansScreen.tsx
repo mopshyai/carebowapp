@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   headerTitle: {
-    ...typography.h2,
+    ...typography.h3,
     color: colors.textPrimary,
   },
   headerSpacer: {

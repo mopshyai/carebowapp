@@ -33,6 +33,25 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Custom scheme deep links: carebow://verify-email?token=... -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="carebow" />
+        </intent-filter>
+        <!-- App Links for emailed URLs. autoVerify needs
+             https://www.carebow.com/.well-known/assetlinks.json on the VPS;
+             until then Android shows an app-chooser dialog, which still works. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="www.carebow.com" android:pathPrefix="/verify-email" />
+            <data android:scheme="https" android:host="carebow.com" android:pathPrefix="/verify-email" />
+            <data android:scheme="https" android:host="www.carebow.com" android:pathPrefix="/reset-password" />
+            <data android:scheme="https" android:host="carebow.com" android:pathPrefix="/reset-password" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>
