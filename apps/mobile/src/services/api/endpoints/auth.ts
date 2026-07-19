@@ -1,11 +1,10 @@
 /**
  * Auth API Endpoints
  *
- * Live contract (verified against https://www.carebow.com/api on 2026-07-18):
+ * Live contract (verified against https://www.carebow.com/api on 2026-07-19):
  * - GET  /auth/enabled-methods?action=signup&userType=<slug>
- * - POST /auth/signup       {method, email, password, userTypeSlug, userRoleSlug?}
- * - POST /auth/verify-email {token}
- * - POST /auth/login        {method, email, password, userTypeSlug}
+ * - POST /v1/auth/signup, /login, /verify, /refresh
+ * - POST /v1/auth/resend-verification, /forgot, /reset, /logout
  * Responses use a {success, error?, ...} envelope; error shape is stable but
  * success payloads are not fully documented — use the normalizers below.
  */
@@ -21,8 +20,6 @@ import {
   SignupResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
-  UserResponse,
-  UpdateUserRequest,
 } from '../types';
 
 /**
@@ -41,13 +38,17 @@ export function extractTokens(payload: AuthEnvelope | null | undefined): AuthTok
   // then to a conservative 15-minute assumption so refresh kicks in early.
   const expiresAt =
     t?.expiresAt ??
-    (t?.expiresIn ? Math.floor(Date.now() / 1000) + t.expiresIn : Math.floor(Date.now() / 1000) + 15 * 60);
+    (t?.expiresIn
+      ? Math.floor(Date.now() / 1000) + t.expiresIn
+      : Math.floor(Date.now() / 1000) + 15 * 60);
 
   return { accessToken, refreshToken, expiresAt };
 }
 
 /** Pull the user object out of whichever envelope field the backend used. */
-export function extractUser(payload: AuthEnvelope | null | undefined): Record<string, unknown> | null {
+export function extractUser(
+  payload: AuthEnvelope | null | undefined
+): Record<string, unknown> | null {
   return payload?.user ?? payload?.data?.user ?? null;
 }
 
@@ -72,13 +73,17 @@ export const authApi = {
    * (userTypeSlug is not required at login). Returns tokens top-level.
    */
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await ApiClient.post<LoginResponse>('/v1/auth/login', {
-      method: data.method,
-      email: data.email,
-      password: data.password,
-    }, {
-      skipAuth: true,
-    });
+    const response = await ApiClient.post<LoginResponse>(
+      '/v1/auth/login',
+      {
+        method: data.method,
+        email: data.email,
+        password: data.password,
+      },
+      {
+        skipAuth: true,
+      }
+    );
 
     const tokens = extractTokens(response.data);
     if (tokens) {
@@ -96,16 +101,20 @@ export const authApi = {
    * Caller should branch on whether extractTokens(response) is non-null.
    */
   signup: async (data: SignupRequest): Promise<SignupResponse> => {
-    const response = await ApiClient.post<SignupResponse>('/v1/auth/signup', {
-      method: data.method,
-      email: data.email,
-      password: data.password,
-      name: [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined,
-      userTypeSlug: data.userTypeSlug,
-      mainType: 'USER',
-    }, {
-      skipAuth: true,
-    });
+    const response = await ApiClient.post<SignupResponse>(
+      '/v1/auth/signup',
+      {
+        method: data.method,
+        email: data.email,
+        password: data.password,
+        name: [data.firstName, data.lastName].filter(Boolean).join(' ') || undefined,
+        userTypeSlug: data.userTypeSlug,
+        mainType: 'USER',
+      },
+      {
+        skipAuth: true,
+      }
+    );
 
     // email-password path returns tokens right away — persist them.
     const tokens = extractTokens(response.data);
@@ -137,9 +146,13 @@ export const authApi = {
    * Resend verification code
    */
   resendVerificationCode: async (email: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/resend-verification', { email }, {
-      skipAuth: true,
-    });
+    const response = await ApiClient.post<{ message: string }>(
+      '/v1/auth/resend-verification',
+      { email },
+      {
+        skipAuth: true,
+      }
+    );
     return response.data;
   },
 
@@ -147,9 +160,13 @@ export const authApi = {
    * Request password reset
    */
   requestPasswordReset: async (email: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/forgot-password', { email }, {
-      skipAuth: true,
-    });
+    const response = await ApiClient.post<{ message: string }>(
+      '/v1/auth/forgot',
+      { email },
+      {
+        skipAuth: true,
+      }
+    );
     return response.data;
   },
 
@@ -157,12 +174,16 @@ export const authApi = {
    * Reset password with token
    */
   resetPassword: async (token: string, newPassword: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/reset-password', {
-      token,
-      newPassword,
-    }, {
-      skipAuth: true,
-    });
+    const response = await ApiClient.post<{ message: string }>(
+      '/v1/auth/reset',
+      {
+        token,
+        password: newPassword,
+      },
+      {
+        skipAuth: true,
+      }
+    );
     return response.data;
   },
 
@@ -186,7 +207,10 @@ export const authApi = {
   /**
    * Change password
    */
-  changePassword: async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> => {
     const response = await ApiClient.post<{ message: string }>('/auth/change-password', {
       currentPassword,
       newPassword,
@@ -199,8 +223,8 @@ export const authApi = {
    */
   logout: async (): Promise<void> => {
     try {
-      // Optionally notify server
-      await ApiClient.post('/auth/logout', {});
+      const refreshToken = ApiClient.getRefreshToken();
+      await ApiClient.post('/v1/auth/logout', refreshToken ? { refreshToken } : {});
     } catch {
       // Ignore errors
     } finally {
@@ -212,7 +236,9 @@ export const authApi = {
    * Delete account
    */
   deleteAccount: async (password: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/delete-account', { password });
+    const response = await ApiClient.post<{ message: string }>('/auth/delete-account', {
+      password,
+    });
     await ApiClient.clearTokens();
     return response.data;
   },
