@@ -10,7 +10,7 @@ import type { RootStackParamList } from './types';
 import { colors } from '@/theme';
 
 // Auth Store
-import { useAuthStore } from '@/store/useAuthStore';
+import { useAuthStore, isProviderUserType } from '@/store/useAuthStore';
 
 // Navigators
 import AuthNavigator from './AuthNavigator';
@@ -60,6 +60,7 @@ function LoadingScreen() {
 export default function RootNavigator() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasCompletedOnboarding = useAuthStore((state) => state.hasCompletedOnboarding);
+  const userType = useAuthStore((state) => state.userType);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
 
   // Show loading while store is hydrating
@@ -67,12 +68,17 @@ export default function RootNavigator() {
     return <LoadingScreen />;
   }
 
+  // Providers (healthcare_provider / service_provider / service_partner) skip
+  // the customer onboarding flow (symptom slides, role selection, care recipient).
+  const isProvider = isProviderUserType(userType);
+  const showOnboarding = isAuthenticated && !hasCompletedOnboarding && !isProvider;
+
   // Determine initial route based on auth state
   const getInitialRoute = (): keyof RootStackParamList => {
     if (!isAuthenticated) {
       return 'Auth';
     }
-    if (!hasCompletedOnboarding) {
+    if (showOnboarding) {
       return 'Onboarding';
     }
     return 'MainTabs';
@@ -94,8 +100,9 @@ export default function RootNavigator() {
         />
       ) : (
         <>
-          {/* Onboarding Flow - shown after auth but before completing onboarding */}
-          {!hasCompletedOnboarding && (
+          {/* Onboarding Flow - shown after auth but before completing onboarding.
+              Skipped entirely for provider user types. */}
+          {showOnboarding && (
             <Stack.Screen
               name="Onboarding"
               component={OnboardingNavigator}
