@@ -252,7 +252,10 @@ export const useAuthStore = create<AuthStore>()(
           set({
             user,
             isAuthenticated: true,
-            userType: extractUserType(envelope) ?? get().userType,
+            // The login response is authoritative for account type. Never inherit
+            // a stale persisted type (would show e.g. a provider dashboard to a
+            // customer); default to 'customer' if the field is somehow absent.
+            userType: extractUserType(envelope) ?? 'customer',
             accessToken: tokens?.accessToken ?? null,
             refreshToken: tokens?.refreshToken ?? null,
             isLoading: false,
