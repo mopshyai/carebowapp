@@ -34,6 +34,27 @@ export interface SignupData {
 
 export type UserRole = 'family_member' | 'caregiver';
 
+/**
+ * Backend user_type slug from the v1 auth response.
+ * 'customer' is the care-seeker; the other three are providers who must
+ * skip the customer onboarding flow (slides / role / care recipient).
+ */
+export type UserTypeSlug =
+  | 'customer'
+  | 'healthcare_provider'
+  | 'service_provider'
+  | 'service_partner';
+
+/** Provider user types that bypass the customer onboarding flow. */
+export const PROVIDER_USER_TYPES: readonly UserTypeSlug[] = [
+  'healthcare_provider',
+  'service_provider',
+  'service_partner',
+];
+
+export const isProviderUserType = (userType: UserTypeSlug | null): boolean =>
+  userType != null && userType !== 'customer';
+
 export type OnboardingStep =
   | 'slides'
   | 'role_selection'
@@ -49,6 +70,9 @@ interface AuthState {
   // Session
   accessToken: string | null;
   refreshToken: string | null;
+
+  // User type (from v1 auth response) - drives onboarding routing
+  userType: UserTypeSlug | null;
 
   // Onboarding
   hasCompletedOnboarding: boolean;
@@ -76,6 +100,9 @@ interface AuthActions {
   // Password reset
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+
+  // User type
+  setUserType: (userType: UserTypeSlug | null) => void;
 
   // Onboarding
   setUserRole: (role: UserRole) => void;
@@ -111,6 +138,7 @@ const initialState: AuthState = {
   isLoading: false,
   accessToken: null,
   refreshToken: null,
+  userType: null,
   hasCompletedOnboarding: false,
   userRole: null,
   currentOnboardingStep: 'slides',
@@ -171,6 +199,8 @@ export const useAuthStore = create<AuthStore>()(
             set({
               user: mockUser,
               isAuthenticated: true,
+              // TODO(v1): set from response.user.userType once wired to authApi
+              userType: 'customer',
               accessToken, // Keep in memory for API calls
               refreshToken, // Keep in memory for token refresh
               isLoading: false,
@@ -297,6 +327,14 @@ export const useAuthStore = create<AuthStore>()(
             set({
               user: mockUser,
               isAuthenticated: true,
+              // TODO(v1): set from response.user.userType once wired to authApi.
+              // Dev shortcut: a "+provider" email tag simulates a provider signup
+              // so the onboarding-bypass can be exercised without a real backend.
+              userType: /\+(healthcare|service_provider|service_partner|provider)/.test(
+                pendingEmail || ''
+              )
+                ? 'service_provider'
+                : 'customer',
               accessToken,
               refreshToken,
               pendingVerificationEmail: null,
@@ -380,6 +418,10 @@ export const useAuthStore = create<AuthStore>()(
       // ========================================
       // ONBOARDING
       // ========================================
+
+      setUserType: (userType: UserTypeSlug | null) => {
+        set({ userType });
+      },
 
       setUserRole: (role: UserRole) => {
         set({ userRole: role });
@@ -493,6 +535,7 @@ export const useAuthStore = create<AuthStore>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        userType: state.userType,
         // accessToken and refreshToken are stored in SecureStorage, not here
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         userRole: state.userRole,

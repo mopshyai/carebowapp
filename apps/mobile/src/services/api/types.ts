@@ -123,6 +123,13 @@ export interface LoginRequest {
   password: string;
 }
 
+/** Backend user_type slug returned by the v1 auth response. */
+export type UserTypeSlug =
+  | 'customer'
+  | 'healthcare_provider'
+  | 'service_provider'
+  | 'service_partner';
+
 export interface LoginResponse {
   user: {
     id: string;
@@ -131,6 +138,7 @@ export interface LoginResponse {
     lastName: string;
     phone?: string;
     avatarUrl?: string;
+    userType?: UserTypeSlug;
   };
   tokens: AuthTokens;
 }
