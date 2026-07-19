@@ -4,13 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  HttpMethod,
-  RequestConfig,
-  ApiResponse,
-  ApiError,
-  AuthTokens,
-} from './types';
+import { HttpMethod, RequestConfig, ApiResponse, ApiError, AuthTokens } from './types';
 
 // ============================================
 // CONFIGURATION
@@ -111,11 +105,15 @@ class ApiClientImpl {
     return !!this.accessToken;
   }
 
+  getRefreshToken(): string | null {
+    return this.refreshToken;
+  }
+
   private isTokenExpired(): boolean {
     // Add 60 second buffer before expiry
     // tokenExpiry is stored as Unix timestamp in seconds
     const bufferMs = 60 * 1000; // 60 seconds
-    return Date.now() >= (this.tokenExpiry * 1000) - bufferMs;
+    return Date.now() >= this.tokenExpiry * 1000 - bufferMs;
   }
 
   private async refreshAccessToken(): Promise<boolean> {
@@ -165,8 +163,11 @@ class ApiClientImpl {
         await this.clearTokens();
         return false;
       }
-      const expiresAt = data.tokens?.expiresAt
-        ?? (data.expiresIn ? Math.floor(Date.now() / 1000) + data.expiresIn : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+      const expiresAt =
+        data.tokens?.expiresAt ??
+        (data.expiresIn
+          ? Math.floor(Date.now() / 1000) + data.expiresIn
+          : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
       await this.setTokens({ accessToken, refreshToken, expiresAt });
       return true;
     } catch (error) {
@@ -194,7 +195,11 @@ class ApiClientImpl {
     return this.request<T>('PUT', endpoint, data, config);
   }
 
-  async patch<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<ApiResponse<T>> {
+  async patch<T>(
+    endpoint: string,
+    data?: unknown,
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
     return this.request<T>('PATCH', endpoint, data, config);
   }
 
@@ -241,7 +246,7 @@ class ApiClientImpl {
     // Build headers
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
       ...headers,
     };
 
@@ -365,7 +370,7 @@ class ApiClientImpl {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // ========================================
@@ -391,7 +396,7 @@ class ApiClientImpl {
     }
 
     const headers: Record<string, string> = {
-      'Accept': 'application/json',
+      Accept: 'application/json',
     };
 
     if (this.accessToken) {
