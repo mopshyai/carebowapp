@@ -53,6 +53,15 @@ CareBow is a comprehensive healthcare platform designed for modern families:
 - **Emergency Safety Features** - One-tap SOS alerts, scheduled check-ins, and emergency contact management
 - **Family Care Management** - Manage health records, care history, and insurance for your entire family
 
+### Production backend boundary
+
+This repository owns the React Native app and a legacy API used only for local development.
+The deployed REST API, authentication system, Prisma schema, and production PostgreSQL
+database are owned by [`mopshyai/carebow-main`](https://github.com/mopshyai/carebow-main).
+Do not apply `apps/api/prisma/schema.prisma` to a remote database; the schemas are not
+compatible. The package database commands enforce this boundary by accepting only local
+or Docker Compose database hosts.
+
 ## Features
 
 | Feature | Description |
@@ -137,7 +146,7 @@ carebow/
 │   │   │   └── theme/       # Design system tokens
 │   │   ├── ios/             # iOS native project
 │   │   └── android/         # Android native project
-│   └── api/                 # Next.js 15 backend API
+│   └── api/                 # Legacy local-development API (not production)
 │       ├── app/api/         # API routes
 │       ├── lib/             # Auth, Prisma, utilities
 │       └── prisma/          # Database schema
