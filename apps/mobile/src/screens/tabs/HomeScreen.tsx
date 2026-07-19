@@ -27,6 +27,7 @@ import type { MainTabScreenProps } from '@/navigation/types';
 import { CareBowLogoAccurate } from '@/components/icons/CareBowLogo';
 import { AppIcon } from '@/components/icons/AppIcon';
 import type { IconName } from '@/components/icons/iconMap';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useCareReadiness } from '@/store/useProfileStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -111,8 +112,18 @@ const AnimatedPressable = ({ children, onPress, style, delay = 0 }: any) => {
 // HEADER - Premium Feel
 // ============================================
 const Header = ({ navigation }: { navigation: any }) => {
+  const user = useAuthStore((state) => state.user);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+  const firstName = user?.firstName.trim() || user?.email.split('@')[0]?.trim() || 'there';
+  const initials =
+    [user?.firstName, user?.lastName]
+      .map((name) => name?.trim().charAt(0))
+      .filter(Boolean)
+      .join('')
+      .toUpperCase() ||
+    firstName.charAt(0).toUpperCase() ||
+    'C';
 
   const handleNotificationPress = () => {
     Haptics.trigger('impactLight');
@@ -130,7 +141,7 @@ const Header = ({ navigation }: { navigation: any }) => {
         <CareBowLogoAccurate size={36} />
         <View style={styles.greetingContainer}>
           <Text style={styles.greeting}>{greeting} 👋</Text>
-          <Text style={styles.userName}>Priya</Text>
+          <Text style={styles.userName}>{firstName}</Text>
         </View>
       </View>
       <View style={styles.headerRight}>
@@ -138,9 +149,17 @@ const Header = ({ navigation }: { navigation: any }) => {
           <View style={styles.notificationDot} />
           <AppIcon name="bell" size={22} color={colors.textPrimary} />
         </Pressable>
-        <Pressable style={styles.avatarContainer} onPress={handleProfilePress}>
-          <LinearGradient colors={[colors.accentLight, colors.accent]} style={styles.avatarGradient}>
-            <Text style={styles.avatarText}>P</Text>
+        <Pressable
+          style={styles.avatarContainer}
+          onPress={handleProfilePress}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${firstName}'s profile`}
+        >
+          <LinearGradient
+            colors={[colors.accentLight, colors.accent]}
+            style={styles.avatarGradient}
+          >
+            <Text style={styles.avatarText}>{initials}</Text>
           </LinearGradient>
         </Pressable>
       </View>

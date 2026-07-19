@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.com.carebow.app",
+        "paths": ["/verify-email*", "/reset-password*"]
+      }
+    ]
+  }
+}
