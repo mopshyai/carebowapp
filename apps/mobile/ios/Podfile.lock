@@ -1389,6 +1389,8 @@ PODS:
     - Yoga
   - react-native-splash-screen (3.3.0):
     - React-Core
+  - react-native-voice (3.2.4):
+    - React-Core
   - React-nativeconfig (0.76.6)
   - React-NativeModulesApple (0.76.6):
     - glog
@@ -1948,7 +1950,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - Sentry/HybridSDK (= 8.58.0)
     - Yoga
-  - RNSVG (15.15.1):
+  - RNSVG (15.8.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1968,9 +1970,9 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNSVG/common (= 15.15.1)
+    - RNSVG/common (= 15.8.0)
     - Yoga
-  - RNSVG/common (15.15.1):
+  - RNSVG/common (15.8.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1999,6 +2001,8 @@ PODS:
     - SDWebImage/Core (~> 5.10)
   - Sentry/HybridSDK (8.58.0)
   - SocketRocket (0.7.1)
+  - TextToSpeech (4.1.1):
+    - React-Core
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2046,6 +2050,7 @@ DEPENDENCIES:
   - "react-native-netinfo (from `../../../node_modules/@react-native-community/netinfo`)"
   - react-native-safe-area-context (from `../../../node_modules/react-native-safe-area-context`)
   - react-native-splash-screen (from `../../../node_modules/react-native-splash-screen`)
+  - "react-native-voice (from `../../../node_modules/@react-native-voice/voice`)"
   - React-nativeconfig (from `../../../node_modules/react-native/ReactCommon`)
   - React-NativeModulesApple (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-perflogger (from `../../../node_modules/react-native/ReactCommon/reactperflogger`)
@@ -2086,6 +2091,7 @@ DEPENDENCIES:
   - RNScreens (from `../../../node_modules/react-native-screens`)
   - "RNSentry (from `../../../node_modules/@sentry/react-native`)"
   - RNSVG (from `../../../node_modules/react-native-svg`)
+  - TextToSpeech (from `../../../node_modules/react-native-tts`)
   - Yoga (from `../../../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2182,6 +2188,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native-safe-area-context"
   react-native-splash-screen:
     :path: "../../../node_modules/react-native-splash-screen"
+  react-native-voice:
+    :path: "../../../node_modules/@react-native-voice/voice"
   React-nativeconfig:
     :path: "../../../node_modules/react-native/ReactCommon"
   React-NativeModulesApple:
@@ -2262,6 +2270,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@sentry/react-native"
   RNSVG:
     :path: "../../../node_modules/react-native-svg"
+  TextToSpeech:
+    :path: "../../../node_modules/react-native-tts"
   Yoga:
     :path: "../../../node_modules/react-native/ReactCommon/yoga"
 
@@ -2309,6 +2319,7 @@ SPEC CHECKSUMS:
   react-native-netinfo: cec9c4e86083cb5b6aba0e0711f563e2fbbff187
   react-native-safe-area-context: 0f16e24dc808e9f0ced17f2bdcec692b2376fb68
   react-native-splash-screen: 95994222cc95c236bd3cdc59fe45ed5f27969594
+  react-native-voice: 908a0eba96c8c3d643e4f98b7232c6557d0a6f9c
   React-nativeconfig: 539ff4de6ce3b694e8e751080568c281c84903ce
   React-NativeModulesApple: 702246817c286d057e23fe4b1302019796e62521
   React-perflogger: f260e2de95f9dbd002035251559c13bf1f0643d4
@@ -2348,11 +2359,12 @@ SPEC CHECKSUMS:
   RNReanimated: e66b914922f3bb837f87fdf4d06f1ac8840a1fcd
   RNScreens: e6e9c91fc2507887016a184e00013a1240580b85
   RNSentry: baf73277e129b5efc2df3542d078426f32f0ce1f
-  RNSVG: e9262561fa0e59cd3fec23ee52d076f19727a41a
+  RNSVG: 030717ff82ea8f2117347c2fcf52a2d1eafba9ba
   SDWebImage: a7f831e1a65eb5e285e3fb046a23fcfbf08e696d
   SDWebImageWebPCoder: 908b83b6adda48effe7667cd2b7f78c897e5111d
   Sentry: d587a8fe91ca13503ecd69a1905f3e8a0fcf61be
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  TextToSpeech: 89b239221ec378d213af422d14789a729705360b
   Yoga: be6f55a028e86c83ae066f018e9b5d24ffc45436
 
 PODFILE CHECKSUM: 5632d7c0725d2ecd2e19b438a53b959c8519a93a
