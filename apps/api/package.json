@@ -9,10 +9,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:push": "node scripts/run-local-database-command.mjs prisma db push",
+    "db:migrate": "node scripts/run-local-database-command.mjs prisma migrate dev",
+    "db:seed": "node scripts/run-local-database-command.mjs tsx prisma/seed.ts",
+    "db:studio": "node scripts/run-local-database-command.mjs prisma studio",
+    "test:db-guard": "node --test scripts/run-local-database-command.test.mjs"
   },
   "dependencies": {
     "@carebow/shared": "workspace:*",

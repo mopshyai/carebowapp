@@ -1,13 +1,17 @@
 # CareBow Backend API
 
-Next.js 15 backend with PostgreSQL, Prisma, and NextAuth v5 for the CareBow healthcare platform.
+Legacy local-development API with PostgreSQL, Prisma, and NextAuth v5.
+
+> **Production boundary:** this API and its Prisma schema are not deployed to CareBow production.
+> The `mopshyai/carebow-main` repository is the only production API and database-schema
+> authority. Database scripts in this package intentionally reject remote database hosts.
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL database
+- Local PostgreSQL database (or the repository's Docker Compose `db` service)
 - pnpm/npm/yarn
 
 ### Setup
@@ -22,7 +26,7 @@ Next.js 15 backend with PostgreSQL, Prisma, and NextAuth v5 for the CareBow heal
    cp .env.example .env
    ```
 
-   Update `.env` with your database URL and auth secret:
+   Update `.env` with a local database URL and auth secret:
    ```env
    DATABASE_URL="postgresql://username:password@localhost:5432/carebow"
    AUTH_SECRET="generate-with-openssl-rand-base64-32"
