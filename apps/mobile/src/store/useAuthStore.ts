@@ -46,6 +46,10 @@ export const USER_TYPES: Array<{ slug: UserTypeSlug; title: string; description:
   { slug: 'service_partner', title: 'Service Partner', description: 'Labs, pharmacies & partners' },
 ];
 
+/** Provider accounts use the provider dashboard and skip customer onboarding. */
+export const isProviderUserType = (userType: UserTypeSlug | null): boolean =>
+  userType != null && userType !== 'customer';
+
 export type OnboardingStep =
   | 'slides'
   | 'role_selection'
