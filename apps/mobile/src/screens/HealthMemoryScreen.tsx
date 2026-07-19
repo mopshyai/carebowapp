@@ -16,6 +16,7 @@ import {
   Modal,
   Pressable,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -141,8 +142,12 @@ function AddEditModal({ visible, onClose, item, onSave }: AddEditModalProps) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+      <KeyboardAvoidingView
+        style={styles.modalKeyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={styles.modalOverlay} onPress={onClose}>
+          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.modalHandle} />
 
           <Text style={styles.modalTitle}>
@@ -221,8 +226,9 @@ function AddEditModal({ visible, onClose, item, onSave }: AddEditModalProps) {
               </Text>
             </TouchableOpacity>
           </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -726,6 +732,9 @@ const styles = StyleSheet.create({
   },
 
   // Modal
+  modalKeyboardView: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: colors.overlay,

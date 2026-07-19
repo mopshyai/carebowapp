@@ -21,31 +21,20 @@ import { useUpcomingFollowUps, useFollowUpStore } from '../../store/followUpStor
 import { EpisodeCard, FollowUpCard } from '../../components/episodes';
 import { Episode } from '../../types/episode';
 
-// Doctor conversations (existing data)
-const doctorConversations = [
-  {
-    id: '1',
-    name: 'Dr. Sarah Chen',
-    initials: 'SC',
-    role: 'General Practitioner',
-    lastMessage: 'Your test results look good. Continue with the prescribed medication.',
-    timestamp: '10 min ago',
-    unread: 2,
-    online: true,
-    avatarColor: colors.accent,
-  },
-  {
-    id: '2',
-    name: 'Dr. James Wilson',
-    initials: 'JW',
-    role: 'Cardiologist',
-    lastMessage: 'Please schedule a follow-up in 2 weeks.',
-    timestamp: '2 hours ago',
-    unread: 0,
-    online: false,
-    avatarColor: colors.info,
-  },
-];
+// Doctor conversations. Empty until a real messaging backend is wired — the app
+// no longer ships fake sample conversations to users.
+interface DoctorConversation {
+  id: string;
+  name: string;
+  initials: string;
+  role: string;
+  lastMessage: string;
+  timestamp: string;
+  unread: number;
+  online: boolean;
+  avatarColor: string;
+}
+const doctorConversations: DoctorConversation[] = [];
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
@@ -172,6 +161,14 @@ export default function MessagesScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Doctor Messages</Text>
           <View style={styles.doctorList}>
+            {doctorConversations.length === 0 && (
+              <View style={styles.emptyEpisodes}>
+                <Icon name="chatbubbles-outline" size={40} color={colors.textTertiary} />
+                <Text style={styles.emptyText}>
+                  No messages yet. Conversations with your care team will appear here.
+                </Text>
+              </View>
+            )}
             {doctorConversations.map((conv) => (
               <TouchableOpacity
                 key={conv.id}

@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...typography.label,
+    ...typography.h3,
     color: colors.textPrimary,
   },
   headerSpacer: {

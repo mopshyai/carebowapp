@@ -17,8 +17,9 @@ import {
 // ============================================
 
 const API_CONFIG = {
-  // SECURITY: Explicit fallback handling - never default to production
-  baseUrl: process.env.API_BASE_URL || (__DEV__ ? 'http://localhost:3000/api' : (() => { throw new Error('API_BASE_URL must be configured for production'); })()),
+  // Live backend on Hostinger VPS. The `www` is mandatory: the bare domain
+  // 302/307-redirects to www, and RN fetch drops POST bodies on redirect.
+  baseUrl: process.env.API_BASE_URL || 'https://www.carebow.com/api',
   timeout: 30000, // 30 seconds
   retries: 2,
 };
@@ -140,10 +141,13 @@ class ApiClientImpl {
 
   private async doRefreshToken(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+      // v1 rotation: send the refresh token in the body AND the (expired)
+      // access token in the Authorization header so the server can bind them.
+      const response = await fetch(`${this.baseUrl}/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {}),
         },
         body: JSON.stringify({ refreshToken: this.refreshToken }),
       });
@@ -153,8 +157,17 @@ class ApiClientImpl {
         return false;
       }
 
+      // v1 returns tokens top-level with expiresIn (relative seconds).
       const data = await response.json();
-      await this.setTokens(data.tokens);
+      const accessToken = data.accessToken ?? data.tokens?.accessToken;
+      const refreshToken = data.refreshToken ?? data.tokens?.refreshToken;
+      if (!accessToken || !refreshToken) {
+        await this.clearTokens();
+        return false;
+      }
+      const expiresAt = data.tokens?.expiresAt
+        ?? (data.expiresIn ? Math.floor(Date.now() / 1000) + data.expiresIn : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+      await this.setTokens({ accessToken, refreshToken, expiresAt });
       return true;
     } catch (error) {
       if (__DEV__) {
@@ -257,7 +270,7 @@ class ApiClientImpl {
 
         // Parse response
         const responseHeaders: Record<string, string> = {};
-        response.headers.forEach((value, key) => {
+        response.headers.forEach((value: string, key: string) => {
           responseHeaders[key] = value;
         });
 
@@ -288,6 +301,15 @@ class ApiClientImpl {
         };
       } catch (error) {
         lastError = error as Error;
+
+        if (__DEV__) {
+          console.log('[ApiClient] request attempt failed', {
+            url,
+            attempt,
+            name: (error as Error)?.name,
+            message: (error as Error)?.message,
+          });
+        }
 
         // Don't retry on certain errors
         if (error instanceof ApiError) {

@@ -213,8 +213,9 @@ export default function VideoCallScreen() {
         </View>
       </View>
 
-      {/* Local Video (Picture-in-Picture) */}
-      <View style={[styles.localVideo, { top: insets.top + 16 }]}>
+      {/* Local Video (Picture-in-Picture) — sits below the top bar so it never
+          overlaps the minimize button, which occupies the same top-right corner */}
+      <View style={[styles.localVideo, { top: insets.top + 88 }]}>
         {callState.isVideoEnabled ? (
           <View style={styles.localVideoPlaceholder}>
             <Icon name="person" size={24} color={colors.textInverse} />

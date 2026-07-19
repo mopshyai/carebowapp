@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useTranslation, LANGUAGES, type SupportedLanguage } from '../../localization';
 import { createLogger } from '../../utils/logger';
 
@@ -30,7 +31,9 @@ export default function SettingsScreen() {
 
   const appSettings = useProfileStore((state) => state.appSettings);
   const updateAppSettings = useProfileStore((state) => state.updateAppSettings);
-  const logout = useProfileStore((state) => state.logout);
+  // Auth-store logout clears JWT + SecureStorage and returns to login
+  // (also clears the local profile store).
+  const logout = useAuthStore((state) => state.logout);
 
   const handleThemeChange = () => {
     Alert.alert('Select Theme', 'Choose your preferred theme', [
@@ -133,7 +136,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -312,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...typography.h4,
+    ...typography.h3,
   },
   scrollView: {
     flex: 1,

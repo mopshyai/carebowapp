@@ -39,16 +39,18 @@ if (__DEV__) {
 // ============================================
 
 const linking = {
-  prefixes: ['carebow://', 'https://carebow.app', 'https://www.carebow.app'],
+  prefixes: ['carebow://', 'https://www.carebow.com', 'https://carebow.com'],
   config: {
     screens: {
-      // Auth Stack (for password reset links, etc.)
+      // Auth Stack (email verification + password reset links)
       Auth: {
         screens: {
           Welcome: 'welcome',
           Login: 'login',
           Signup: 'signup',
-          VerifyEmail: 'verify-email/:email',
+          // Backend emails link to /verify-email?token=...  — query params
+          // (token, email) arrive as route params automatically.
+          VerifyEmail: 'verify-email',
           ForgotPassword: 'forgot-password',
           ResetPassword: 'reset-password/:token',
         },

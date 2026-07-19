@@ -199,15 +199,63 @@ class SecureStorageService {
 
       return true;
     } catch (error) {
-      // If Keychain fails at runtime, mark it as unavailable and retry with fallback
       const errorMessage = String(error);
+
+      // If Keychain native module returned null/undefined, mark unavailable and
+      // retry (which routes to the AsyncStorage fallback path above).
       if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
         this.keychainAvailable = false;
         this.logFallbackWarning();
         return this.setItem(key, value, options);
       }
-      console.error(`[SecureStorage] Failed to store ${key}:`, error);
-      return false;
+
+      // Hardware keystore unavailable (emulators + devices without a secure
+      // element / StrongBox) → CryptoFailedException / "security guarantees".
+      // Retry once with software-backed security before giving up, so the
+      // session token still persists. Only downgrade when we asked for
+      // SECURE_HARDWARE and it wasn't the caller's explicit choice.
+      const isCryptoFailure =
+        errorMessage.includes('CryptoFailedException') ||
+        errorMessage.includes('security guarantee') ||
+        errorMessage.includes('Cannot generate keys');
+      const askedForSecureHardware =
+        (options?.securityLevel ?? getDefaultOptions().securityLevel) ===
+        Keychain.SECURITY_LEVEL?.SECURE_HARDWARE;
+
+      if (isCryptoFailure && askedForSecureHardware && Keychain.SECURITY_LEVEL?.ANY) {
+        try {
+          const mergedOptions = { ...getDefaultOptions(), ...options };
+          await Keychain.setGenericPassword(key, value, {
+            service: `${mergedOptions.service}.${key}`,
+            accessible: mergedOptions.accessible,
+            accessControl: mergedOptions.accessControl,
+            securityLevel: Keychain.SECURITY_LEVEL.ANY, // software or hardware
+          });
+          if (__DEV__) {
+            console.log(`[SecureStorage] Stored (software-backed): ${key}`);
+          }
+          return true;
+        } catch (retryError) {
+          // Fall through to AsyncStorage fallback below.
+          if (__DEV__) {
+            console.log(`[SecureStorage] Software-backed store also failed for ${key}:`, retryError);
+          }
+        }
+      }
+
+      // Last resort: keep the user logged in across restarts even if the
+      // secure store is entirely unusable on this device.
+      try {
+        await AsyncStorage.setItem(`${FALLBACK_PREFIX}${key}`, value);
+        this.logFallbackWarning();
+        if (__DEV__) {
+          console.log(`[SecureStorage] Stored (AsyncStorage fallback): ${key}`);
+        }
+        return true;
+      } catch (fallbackError) {
+        console.error(`[SecureStorage] Failed to store ${key}:`, fallbackError);
+        return false;
+      }
     }
   }
 
@@ -252,7 +300,9 @@ class SecureStorageService {
         return credentials.password;
       }
 
-      return null;
+      // Keychain returned nothing — the value may have been written via the
+      // AsyncStorage fallback (e.g. hardware keystore unavailable at write time).
+      return await this.getFallback(key);
     } catch (error) {
       // If Keychain fails at runtime, mark it as unavailable and retry with fallback
       const errorMessage = String(error);
@@ -261,10 +311,23 @@ class SecureStorageService {
         this.logFallbackWarning();
         return this.getItem(key, options);
       }
-      // User cancelled biometric prompt or error occurred
+      // User cancelled biometric prompt or error occurred — still try fallback.
       if (__DEV__) {
         console.log(`[SecureStorage] Failed to retrieve ${key}:`, error);
       }
+      return await this.getFallback(key);
+    }
+  }
+
+  /** Read a value from the AsyncStorage fallback bucket. */
+  private async getFallback(key: SecureStorageKey): Promise<string | null> {
+    try {
+      const value = await AsyncStorage.getItem(`${FALLBACK_PREFIX}${key}`);
+      if (__DEV__ && value) {
+        console.log(`[SecureStorage] Retrieved (AsyncStorage fallback): ${key}`);
+      }
+      return value;
+    } catch {
       return null;
     }
   }
@@ -299,6 +362,10 @@ class SecureStorageService {
       await Keychain.resetGenericPassword({
         service: `${mergedOptions.service}.${key}`,
       });
+
+      // Also clear any AsyncStorage-fallback copy so logout fully removes tokens
+      // even when a value was written via the fallback path.
+      await AsyncStorage.removeItem(`${FALLBACK_PREFIX}${key}`).catch(() => {});
 
       if (__DEV__) {
         console.log(`[SecureStorage] Removed: ${key}`);

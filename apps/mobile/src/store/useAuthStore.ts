@@ -8,6 +8,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SecureStorage } from '@/services/storage/SecureStorage';
+import { authApi, extractTokens, extractUser } from '@/services/api/endpoints/auth';
+import { ApiClient } from '@/services/api/ApiClient';
+import { ApiError, UserTypeSlug } from '@/services/api/types';
 
 // ============================================
 // TYPES
@@ -34,6 +37,19 @@ export interface SignupData {
 
 export type UserRole = 'family_member' | 'caregiver';
 
+export type { UserTypeSlug };
+
+export const USER_TYPES: Array<{ slug: UserTypeSlug; title: string; description: string }> = [
+  { slug: 'customer', title: 'Customer', description: 'Get care for yourself or family' },
+  { slug: 'healthcare_provider', title: 'Healthcare Provider', description: 'Doctors, nurses & clinicians' },
+  { slug: 'service_provider', title: 'Service Provider', description: 'Home care & support services' },
+  { slug: 'service_partner', title: 'Service Partner', description: 'Labs, pharmacies & partners' },
+];
+
+/** Provider accounts use the provider dashboard and skip customer onboarding. */
+export const isProviderUserType = (userType: UserTypeSlug | null): boolean =>
+  userType != null && userType !== 'customer';
+
 export type OnboardingStep =
   | 'slides'
   | 'role_selection'
@@ -45,6 +61,9 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+
+  // Which of the 4 backend user types this account belongs to
+  userType: UserTypeSlug;
 
   // Session
   accessToken: string | null;
@@ -68,10 +87,14 @@ interface AuthActions {
   signup: (data: SignupData) => Promise<boolean>;
   logout: () => Promise<void>;
 
+  // User type (backend account type, chosen at signup)
+  setUserType: (userType: UserTypeSlug) => void;
+
   // Email verification
   sendVerificationCode: (email: string) => Promise<boolean>;
   verifyEmail: (code: string) => Promise<boolean>;
   setPendingVerificationEmail: (email: string | null) => void;
+  completeVerifiedLogin: () => Promise<boolean>;
 
   // Password reset
   requestPasswordReset: (email: string) => Promise<boolean>;
@@ -109,6 +132,7 @@ const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
   isLoading: false,
+  userType: 'customer',
   accessToken: null,
   refreshToken: null,
   hasCompletedOnboarding: false,
@@ -119,14 +143,77 @@ const initialState: AuthState = {
 };
 
 // ============================================
-// MOCK API HELPERS (Replace with real API calls)
+// HELPERS
 // ============================================
 
-// Simulated delay for mock API calls
-const mockApiDelay = () => new Promise(resolve => setTimeout(resolve, 1000));
+/**
+ * Held in memory only (never persisted) so we can auto-login right after
+ * OTP verification if the backend doesn't issue a session on verify.
+ */
+let pendingSignupPassword: string | null = null;
 
-// Generate mock user ID
-const generateUserId = () => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+/** Map the backend's (loosely-shaped) user object onto the store's User. */
+const normalizeUser = (raw: Record<string, unknown> | null, fallbackEmail: string): User => {
+  const r = raw ?? {};
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  return {
+    id: str(r.id ?? r._id ?? r.userId) || `user_${fallbackEmail}`,
+    email: str(r.email) || fallbackEmail,
+    firstName: str(r.firstName ?? r.first_name ?? r.name),
+    lastName: str(r.lastName ?? r.last_name),
+    phone: str(r.phone ?? r.mobile) || undefined,
+    avatarUrl: str(r.avatarUrl ?? r.avatar_url ?? r.avatar) || undefined,
+    createdAt: str(r.createdAt ?? r.created_at) || new Date().toISOString(),
+    updatedAt: str(r.updatedAt ?? r.updated_at) || new Date().toISOString(),
+  };
+};
+
+const VALID_USER_TYPES: UserTypeSlug[] = ['customer', 'healthcare_provider', 'service_provider', 'service_partner'];
+
+/** Pull a valid userTypeSlug out of the auth response user object. */
+const extractUserType = (payload: { user?: Record<string, unknown>; data?: { user?: Record<string, unknown> } } | null | undefined): UserTypeSlug | null => {
+  const raw = payload?.user?.userTypeSlug ?? payload?.data?.user?.userTypeSlug;
+  return typeof raw === 'string' && (VALID_USER_TYPES as string[]).includes(raw) ? (raw as UserTypeSlug) : null;
+};
+
+/**
+ * Mirror the authenticated account into the profile store so Profile/Settings
+ * screens show the REAL logged-in user instead of stale local data. Uses a lazy
+ * require to avoid a circular import between the two stores.
+ */
+const syncProfileStore = (u: User) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useProfileStore } = require('@/store/useProfileStore');
+    const existing = useProfileStore.getState().user;
+    useProfileStore.getState().setUser({
+      id: u.id,
+      firstName: u.firstName || '',
+      lastName: u.lastName || '',
+      email: u.email || '',
+      phone: u.phone || existing?.phone || '',
+      dateOfBirth: existing?.dateOfBirth,
+      gender: existing?.gender,
+      createdAt: u.createdAt || existing?.createdAt || new Date().toISOString(),
+      updatedAt: u.updatedAt || new Date().toISOString(),
+    });
+  } catch {
+    // profile store unavailable — non-fatal
+  }
+};
+
+const messageFromError = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiError) {
+    if (error.code === 'RATE_LIMITED') {
+      return 'Too many attempts. Please wait a minute and try again.';
+    }
+    if (error.code === 'NETWORK_ERROR') {
+      return 'Cannot reach CareBow servers. Check your connection and try again.';
+    }
+    return error.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+};
 
 // ============================================
 // STORE
@@ -146,50 +233,43 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
+          const envelope = await authApi.login({
+            method: 'email-password',
+            email,
+            password,
+            userTypeSlug: get().userType,
+          });
 
-          // TODO: Replace with real API call
-          // const response = await api.auth.login({ email, password });
-
-          // Mock successful login
-          if (email && password.length >= 8) {
-            const mockUser: User = {
-              id: generateUserId(),
-              email,
-              firstName: 'Priya',
-              lastName: 'Sharma',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-
-            const accessToken = 'mock_access_token';
-            const refreshToken = 'mock_refresh_token';
-
-            // SECURITY: Store tokens in secure storage (Keychain/Keystore)
-            await SecureStorage.setAuthTokens(accessToken, refreshToken);
-
-            set({
-              user: mockUser,
-              isAuthenticated: true,
-              accessToken, // Keep in memory for API calls
-              refreshToken, // Keep in memory for token refresh
-              isLoading: false,
-              error: null,
-            });
-
-            return true;
-          } else {
-            set({
-              isLoading: false,
-              error: 'Invalid email or password'
-            });
+          if (envelope.success === false) {
+            set({ isLoading: false, error: envelope.error || 'Invalid email or password' });
             return false;
           }
+
+          const user = normalizeUser(extractUser(envelope), email);
+          const tokens = extractTokens(envelope);
+
+          if (tokens) {
+            // SECURITY: Store tokens in secure storage (Keychain/Keystore)
+            await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+          }
+
+          set({
+            user,
+            isAuthenticated: true,
+            // The login response is authoritative for account type. Never inherit
+            // a stale persisted type (would show e.g. a provider dashboard to a
+            // customer); default to 'customer' if the field is somehow absent.
+            userType: extractUserType(envelope) ?? 'customer',
+            accessToken: tokens?.accessToken ?? null,
+            refreshToken: tokens?.refreshToken ?? null,
+            isLoading: false,
+            error: null,
+          });
+          syncProfileStore(user);
+
+          return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'An unexpected error occurred';
-          set({ isLoading: false, error: errorMessage });
+          set({ isLoading: false, error: messageFromError(error, 'Login failed. Please try again.') });
           return false;
         }
       },
@@ -198,45 +278,83 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
+          const envelope = await authApi.signup({
+            method: 'email-password',
+            email: data.email,
+            password: data.password,
+            userTypeSlug: get().userType,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phone: data.phone,
+          });
 
-          // TODO: Replace with real API call
-          // const response = await api.auth.signup(data);
+          if (envelope.success === false) {
+            set({ isLoading: false, error: envelope.error || 'Signup failed. Please try again.' });
+            return false;
+          }
 
-          // Mock successful signup
-          if (data.email && data.password.length >= 8) {
-            // Set pending verification email
+          // v1 email-password signup AUTO-VERIFIES and returns tokens immediately.
+          // If tokens are present, log the user straight in (no OTP screen).
+          const tokens = extractTokens(envelope);
+          if (tokens) {
+            await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            const su = normalizeUser(extractUser(envelope), data.email);
             set({
-              pendingVerificationEmail: data.email,
+              user: su,
+              isAuthenticated: true,
+              userType: extractUserType(envelope) ?? get().userType,
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
+              pendingVerificationEmail: null,
               isLoading: false,
               error: null,
             });
-
+            syncProfileStore(su);
             return true;
-          } else {
-            set({
-              isLoading: false,
-              error: 'Please provide valid email and password (min 8 characters)'
-            });
-            return false;
           }
+
+          // Fallback (e.g. email-otp method): backend sent an OTP; keep the
+          // password in memory only, so we can auto-login after verification.
+          pendingSignupPassword = data.password;
+          set({
+            pendingVerificationEmail: data.email,
+            isLoading: false,
+            error: null,
+          });
+
+          return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'An unexpected error occurred';
-          set({ isLoading: false, error: errorMessage });
+          set({ isLoading: false, error: messageFromError(error, 'Signup failed. Please try again.') });
           return false;
         }
       },
 
       logout: async () => {
-        // SECURITY: Clear tokens from secure storage
-        await SecureStorage.clearAuthTokens();
+        pendingSignupPassword = null;
+
+        // SECURITY: Clear tokens from secure storage and the API client
+        await Promise.all([
+          SecureStorage.clearAuthTokens(),
+          ApiClient.clearTokens(),
+        ]);
+
+        // Also clear the local profile store so no account data lingers.
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { useProfileStore } = require('@/store/useProfileStore');
+          useProfileStore.getState().logout?.();
+        } catch {
+          // profile store unavailable — non-fatal
+        }
 
         set({
           ...initialState,
           _hasHydrated: true, // Keep hydration state
         });
+      },
+
+      setUserType: (userType: UserTypeSlug) => {
+        set({ userType });
       },
 
       // ========================================
@@ -247,10 +365,10 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
-
-          // TODO: Replace with real API call
-          // await api.auth.sendVerificationCode(email);
+          // NOTE: /auth/resend-verification is not yet verified against the live
+          // backend (signup itself auto-sends the first OTP). If the endpoint is
+          // missing server-side this surfaces as a clear error instead of a mock success.
+          await authApi.resendVerificationCode(email);
 
           set({
             pendingVerificationEmail: email,
@@ -258,10 +376,10 @@ export const useAuthStore = create<AuthStore>()(
           });
           return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'Failed to send verification code';
-          set({ isLoading: false, error: errorMessage });
+          set({
+            isLoading: false,
+            error: messageFromError(error, 'Failed to send verification code'),
+          });
           return false;
         }
       },
@@ -270,59 +388,129 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
+          const pendingEmail = get().pendingVerificationEmail;
 
-          // TODO: Replace with real API call
-          // const response = await api.auth.verifyEmail(code);
+          const envelope = await authApi.verifyEmail({ token: code });
 
-          // Mock verification - accept any 6-digit code
-          if (code.length === 6) {
-            const pendingEmail = get().pendingVerificationEmail;
+          if (envelope.success === false) {
+            set({ isLoading: false, error: envelope.error || 'Invalid verification code' });
+            return false;
+          }
 
-            const mockUser: User = {
-              id: generateUserId(),
-              email: pendingEmail || 'user@example.com',
-              firstName: '',
-              lastName: '',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
+          let user = extractUser(envelope);
+          let tokens = extractTokens(envelope);
 
-            const accessToken = 'mock_access_token';
-            const refreshToken = 'mock_refresh_token';
+          // If verification succeeded but didn't issue a session, log in with
+          // the credentials from the just-completed signup.
+          if (!tokens && pendingEmail && pendingSignupPassword) {
+            const loginEnvelope = await authApi.login({
+              method: 'email-password',
+              email: pendingEmail,
+              password: pendingSignupPassword,
+              userTypeSlug: get().userType,
+            });
+            if (loginEnvelope.success !== false) {
+              user = extractUser(loginEnvelope) ?? user;
+              tokens = extractTokens(loginEnvelope);
+            }
+          }
 
+          pendingSignupPassword = null;
+
+          if (tokens) {
             // SECURITY: Store tokens in secure storage (Keychain/Keystore)
-            await SecureStorage.setAuthTokens(accessToken, refreshToken);
-
+            await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            const vu = normalizeUser(user, pendingEmail || '');
             set({
-              user: mockUser,
+              user: vu,
               isAuthenticated: true,
-              accessToken,
-              refreshToken,
+              userType: extractUserType({ user: user ?? undefined }) ?? get().userType,
+              accessToken: tokens.accessToken,
+              refreshToken: tokens.refreshToken,
               pendingVerificationEmail: null,
               isLoading: false,
               error: null,
             });
-
-            return true;
+            syncProfileStore(vu);
           } else {
+            // Verified, but no session (e.g. deep link on a cold start where the
+            // signup password is gone). Caller should route to Login.
             set({
+              pendingVerificationEmail: null,
               isLoading: false,
-              error: 'Invalid verification code'
+              error: null,
             });
-            return false;
           }
+
+          return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'Verification failed';
-          set({ isLoading: false, error: errorMessage });
+          set({ isLoading: false, error: messageFromError(error, 'Verification failed') });
           return false;
         }
       },
 
       setPendingVerificationEmail: (email: string | null) => {
         set({ pendingVerificationEmail: email });
+      },
+
+      /**
+       * The backend verifies via an emailed link (not an in-app code). After
+       * the user taps that link, this logs them in with the credentials held
+       * in memory from the just-completed signup.
+       */
+      completeVerifiedLogin: async () => {
+        const pendingEmail = get().pendingVerificationEmail;
+
+        if (!pendingEmail || !pendingSignupPassword) {
+          set({
+            error: 'Session expired. Please sign in with your email and password.',
+          });
+          return false;
+        }
+
+        set({ isLoading: true, error: null });
+
+        try {
+          const envelope = await authApi.login({
+            method: 'email-password',
+            email: pendingEmail,
+            password: pendingSignupPassword,
+            userTypeSlug: get().userType,
+          });
+
+          if (envelope.success === false) {
+            set({
+              isLoading: false,
+              // Most common cause: they haven't actually clicked the link yet.
+              error: envelope.error || 'Please tap the verification link in your email first, then try again.',
+            });
+            return false;
+          }
+
+          const user = extractUser(envelope);
+          const tokens = extractTokens(envelope);
+
+          if (tokens) {
+            await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+          }
+
+          pendingSignupPassword = null;
+
+          set({
+            user: normalizeUser(user, pendingEmail),
+            isAuthenticated: true,
+            accessToken: tokens?.accessToken ?? null,
+            refreshToken: tokens?.refreshToken ?? null,
+            pendingVerificationEmail: null,
+            isLoading: false,
+            error: null,
+          });
+
+          return true;
+        } catch (error) {
+          set({ isLoading: false, error: messageFromError(error, 'Login failed') });
+          return false;
+        }
       },
 
       // ========================================
@@ -333,18 +521,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
-
-          // TODO: Replace with real API call
-          // await api.auth.requestPasswordReset(email);
-
+          // NOTE: endpoint not yet verified against the live backend.
+          await authApi.requestPasswordReset(email);
           set({ isLoading: false });
           return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'Failed to send reset email';
-          set({ isLoading: false, error: errorMessage });
+          set({
+            isLoading: false,
+            error: messageFromError(error, 'Failed to send reset email'),
+          });
           return false;
         }
       },
@@ -353,26 +538,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          await mockApiDelay();
-
-          // TODO: Replace with real API call
-          // await api.auth.resetPassword(token, newPassword);
-
-          if (newPassword.length >= 8) {
-            set({ isLoading: false });
-            return true;
-          } else {
-            set({
-              isLoading: false,
-              error: 'Password must be at least 8 characters'
-            });
-            return false;
-          }
+          // NOTE: endpoint not yet verified against the live backend.
+          await authApi.resetPassword(token, newPassword);
+          set({ isLoading: false });
+          return true;
         } catch (error) {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : 'Password reset failed';
-          set({ isLoading: false, error: errorMessage });
+          set({
+            isLoading: false,
+            error: messageFromError(error, 'Password reset failed'),
+          });
           return false;
         }
       },
@@ -420,13 +594,15 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true });
 
         try {
-          await mockApiDelay();
-
-          // TODO: Replace with real API call
-          // const response = await api.auth.me();
-          // set({ user: response.user, isLoading: false });
-
-          set({ isLoading: false });
+          // NOTE: /auth/me not yet verified against the live backend; keeps
+          // the cached user on failure rather than logging out.
+          const response = await authApi.getCurrentUser();
+          const raw = (response as unknown as Record<string, unknown>);
+          const user = normalizeUser(
+            (raw.user as Record<string, unknown>) ?? raw,
+            get().user?.email || ''
+          );
+          set({ user, isLoading: false });
         } catch (error) {
           console.error('Failed to refresh user:', error);
           set({ isLoading: false });
@@ -459,12 +635,15 @@ export const useAuthStore = create<AuthStore>()(
           const { accessToken, refreshToken } = await SecureStorage.getAuthTokens();
 
           if (accessToken && refreshToken) {
+            const hydratedUser = get().user;
             set({
               accessToken,
               refreshToken,
               // Only set authenticated if we have a user from AsyncStorage
-              isAuthenticated: get().user !== null,
+              isAuthenticated: hydratedUser !== null,
             });
+            // Overwrite any stale local profile data with the real account.
+            if (hydratedUser) syncProfileStore(hydratedUser);
 
             if (__DEV__) {
               console.log('[AuthStore] Tokens hydrated from secure storage');
@@ -493,6 +672,7 @@ export const useAuthStore = create<AuthStore>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        userType: state.userType,
         // accessToken and refreshToken are stored in SecureStorage, not here
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         userRole: state.userRole,

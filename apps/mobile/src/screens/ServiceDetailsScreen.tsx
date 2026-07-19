@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -399,6 +401,10 @@ export default function ServiceDetailsScreen() {
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -612,6 +618,7 @@ export default function ServiceDetailsScreen() {
         disabled={!isValid || isProcessing}
         isOnRequest={isOnRequestService && service.pricing.type === 'quote' && !service.pricing.bookingFee}
       />
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -620,6 +627,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  keyboardView: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -638,7 +648,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    ...typography.h4,
+    ...typography.h3,
   },
   shareButton: {
     width: 40,

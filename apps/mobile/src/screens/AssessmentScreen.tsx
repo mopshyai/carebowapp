@@ -1,11 +1,4 @@
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Linking,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
@@ -21,7 +14,8 @@ const riskLevels = {
     icon: 'checkmark-circle',
     title: 'Low Risk',
     subtitle: 'Self-care may be appropriate',
-    recommendation: 'Based on your responses, your symptoms appear to be manageable with self-care. Monitor your condition and seek medical attention if symptoms worsen.',
+    recommendation:
+      'Based on your responses, your symptoms appear to be manageable with self-care. Monitor your condition and seek medical attention if symptoms worsen.',
     actions: [
       { id: 'self-care', title: 'Self-care tips', icon: 'heart-outline', primary: false },
       { id: 'schedule', title: 'Schedule check-up', icon: 'calendar-outline', primary: true },
@@ -34,7 +28,8 @@ const riskLevels = {
     icon: 'alert-circle',
     title: 'Moderate Risk',
     subtitle: 'Consider speaking with a doctor',
-    recommendation: 'Your symptoms may benefit from professional evaluation. We recommend scheduling a video consultation with a doctor within the next 24-48 hours.',
+    recommendation:
+      'Your symptoms may benefit from professional evaluation. We recommend scheduling a video consultation with a doctor within the next 24-48 hours.',
     actions: [
       { id: 'video', title: 'Video consult', icon: 'videocam-outline', primary: true },
       { id: 'schedule', title: 'Schedule visit', icon: 'calendar-outline', primary: false },
@@ -47,7 +42,8 @@ const riskLevels = {
     icon: 'warning',
     title: 'High Risk',
     subtitle: 'Seek medical attention soon',
-    recommendation: 'Your symptoms suggest you should see a healthcare provider today. Please schedule an urgent appointment or visit an urgent care facility.',
+    recommendation:
+      'Your symptoms suggest you should see a healthcare provider today. Please schedule an urgent appointment or visit an urgent care facility.',
     actions: [
       { id: 'urgent', title: 'Find urgent care', icon: 'location-outline', primary: true },
       { id: 'video', title: 'Video consult now', icon: 'videocam-outline', primary: false },
@@ -60,7 +56,8 @@ const riskLevels = {
     icon: 'alert',
     title: 'Emergency',
     subtitle: 'Call 911 immediately',
-    recommendation: 'Based on your responses, you may be experiencing a medical emergency. Please call 911 or go to your nearest emergency room immediately.',
+    recommendation:
+      'Based on your responses, you may be experiencing a medical emergency. Please call 911 or go to your nearest emergency room immediately.',
     actions: [
       { id: 'call-911', title: 'Call 911', icon: 'call', primary: true },
       { id: 'er', title: 'Find nearest ER', icon: 'location-outline', primary: false },
@@ -96,8 +93,11 @@ export default function AssessmentScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.navigate('MainTabs')}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing[3] }]}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => navigation.navigate('MainTabs')}
+        >
           <Icon name="close" size={24} color={Colors.gray[900]} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Assessment Summary</Text>
@@ -106,14 +106,16 @@ export default function AssessmentScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 32 + insets.bottom },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Risk Level Card */}
-        <View style={[styles.riskCard, { backgroundColor: riskInfo.bgColor, borderColor: riskInfo.borderColor }]}>
+        <View
+          style={[
+            styles.riskCard,
+            { backgroundColor: riskInfo.bgColor, borderColor: riskInfo.borderColor },
+          ]}
+        >
           <View style={[styles.riskIconContainer, { backgroundColor: riskInfo.color }]}>
             <Icon name={riskInfo.icon as any} size={32} color={Colors.white} />
           </View>
@@ -156,12 +158,14 @@ export default function AssessmentScreen() {
                 <Icon
                   name={action.icon as any}
                   size={20}
-                  color={action.primary ? Colors.white : Colors.purple[600]}
+                  color={action.primary ? Colors.white : Colors.primary[600]}
                 />
                 <Text
                   style={[
                     styles.actionButtonText,
-                    action.primary ? styles.actionButtonTextPrimary : styles.actionButtonTextSecondary,
+                    action.primary
+                      ? styles.actionButtonTextPrimary
+                      : styles.actionButtonTextSecondary,
                   ]}
                 >
                   {action.title}
@@ -175,7 +179,8 @@ export default function AssessmentScreen() {
         <View style={styles.disclaimer}>
           <Icon name="information-circle" size={16} color={Colors.blue[600]} />
           <Text style={styles.disclaimerText}>
-            This assessment is for informational purposes only and does not constitute medical advice. Always consult with a healthcare professional for medical decisions.
+            This assessment is for informational purposes only and does not constitute medical
+            advice. Always consult with a healthcare professional for medical decisions.
           </Text>
         </View>
 
@@ -209,7 +214,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '600',
     color: Colors.gray[900],
   },
@@ -293,13 +299,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
   },
   actionButtonPrimary: {
-    backgroundColor: Colors.purple[600],
+    backgroundColor: Colors.primary[600],
     ...Shadow.md,
   },
   actionButtonSecondary: {
     backgroundColor: Colors.white,
     borderWidth: 2,
-    borderColor: Colors.purple[200],
+    borderColor: Colors.primary[200],
   },
   actionButtonText: {
     fontSize: 16,
@@ -309,7 +315,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   actionButtonTextSecondary: {
-    color: Colors.purple[600],
+    color: Colors.primary[600],
   },
   disclaimer: {
     flexDirection: 'row',

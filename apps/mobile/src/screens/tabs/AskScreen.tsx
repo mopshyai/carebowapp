@@ -473,6 +473,9 @@ export default function AskCareBowScreen() {
                 keyboardType="numeric"
                 maxLength={3}
               />
+              <Text style={styles.fieldHint}>
+                Helps me provide safer guidance, especially for children and older adults.
+              </Text>
             </View>
 
             {/* Caregiver Presence Toggle */}
@@ -516,13 +519,6 @@ export default function AskCareBowScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
-            <View style={styles.infoBox}>
-              <Icon name="information-circle" size={16} color={colors.accent} />
-              <Text style={styles.infoText}>
-                Age helps me provide safer guidance, especially for children and older adults.
-              </Text>
             </View>
           </View>
         )}
@@ -569,17 +565,6 @@ export default function AskCareBowScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Helper text */}
-          <Text style={styles.inputHelperText}>
-            You can start anywhere — symptoms, worries, or something that feels small.
-          </Text>
-
-          {/* Image Permission Clarity */}
-          <Text style={styles.imagePermissionText}>
-            You can safely share photos (like rashes, swelling, or wounds) if that helps explain
-            things.
-          </Text>
 
           {inputMode === 'text' ? (
             <>
@@ -634,15 +619,11 @@ export default function AskCareBowScreen() {
               {/* Red Flag Warning (inline, below input) */}
               <RedFlagWarning visible={showRedFlagWarning} />
 
-              {/* Safe Space + Memory Signal */}
+              {/* Consolidated helper: privacy/memory + specificity + photo sharing */}
               <Text style={styles.safeSpaceSignal}>
-                Private • Judgment-free • I remember helpful details (like allergies or past issues)
-                to personalize care — you can edit or delete them anytime.
-              </Text>
-
-              <Text style={styles.inputHint}>
-                Be as specific as possible. Include when it started, how severe it is, and anything
-                you've tried.
+                Private • Judgment-free • Share photos if it helps, and be as specific as you can
+                (when it started, how severe, what you've tried) — I'll remember useful details to
+                personalize care, and you can edit or delete them anytime.
               </Text>
             </>
           ) : (
@@ -690,17 +671,6 @@ export default function AskCareBowScreen() {
           )}
         </View>
 
-        {/* Image Invitation Hints (non-interactive) */}
-        <View style={styles.imageInvitationSection}>
-          <Text style={styles.imageInvitationTitle}>You can also share:</Text>
-          <View style={styles.imageInvitationList}>
-            <Text style={styles.imageInvitationItem}>📸 Rash / skin issue</Text>
-            <Text style={styles.imageInvitationItem}>🤕 Pain or swelling</Text>
-            <Text style={styles.imageInvitationItem}>🫁 Breathing or chest issue</Text>
-            <Text style={styles.imageInvitationItem}>🧠 Stress or anxiety</Text>
-          </View>
-        </View>
-
         {/* Health Buddy Starter Prompts (improved) */}
         <View style={styles.examplesSection}>
           <Text style={styles.examplesTitle}>Try something like:</Text>
@@ -734,9 +704,9 @@ export default function AskCareBowScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Disclaimer */}
+        {/* Disclaimer — quiet persistent footnote, not a shouted last-second warning */}
         <View style={styles.disclaimer}>
-          <Icon name="warning" size={16} color={colors.warning} />
+          <Icon name="information-circle-outline" size={14} color={colors.textTertiary} />
           <Text style={styles.disclaimerText}>
             For emergencies, call <Text style={styles.disclaimerBold}>911</Text> immediately.
             CareBow is not a substitute for emergency services or professional medical advice.
@@ -789,11 +759,11 @@ const styles = StyleSheet.create({
   },
   memoryBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
@@ -803,7 +773,6 @@ const styles = StyleSheet.create({
   memoryBadgeText: {
     ...typography.tiny,
     color: colors.textInverse,
-    fontSize: 10,
   },
   headerIcon: {
     width: 56,
@@ -847,7 +816,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   labelRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
@@ -871,11 +840,11 @@ const styles = StyleSheet.create({
   },
   imageCountBadge: {
     position: 'absolute',
-    top: -2,
+    top: -4,
     right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
@@ -883,7 +852,6 @@ const styles = StyleSheet.create({
   imageCountText: {
     ...typography.tiny,
     color: colors.textInverse,
-    fontSize: 9,
   },
   section: {
     marginBottom: spacing.lg,
@@ -896,6 +864,8 @@ const styles = StyleSheet.create({
   labelNoMargin: {
     ...typography.label,
     color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.sm,
   },
   required: {
     color: colors.error,
@@ -954,6 +924,10 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textPrimary,
   },
+  fieldHint: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
   selectButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -996,7 +970,7 @@ const styles = StyleSheet.create({
   },
   pickerOptionTextActive: {
     color: colors.accent,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   ageInput: {
     backgroundColor: colors.surface,
@@ -1037,21 +1011,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '500',
   },
-  infoBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.accentSoft,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs,
-  },
-  infoText: {
-    flex: 1,
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
   inputContainer: {
     position: 'relative',
     marginBottom: spacing.xs,
@@ -1064,7 +1023,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.md + 40, // Extra padding for voice button
-    paddingRight: spacing.md + 50, // Extra padding on right for voice button
+    paddingRight: 64, // Extra padding on right for voice button
     ...typography.body,
     color: colors.textPrimary,
     minHeight: 140,
@@ -1086,21 +1045,6 @@ const styles = StyleSheet.create({
   voiceInputButtonActive: {
     backgroundColor: colors.errorSoft,
     borderColor: colors.error,
-  },
-  inputHint: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
-  inputHelperText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    fontStyle: 'italic',
-  },
-  imagePermissionText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    marginBottom: spacing.sm,
   },
   safeSpaceSignal: {
     ...typography.tiny,
@@ -1124,23 +1068,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.accent,
     flex: 1,
-  },
-  imageInvitationSection: {
-    marginBottom: spacing.md,
-  },
-  imageInvitationTitle: {
-    ...typography.labelSmall,
-    color: colors.textTertiary,
-    marginBottom: spacing.xs,
-  },
-  imageInvitationList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  imageInvitationItem: {
-    ...typography.caption,
-    color: colors.textSecondary,
   },
   examplesSection: {
     marginBottom: spacing.lg,
@@ -1196,11 +1123,7 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
   },
   disclaimer: {
-    backgroundColor: colors.warningSoft,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    borderRadius: radius.md,
-    padding: spacing.md,
+    paddingHorizontal: spacing.xs,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.xs,
@@ -1208,12 +1131,12 @@ const styles = StyleSheet.create({
   disclaimerText: {
     flex: 1,
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     lineHeight: 18,
   },
   disclaimerBold: {
-    fontWeight: '700',
-    color: colors.textPrimary,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
   voiceInputContainer: {
     gap: spacing.md,
@@ -1288,6 +1211,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 10,
+    gap: spacing.sm,
   },
 });

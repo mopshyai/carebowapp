@@ -20,6 +20,8 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { authApi } from '../../services/api/endpoints/auth';
 import { Gender, generateId } from '../../types/profile';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
@@ -36,6 +38,8 @@ export default function PersonalInfoScreen() {
   const user = useProfileStore((state) => state.user);
   const setUser = useProfileStore((state) => state.setUser);
   const updateUser = useProfileStore((state) => state.updateUser);
+  const authUser = useAuthStore((state) => state.user);
+  const updateAuthUser = useAuthStore((state) => state.updateUser);
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
@@ -66,11 +70,7 @@ export default function PersonalInfoScreen() {
       newErrors.firstName = 'First name is required';
     }
 
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
+    // Email is read-only (account identity), no validation needed here.
 
     if (phone && !/^[\d\s\-\+\(\)]+$/.test(phone)) {
       newErrors.phone = 'Please enter a valid phone number';
@@ -86,7 +86,16 @@ export default function PersonalInfoScreen() {
     setIsSaving(true);
     try {
       const now = new Date().toISOString();
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
+      // Persist name/phone to the backend (v1, JWT). Email is the account
+      // identity set at signup and is not editable here.
+      if (authUser) {
+        await authApi.updateProfile({ name: fullName, phoneNumber: phone.trim() || undefined });
+        updateAuthUser({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() });
+      }
+
+      // Mirror into the profile store (local profile-specific fields too).
       if (user) {
         updateUser({
           firstName: firstName.trim(),
@@ -98,7 +107,7 @@ export default function PersonalInfoScreen() {
         });
       } else {
         setUser({
-          id: generateId(),
+          id: authUser?.id || generateId(),
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: email.trim(),
@@ -114,7 +123,7 @@ export default function PersonalInfoScreen() {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to save. Please try again.');
+      Alert.alert('Error', 'Could not save to the server. Please check your connection and try again.');
     } finally {
       setIsSaving(false);
     }
@@ -138,7 +147,7 @@ export default function PersonalInfoScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.headerButton} onPress={handleBack}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -204,20 +213,14 @@ export default function PersonalInfoScreen() {
               />
             </View>
 
-            {/* Email */}
+            {/* Email — account identity, set at signup, not editable here */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email *</Text>
-              <TextInput
-                style={[styles.input, errors.email && styles.inputError]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="Enter email address"
-                placeholderTextColor={colors.textTertiary}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+              <Text style={styles.label}>Email</Text>
+              <View style={[styles.input, styles.inputReadOnly]}>
+                <Text style={styles.inputReadOnlyText}>{email || '—'}</Text>
+                <Icon name="lock-closed" size={16} color={colors.textTertiary} />
+              </View>
+              <Text style={styles.helperText}>This is the email you signed up with.</Text>
             </View>
 
             {/* Phone */}
@@ -315,7 +318,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   headerTitle: {
-    ...typography.h4,
+    ...typography.h3,
   },
   saveText: {
     ...typography.label,
@@ -378,6 +381,17 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: colors.error,
+  },
+  inputReadOnly: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.accentMuted,
+  },
+  inputReadOnlyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    flex: 1,
   },
   errorText: {
     ...typography.caption,

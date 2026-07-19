@@ -10,12 +10,13 @@ import type { RootStackParamList } from './types';
 import { colors } from '@/theme';
 
 // Auth Store
-import { useAuthStore } from '@/store/useAuthStore';
+import { useAuthStore, isProviderUserType } from '@/store/useAuthStore';
 
 // Navigators
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import TabNavigator from './TabNavigator';
+import MemberTabNavigator from './MemberTabNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SafetyStackNavigator from './SafetyStackNavigator';
 
@@ -47,6 +48,20 @@ import AssessmentResultScreen from '../screens/entries/AssessmentResultScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 /**
+ * MainTabs router — picks the tab experience by authenticated user type.
+ * Customers get the original consumer TabNavigator (route name kept stable so
+ * existing navigate('MainTabs') calls still land correctly). The 3 provider
+ * types get the shared MemberTabNavigator.
+ */
+function MainTabsRouter() {
+  const userType = useAuthStore((state) => state.userType);
+  if (userType === 'healthcare_provider' || userType === 'service_provider' || userType === 'service_partner') {
+    return <MemberTabNavigator />;
+  }
+  return <TabNavigator />;
+}
+
+/**
  * Loading screen shown during hydration
  */
 function LoadingScreen() {
@@ -60,6 +75,7 @@ function LoadingScreen() {
 export default function RootNavigator() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasCompletedOnboarding = useAuthStore((state) => state.hasCompletedOnboarding);
+  const userType = useAuthStore((state) => state.userType);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
 
   // Show loading while store is hydrating
@@ -67,12 +83,17 @@ export default function RootNavigator() {
     return <LoadingScreen />;
   }
 
+  // Providers (healthcare_provider / service_provider / service_partner) skip
+  // the customer onboarding flow (symptom slides, role selection, care recipient).
+  const isProvider = isProviderUserType(userType);
+  const showOnboarding = isAuthenticated && !hasCompletedOnboarding && !isProvider;
+
   // Determine initial route based on auth state
   const getInitialRoute = (): keyof RootStackParamList => {
     if (!isAuthenticated) {
       return 'Auth';
     }
-    if (!hasCompletedOnboarding) {
+    if (showOnboarding) {
       return 'Onboarding';
     }
     return 'MainTabs';
@@ -94,8 +115,9 @@ export default function RootNavigator() {
         />
       ) : (
         <>
-          {/* Onboarding Flow - shown after auth but before completing onboarding */}
-          {!hasCompletedOnboarding && (
+          {/* Onboarding Flow - shown after auth but before completing onboarding.
+              Skipped entirely for provider user types. */}
+          {showOnboarding && (
             <Stack.Screen
               name="Onboarding"
               component={OnboardingNavigator}
@@ -105,8 +127,9 @@ export default function RootNavigator() {
             />
           )}
 
-          {/* Main App - shown when authenticated and onboarding complete */}
-          <Stack.Screen name="MainTabs" component={TabNavigator} />
+          {/* Main App - shown when authenticated and onboarding complete.
+              Routes to customer tabs or provider tabs based on user type. */}
+          <Stack.Screen name="MainTabs" component={MainTabsRouter} />
 
           {/* Symptom Entry Flow (PRD V1) */}
           <Stack.Screen
