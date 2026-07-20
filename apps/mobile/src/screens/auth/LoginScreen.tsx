@@ -33,7 +33,10 @@ export default function LoginScreen() {
     login,
     chooseLoginProfile,
     cancelProfileSelection,
+    dismissPasswordSetup,
     availableProfiles,
+    passwordSetupEmail,
+    requestPasswordReset,
     isLoading,
     error,
     clearError,
@@ -44,6 +47,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [setupEmailSent, setSetupEmailSent] = useState(false);
+
+  const handlePasswordSetup = async () => {
+    if (!passwordSetupEmail) return;
+    const sent = await requestPasswordReset(passwordSetupEmail);
+    if (sent) setSetupEmailSent(true);
+  };
 
   const validateEmail = (value: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -88,6 +98,68 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Modal
+        visible={Boolean(passwordSetupEmail)}
+        transparent
+        animationType="slide"
+        onRequestClose={dismissPasswordSetup}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.profileSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.passwordSetupIcon}>
+              <Icon name="key" size={24} color={colors.accent} />
+            </View>
+            <Text style={styles.profileSheetTitle}>Add email sign-in</Text>
+            <Text style={styles.passwordSetupDescription}>
+              This email is already connected to Google. Create one password so the same account
+              works on CareBow web and mobile.
+            </Text>
+            <View style={styles.googleConnectedRow}>
+              <Icon name="check-circle" size={18} color={colors.success} />
+              <Text style={styles.googleConnectedText}>Google sign-in will stay connected</Text>
+            </View>
+
+            {error ? (
+              <View style={styles.setupError}>
+                <Icon name="alert-circle" size={16} color={colors.error} />
+                <Text style={styles.apiErrorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {setupEmailSent ? (
+              <View style={styles.setupSuccess}>
+                <Text style={styles.setupSuccessTitle}>Check your email</Text>
+                <Text style={styles.setupSuccessText}>
+                  Open the secure link to create your password, then return here to sign in.
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [styles.setupButton, pressed && styles.buttonPressed]}
+                onPress={handlePasswordSetup}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.textInverse} />
+                ) : (
+                  <Text style={styles.setupButtonText}>Email me a setup link</Text>
+                )}
+              </Pressable>
+            )}
+
+            <Pressable
+              style={styles.setupCancelButton}
+              onPress={() => {
+                setSetupEmailSent(false);
+                dismissPasswordSetup();
+              }}
+            >
+              <Text style={styles.setupCancelText}>Not now</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={availableProfiles.length > 0}
         transparent
@@ -370,6 +442,81 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  passwordSetupIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentMuted,
+    marginBottom: spacing.md,
+  },
+  passwordSetupDescription: {
+    ...typography.body,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginTop: spacing.sm,
+  },
+  googleConnectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.successSoft,
+  },
+  googleConnectedText: {
+    ...typography.bodySmall,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  setupButton: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    marginTop: spacing.lg,
+  },
+  setupButtonText: {
+    ...typography.label,
+    color: colors.textInverse,
+  },
+  setupCancelButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  setupCancelText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  setupSuccess: {
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentMuted,
+  },
+  setupError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorSoft,
+  },
+  setupSuccessTitle: {
+    ...typography.label,
+    color: colors.accent,
+  },
+  setupSuccessText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   scrollContent: {
     flexGrow: 1,

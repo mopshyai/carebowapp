@@ -65,6 +65,7 @@ interface AuthState {
   // Which of the 4 backend user types this account belongs to
   userType: UserTypeSlug;
   availableProfiles: AccessProfileSummary[];
+  passwordSetupEmail: string | null;
 
   // Session
   accessToken: string | null;
@@ -87,6 +88,7 @@ interface AuthActions {
   login: (email: string, password: string, userTypeSlug?: UserTypeSlug) => Promise<boolean>;
   chooseLoginProfile: (userTypeSlug: UserTypeSlug) => Promise<boolean>;
   cancelProfileSelection: () => void;
+  dismissPasswordSetup: () => void;
   signup: (data: SignupData) => Promise<boolean>;
   logout: () => Promise<void>;
 
@@ -139,6 +141,7 @@ const initialState: AuthState = {
   isLoading: false,
   userType: 'customer',
   availableProfiles: [],
+  passwordSetupEmail: null,
   accessToken: null,
   refreshToken: null,
   hasCompletedOnboarding: false,
@@ -294,12 +297,21 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
             error: null,
             availableProfiles: [],
+            passwordSetupEmail: null,
           });
           pendingLoginCredentials = null;
           syncProfileStore(user);
 
           return true;
         } catch (error) {
+          if (error instanceof ApiError && error.status === 409) {
+            set({
+              isLoading: false,
+              error: null,
+              passwordSetupEmail: email.trim().toLowerCase(),
+            });
+            return false;
+          }
           set({
             isLoading: false,
             error: messageFromError(error, 'Login failed. Please try again.'),
@@ -323,6 +335,10 @@ export const useAuthStore = create<AuthStore>()(
       cancelProfileSelection: () => {
         pendingLoginCredentials = null;
         set({ availableProfiles: [], error: null });
+      },
+
+      dismissPasswordSetup: () => {
+        set({ passwordSetupEmail: null, error: null });
       },
 
       signup: async (data: SignupData) => {
