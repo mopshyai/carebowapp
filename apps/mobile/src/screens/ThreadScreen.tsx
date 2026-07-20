@@ -15,99 +15,26 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
 
-const conversationsData: Record<
-  string,
-  {
-    name: string;
-    initials: string;
-    role: string;
-    online: boolean;
-    avatarColor: string;
-    messages: Array<{
-      id: string;
-      type: 'sent' | 'received';
-      content: string;
-      timestamp: string;
-    }>;
-  }
-> = {
-  '1': {
-    name: 'Dr. Sarah Chen',
-    initials: 'SC',
-    role: 'General Practitioner',
-    online: true,
-    avatarColor: Colors.primary[500],
-    messages: [
-      {
-        id: '1',
-        type: 'received',
-        content: 'Hello! How can I help you today?',
-        timestamp: '9:30 AM',
-      },
-      {
-        id: '2',
-        type: 'sent',
-        content: 'Hi Dr. Chen, I wanted to ask about my recent test results.',
-        timestamp: '9:32 AM',
-      },
-      {
-        id: '3',
-        type: 'received',
-        content: 'Of course! I reviewed your results this morning. Everything looks good overall.',
-        timestamp: '9:35 AM',
-      },
-      {
-        id: '4',
-        type: 'received',
-        content: 'Your test results look good. Continue with the prescribed medication.',
-        timestamp: '9:36 AM',
-      },
-    ],
-  },
-  '2': {
-    name: 'Dr. James Wilson',
-    initials: 'JW',
-    role: 'Cardiologist',
-    online: false,
-    avatarColor: Colors.blue[500],
-    messages: [
-      {
-        id: '1',
-        type: 'received',
-        content: 'Your cardiac assessment was successful.',
-        timestamp: 'Yesterday',
-      },
-      {
-        id: '2',
-        type: 'sent',
-        content: 'Thank you, Doctor. When should I schedule my follow-up?',
-        timestamp: 'Yesterday',
-      },
-      {
-        id: '3',
-        type: 'received',
-        content: 'Please schedule a follow-up in 2 weeks.',
-        timestamp: 'Yesterday',
-      },
-    ],
-  },
-  '3': {
-    name: 'CareBow Support',
-    initials: 'CB',
-    role: 'Care Team',
-    online: true,
-    avatarColor: Colors.pink[600],
-    messages: [
-      {
-        id: '1',
-        type: 'received',
-        content: "Welcome to CareBow! We're here to help you with any questions.",
-        timestamp: '2 days ago',
-      },
-      { id: '2', type: 'received', content: 'How can we help you today?', timestamp: 'Yesterday' },
-    ],
-  },
-};
+// A thread is only rendered when a real messaging API supplies it. Keeping
+// this empty prevents demo clinicians and fabricated medical messages from
+// appearing in production builds.
+interface ConversationMessage {
+  id: string;
+  type: 'sent' | 'received';
+  content: string;
+  timestamp: string;
+}
+
+interface ConversationData {
+  name: string;
+  initials: string;
+  role: string;
+  online: boolean;
+  avatarColor: string;
+  messages: ConversationMessage[];
+}
+
+const conversationsData: Record<string, ConversationData | undefined> = {};
 
 export default function ThreadScreen() {
   const insets = useSafeAreaInsets();
@@ -148,8 +75,15 @@ export default function ThreadScreen() {
 
   if (!conversation) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <Text>Conversation not found</Text>
+      <View style={[styles.container, styles.unavailableContainer, { paddingTop: insets.top }]}>
+        <Icon name="chatbubbles-outline" size={48} color={Colors.gray[400]} />
+        <Text style={styles.unavailableTitle}>No conversation found</Text>
+        <Text style={styles.unavailableText}>
+          Care-team messages will appear here once a real conversation has started.
+        </Text>
+        <TouchableOpacity style={styles.unavailableButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.unavailableButtonText}>Go back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -247,6 +181,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.gray[50],
+  },
+  unavailableContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing[6],
+  },
+  unavailableTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.gray[900],
+    marginTop: Spacing[4],
+  },
+  unavailableText: {
+    color: Colors.gray[600],
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: Spacing[2],
+  },
+  unavailableButton: {
+    marginTop: Spacing[5],
+    minHeight: 44,
+    paddingHorizontal: Spacing[5],
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unavailableButtonText: {
+    color: Colors.white,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

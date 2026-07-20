@@ -79,6 +79,7 @@ export const authApi = {
         method: data.method,
         email: data.email,
         password: data.password,
+        ...(data.userTypeSlug ? { userTypeSlug: data.userTypeSlug } : {}),
       },
       {
         skipAuth: true,
@@ -122,6 +123,27 @@ export const authApi = {
       await ApiClient.setTokens(tokens);
     }
 
+    return response.data;
+  },
+
+  /**
+   * Request a one-time sign-in code for an EXISTING account (passwordless).
+   * Drives the "Forgot password?" recovery flow: the backend has no password-
+   * reset endpoint, but supports EMAIL_OTP login — hitting /v1/auth/login with
+   * method 'email-otp' emails a code, which is then confirmed via verifyEmail.
+   * Returns {success:true} with no tokens; caller then calls verifyEmail(code).
+   */
+  requestEmailCode: async (email: string): Promise<AuthEnvelope> => {
+    const response = await ApiClient.post<AuthEnvelope>(
+      '/v1/auth/login',
+      {
+        method: 'email-otp',
+        email,
+      },
+      {
+        skipAuth: true,
+      }
+    );
     return response.data;
   },
 

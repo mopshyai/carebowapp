@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
-import { formatPrice, defaultTimeSlots } from '../data/catalog';
+import { formatPrice } from '../data/catalog';
 import { StarRating } from '../components/ui/StarRating';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../components/icons';
 import { PackageSelectorList } from '../components/ui/PackageSelectorList';
@@ -32,16 +32,15 @@ import { QuantityStepper } from '../components/ui/QuantityStepper';
 import {
   getServiceById,
   getCategoryByServiceId,
-  mockMembers,
   calculatePrice,
   defaultTimeSlots as serviceTimeSlots,
 } from '../data/services';
-import { Service, Member, PackageOption } from '../data/types';
+import { Member, PackageOption } from '../data/types';
 import { useCartStore } from '../store/useCartStore';
 import { useRequestsStore } from '../store/requestsStore';
-import { processBookingFee } from '../utils/mockPayment';
 import { buildBookingCore } from '../lib/bookingDraft';
-import { BookingDraftInput, PricingModelType, money } from '../types/booking';
+import { BookingDraftInput, PricingModelType } from '../types/booking';
+import { useMembers } from '../store/useProfileStore';
 
 // Icon mapping for service categories
 const getServiceIcon = (imageKey: string): IconName => {
@@ -71,14 +70,18 @@ export default function ServiceDetailsScreen() {
   const { id } = (route.params as { id: string }) || {};
 
   // Store hooks
-  const {
-    bookingDraft,
-    initBookingDraft,
-    updateBookingDraft,
-    clearBookingDraft,
-  } = useCartStore();
+  const { bookingDraft, initBookingDraft, updateBookingDraft, clearBookingDraft } = useCartStore();
   const createRequest = useRequestsStore((state) => state.createRequest);
-  const markBookingFeePaid = useRequestsStore((state) => state.markBookingFeePaid);
+  const profileMembers = useMembers();
+  const bookingMembers = useMemo<Member[]>(
+    () =>
+      profileMembers.map((member) => ({
+        id: member.id,
+        name: [member.firstName, member.lastName].filter(Boolean).join(' '),
+        relationship: member.relationship,
+      })),
+    [profileMembers]
+  );
 
   // Local state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -218,31 +221,7 @@ export default function ServiceDetailsScreen() {
     setIsProcessing(true);
 
     try {
-      const hasBookingFee =
-        service.pricing.type === 'quote' &&
-        service.pricing.bookingFee &&
-        service.fulfillment.allowBookingFee;
-
-      if (hasBookingFee && service.pricing.type === 'quote' && service.pricing.bookingFee) {
-        const bookingFee = service.pricing.bookingFee;
-        Alert.alert(
-          'Priority Processing',
-          `Pay ${formatPrice(bookingFee)} booking fee to get priority response within 2 hours.`,
-          [
-            {
-              text: 'Submit without fee',
-              style: 'cancel',
-              onPress: () => submitRequestWithoutFee(),
-            },
-            {
-              text: `Pay ${formatPrice(bookingFee)}`,
-              onPress: () => submitRequestWithFee(bookingFee),
-            },
-          ]
-        );
-      } else {
-        await submitRequestWithoutFee();
-      }
+      await submitRequestWithoutFee();
     } catch (error) {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
@@ -263,7 +242,9 @@ export default function ServiceDetailsScreen() {
     let packagePrice: number | undefined;
     let packageOriginalPrice: number | undefined;
     if (service.pricing.type === 'packages' && bookingDraft.selectedPackageId) {
-      const selectedPkg = service.pricing.packages.find(p => p.id === bookingDraft.selectedPackageId);
+      const selectedPkg = service.pricing.packages.find(
+        (p) => p.id === bookingDraft.selectedPackageId
+      );
       if (selectedPkg) {
         packagePrice = selectedPkg.price;
         packageOriginalPrice = selectedPkg.originalPrice;
@@ -293,7 +274,8 @@ export default function ServiceDetailsScreen() {
         hourlyRate: service.pricing.type === 'hourly' ? service.pricing.hourlyRate : undefined,
         dailyRate: service.pricing.type === 'daily' ? service.pricing.dailyRate : undefined,
         fixedPrice: service.pricing.type === 'fixed' ? service.pricing.price : undefined,
-        fixedOriginalPrice: service.pricing.type === 'fixed' ? service.pricing.originalPrice : undefined,
+        fixedOriginalPrice:
+          service.pricing.type === 'fixed' ? service.pricing.originalPrice : undefined,
       },
     };
 
@@ -322,39 +304,6 @@ export default function ServiceDetailsScreen() {
     }
   };
 
-  const submitRequestWithFee = async (bookingFeeAmount: number) => {
-    if (!bookingDraft || !service) return;
-
-    setIsProcessing(true);
-
-    try {
-      const bookingCore = buildBookingCoreFromDraft();
-      if (!bookingCore) {
-        Alert.alert('Error', 'Failed to create booking.');
-        return;
-      }
-
-      const request = createRequest(bookingCore);
-      const result = await processBookingFee(bookingFeeAmount);
-
-      if (result.success && result.paymentInfo) {
-        markBookingFeePaid(request.id, result.paymentInfo.paymentId, money(bookingFeeAmount));
-
-        Alert.alert(
-          'Priority Request Submitted',
-          `Your request has been submitted with priority status. We'll respond within 2 hours with available options.`,
-          [{ text: 'View Requests', onPress: () => navigation.navigate('Requests') }]
-        );
-      } else {
-        Alert.alert('Payment Failed', result.error || 'Please try again.');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Payment processing failed. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   // Error state
   if (!service) {
     return (
@@ -371,7 +320,6 @@ export default function ServiceDetailsScreen() {
   }
 
   const icon = getServiceIcon(service.image);
-  const isCheckoutService = service.fulfillment.mode === 'checkout';
   const isOnRequestService = service.fulfillment.mode === 'on_request';
   const availableSlots = service.booking.availableTimeSlots || serviceTimeSlots;
 
@@ -383,7 +331,7 @@ export default function ServiceDetailsScreen() {
   if (isOnRequestService) {
     buttonLabel = 'Submit request';
     buttonAction = handleSubmitRequest;
-    confirmationNote = "Our team will review and respond within 2-4 hours";
+    confirmationNote = 'Our team will review and respond within 2-4 hours';
   }
 
   return (
@@ -405,219 +353,239 @@ export default function ServiceDetailsScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 140 + insets.bottom },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Section */}
-        <View style={styles.heroContainer}>
-          <IconContainer
-            size="xl"
-            variant="soft"
-            backgroundColor={getIconColors(icon).background}
-            style={styles.heroIconWrap}
-          >
-            <AppIcon name={icon} size={48} color={getIconColors(icon).primary} fillOpacity={0.2} />
-          </IconContainer>
-        </View>
-
-        {/* Service Info */}
-        <View style={styles.infoContainer}>
-          {category && <Text style={styles.categoryLabel}>{category.title}</Text>}
-          <Text style={styles.serviceTitle}>{service.title}</Text>
-          <View style={styles.ratingRow}>
-            <StarRating
-              rating={service.rating}
-              size={16}
-              showReviewCount
-              reviewCount={service.reviewCount}
-            />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 140 + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero Section */}
+          <View style={styles.heroContainer}>
+            <IconContainer
+              size="xl"
+              variant="soft"
+              backgroundColor={getIconColors(icon).background}
+              style={styles.heroIconWrap}
+            >
+              <AppIcon
+                name={icon}
+                size={48}
+                color={getIconColors(icon).primary}
+                fillOpacity={0.2}
+              />
+            </IconContainer>
           </View>
-          <Text style={styles.tagline}>{service.shortTagline}</Text>
-        </View>
 
-        {/* Member Selection */}
-        {service.booking.requiresMember && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Who is this for?</Text>
-            <Text style={styles.sectionHint}>Select the family member receiving care</Text>
-            <MemberPicker
-              members={mockMembers}
-              selectedMemberId={bookingDraft?.memberId || null}
-              onSelectMember={handleSelectMember}
-            />
-          </View>
-        )}
-
-        {/* Date Selection */}
-        {service.booking.requiresDate && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select date</Text>
-            <Text style={styles.sectionHint}>Choose your preferred appointment date</Text>
-            <HorizontalDatePicker
-              selectedDate={bookingDraft?.date || null}
-              onSelectDate={handleSelectDate}
-              daysToShow={service.booking.maxDaysAhead || 14}
-            />
-          </View>
-        )}
-
-        {/* Time Selection */}
-        {service.booking.requiresTime && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select time</Text>
-            <Text style={styles.sectionHint}>Available slots for your selected date</Text>
-            <TimePicker
-              availableSlots={availableSlots}
-              selectedTime={bookingDraft?.startTime || null}
-              onSelectTime={handleSelectTime}
-            />
-          </View>
-        )}
-
-        {/* Package Selection */}
-        {service.pricing.type === 'packages' && service.pricing.packages.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose a package</Text>
-            <Text style={styles.sectionHint}>Select the option that best fits your needs</Text>
-            <PackageSelectorList
-              packages={service.pricing.packages}
-              selectedPackageId={bookingDraft?.selectedPackageId || null}
-              onSelectPackage={handleSelectPackage}
-            />
-          </View>
-        )}
-
-        {/* Hourly Selection */}
-        {service.pricing.type === 'hourly' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose duration</Text>
-            <Text style={styles.sectionHint}>Select how many hours you need</Text>
-            <QuantityStepper
-              value={bookingDraft?.hours || service.pricing.minHours}
-              onChange={handleHoursChange}
-              min={service.pricing.minHours}
-              max={service.pricing.maxHours}
-              unit="hour"
-              rate={service.pricing.hourlyRate}
-              showTotal
-            />
-          </View>
-        )}
-
-        {/* Daily Selection */}
-        {service.pricing.type === 'daily' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose duration</Text>
-            <Text style={styles.sectionHint}>Select the number of days</Text>
-            <QuantityStepper
-              value={bookingDraft?.days || service.pricing.minDays}
-              onChange={handleDaysChange}
-              min={service.pricing.minDays}
-              max={service.pricing.maxDays}
-              unit="day"
-              rate={service.pricing.dailyRate}
-              showTotal
-            />
-          </View>
-        )}
-
-        {/* Fixed Price Display */}
-        {service.pricing.type === 'fixed' && (
-          <View style={styles.section}>
-            <View style={styles.fixedPriceCard}>
-              <Text style={styles.fixedPriceLabel}>Service fee</Text>
-              <View style={styles.fixedPriceRow}>
-                <Text style={styles.fixedPrice}>{formatPrice(service.pricing.price)}</Text>
-                {service.pricing.originalPrice && (
-                  <Text style={styles.fixedOriginalPrice}>
-                    {formatPrice(service.pricing.originalPrice)}
-                  </Text>
-                )}
-              </View>
+          {/* Service Info */}
+          <View style={styles.infoContainer}>
+            {category && <Text style={styles.categoryLabel}>{category.title}</Text>}
+            <Text style={styles.serviceTitle}>{service.title}</Text>
+            <View style={styles.ratingRow}>
+              <StarRating
+                rating={service.rating}
+                size={16}
+                showReviewCount
+                reviewCount={service.reviewCount}
+              />
             </View>
+            <Text style={styles.tagline}>{service.shortTagline}</Text>
           </View>
-        )}
 
-        {/* Quote-based Pricing */}
-        {service.pricing.type === 'quote' && (
-          <View style={styles.section}>
-            <View style={styles.quoteCard}>
-              <View style={styles.quoteIconWrap}>
-                <AppIcon name="messages" size={24} color={colors.accent} />
-              </View>
-              <Text style={styles.quoteTitle}>Custom pricing</Text>
-              <Text style={styles.quoteText}>
-                Tell us what you need and we'll provide a personalized quote based on your requirements.
-              </Text>
-              {service.pricing.bookingFee && (
-                <View style={styles.bookingFeeNote}>
-                  <AppIcon name="flash" size={14} color={colors.warning} fillOpacity={0.2} />
-                  <Text style={styles.bookingFeeText}>
-                    {formatPrice(service.pricing.bookingFee)} booking fee for priority response
-                  </Text>
-                </View>
+          {/* Member Selection */}
+          {service.booking.requiresMember && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Who is this for?</Text>
+              <Text style={styles.sectionHint}>Select the family member receiving care</Text>
+              {bookingMembers.length > 0 ? (
+                <MemberPicker
+                  members={bookingMembers}
+                  selectedMemberId={bookingDraft?.memberId || null}
+                  onSelectMember={handleSelectMember}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={styles.emptyMemberCard}
+                  onPress={() => navigation.navigate('Profile', { screen: 'FamilyMembers' })}
+                >
+                  <AppIcon name="user" size={20} color={colors.accent} />
+                  <View style={styles.emptyMemberText}>
+                    <Text style={styles.emptyMemberTitle}>Add a care recipient</Text>
+                    <Text style={styles.sectionHint}>
+                      Create a real family profile before booking.
+                    </Text>
+                  </View>
+                  <AppIcon name="chevron-right" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
               )}
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Request Notes */}
-        {service.request?.enabled && (
-          <View style={styles.section}>
-            <RequestTextArea
-              value={bookingDraft?.requestNotes || ''}
-              onChangeText={handleRequestNotesChange}
-              placeholder={service.request?.placeholder || 'Any special requirements...'}
-              label={service.request?.required ? 'Describe your needs' : 'Additional notes (optional)'}
-            />
-          </View>
-        )}
+          {/* Date Selection */}
+          {service.booking.requiresDate && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Select date</Text>
+              <Text style={styles.sectionHint}>Choose your preferred appointment date</Text>
+              <HorizontalDatePicker
+                selectedDate={bookingDraft?.date || null}
+                onSelectDate={handleSelectDate}
+                daysToShow={service.booking.maxDaysAhead || 14}
+              />
+            </View>
+          )}
 
-        {/* Confirmation Note */}
-        <View style={styles.confirmationNote}>
-          <AppIcon name="check-circle" size={18} color={colors.success} fillOpacity={0.2} />
-          <Text style={styles.confirmationText}>{confirmationNote}</Text>
-        </View>
+          {/* Time Selection */}
+          {service.booking.requiresTime && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Select time</Text>
+              <Text style={styles.sectionHint}>Available slots for your selected date</Text>
+              <TimePicker
+                availableSlots={availableSlots}
+                selectedTime={bookingDraft?.startTime || null}
+                onSelectTime={handleSelectTime}
+              />
+            </View>
+          )}
 
-        {/* Description */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About this service</Text>
-          <Text style={styles.description}>{service.description}</Text>
-        </View>
+          {/* Package Selection */}
+          {service.pricing.type === 'packages' && service.pricing.packages.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Choose a package</Text>
+              <Text style={styles.sectionHint}>Select the option that best fits your needs</Text>
+              <PackageSelectorList
+                packages={service.pricing.packages}
+                selectedPackageId={bookingDraft?.selectedPackageId || null}
+                onSelectPackage={handleSelectPackage}
+              />
+            </View>
+          )}
 
-        {/* Benefits */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What's included</Text>
-          <View style={styles.benefitsList}>
-            {service.benefits.map((benefit, index) => (
-              <View key={index} style={styles.benefitItem}>
-                <View style={styles.benefitIcon}>
-                  <AppIcon name="check-circle" size={20} color={colors.success} fillOpacity={0.2} />
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
+          {/* Hourly Selection */}
+          {service.pricing.type === 'hourly' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Choose duration</Text>
+              <Text style={styles.sectionHint}>Select how many hours you need</Text>
+              <QuantityStepper
+                value={bookingDraft?.hours || service.pricing.minHours}
+                onChange={handleHoursChange}
+                min={service.pricing.minHours}
+                max={service.pricing.maxHours}
+                unit="hour"
+                rate={service.pricing.hourlyRate}
+                showTotal
+              />
+            </View>
+          )}
+
+          {/* Daily Selection */}
+          {service.pricing.type === 'daily' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Choose duration</Text>
+              <Text style={styles.sectionHint}>Select the number of days</Text>
+              <QuantityStepper
+                value={bookingDraft?.days || service.pricing.minDays}
+                onChange={handleDaysChange}
+                min={service.pricing.minDays}
+                max={service.pricing.maxDays}
+                unit="day"
+                rate={service.pricing.dailyRate}
+                showTotal
+              />
+            </View>
+          )}
+
+          {/* Fixed Price Display */}
+          {service.pricing.type === 'fixed' && (
+            <View style={styles.section}>
+              <View style={styles.fixedPriceCard}>
+                <Text style={styles.fixedPriceLabel}>Service fee</Text>
+                <View style={styles.fixedPriceRow}>
+                  <Text style={styles.fixedPrice}>{formatPrice(service.pricing.price)}</Text>
+                  {service.pricing.originalPrice && (
+                    <Text style={styles.fixedOriginalPrice}>
+                      {formatPrice(service.pricing.originalPrice)}
+                    </Text>
+                  )}
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
+            </View>
+          )}
 
-      {/* Sticky Checkout Bar */}
-      <StickyCheckoutBar
-        price={pricing.total}
-        originalPrice={pricing.discount > 0 ? pricing.subtotal : undefined}
-        buttonLabel={isProcessing ? 'Processing...' : buttonLabel}
-        onPress={buttonAction}
-        disabled={!isValid || isProcessing}
-        isOnRequest={isOnRequestService && service.pricing.type === 'quote' && !service.pricing.bookingFee}
-      />
+          {/* Quote-based Pricing */}
+          {service.pricing.type === 'quote' && (
+            <View style={styles.section}>
+              <View style={styles.quoteCard}>
+                <View style={styles.quoteIconWrap}>
+                  <AppIcon name="messages" size={24} color={colors.accent} />
+                </View>
+                <Text style={styles.quoteTitle}>Custom pricing</Text>
+                <Text style={styles.quoteText}>
+                  Tell us what you need and we'll provide a personalized quote based on your
+                  requirements.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Request Notes */}
+          {service.request?.enabled && (
+            <View style={styles.section}>
+              <RequestTextArea
+                value={bookingDraft?.requestNotes || ''}
+                onChangeText={handleRequestNotesChange}
+                placeholder={service.request?.placeholder || 'Any special requirements...'}
+                label={
+                  service.request?.required ? 'Describe your needs' : 'Additional notes (optional)'
+                }
+              />
+            </View>
+          )}
+
+          {/* Confirmation Note */}
+          <View style={styles.confirmationNote}>
+            <AppIcon name="check-circle" size={18} color={colors.success} fillOpacity={0.2} />
+            <Text style={styles.confirmationText}>{confirmationNote}</Text>
+          </View>
+
+          {/* Description */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About this service</Text>
+            <Text style={styles.description}>{service.description}</Text>
+          </View>
+
+          {/* Benefits */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>What's included</Text>
+            <View style={styles.benefitsList}>
+              {service.benefits.map((benefit, index) => (
+                <View key={index} style={styles.benefitItem}>
+                  <View style={styles.benefitIcon}>
+                    <AppIcon
+                      name="check-circle"
+                      size={20}
+                      color={colors.success}
+                      fillOpacity={0.2}
+                    />
+                  </View>
+                  <View style={styles.benefitContent}>
+                    <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                    <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Sticky Checkout Bar */}
+        <StickyCheckoutBar
+          price={pricing.total}
+          originalPrice={pricing.discount > 0 ? pricing.subtotal : undefined}
+          buttonLabel={isProcessing ? 'Processing...' : buttonLabel}
+          onPress={buttonAction}
+          disabled={!isValid || isProcessing}
+          isOnRequest={
+            isOnRequestService && service.pricing.type === 'quote' && !service.pricing.bookingFee
+          }
+        />
       </KeyboardAvoidingView>
     </View>
   );
@@ -741,6 +709,25 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
     marginBottom: spacing.md,
+  },
+  emptyMemberCard: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface2,
+  },
+  emptyMemberText: {
+    flex: 1,
+  },
+  emptyMemberTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
 
   // Fixed Price

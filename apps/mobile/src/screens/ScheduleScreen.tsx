@@ -1,5 +1,12 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,70 +14,45 @@ import type { RootStackParamList } from '@/navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
-
-const upcomingAppointments = [
-  {
-    id: '1',
-    doctor: 'Dr. Sarah Chen',
-    specialty: 'General Practitioner',
-    emoji: '👩‍⚕️',
-    date: 'Jan 5, 2026',
-    time: '2:00 PM',
-    type: 'video',
-    typeLabel: 'Video Consult',
-  },
-  {
-    id: '2',
-    doctor: 'Dr. James Wilson',
-    specialty: 'Cardiologist',
-    emoji: '👨‍⚕️',
-    date: 'Jan 12, 2026',
-    time: '10:30 AM',
-    type: 'in-person',
-    typeLabel: 'In-person',
-  },
-];
-
-const pastAppointments = [
-  {
-    id: '3',
-    doctor: 'Dr. Emily Park',
-    specialty: 'Dermatologist',
-    emoji: '👩‍⚕️',
-    date: 'Dec 20, 2025',
-    time: '3:00 PM',
-    type: 'video',
-    typeLabel: 'Video Consult',
-  },
-  {
-    id: '4',
-    doctor: 'Dr. Sarah Chen',
-    specialty: 'General Practitioner',
-    emoji: '👩‍⚕️',
-    date: 'Dec 5, 2025',
-    time: '11:00 AM',
-    type: 'in-person',
-    typeLabel: 'In-person',
-  },
-];
+import { memberApi, V1Booking } from '@/services/api/endpoints/member';
 
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [bookings, setBookings] = useState<V1Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  const appointments = activeTab === 'upcoming' ? upcomingAppointments : pastAppointments;
+  useEffect(() => {
+    memberApi
+      .getBookings()
+      .then((response) => {
+        if (response.success) setBookings(response.bookings ?? []);
+        else setLoadError(true);
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const appointments = useMemo(() => {
+    const now = Date.now();
+    return bookings
+      .filter((booking) => {
+        const isPast =
+          new Date(booking.scheduledAt).getTime() < now ||
+          booking.status === 'COMPLETED' ||
+          booking.status === 'CANCELLED';
+        return activeTab === 'past' ? isPast : !isPast;
+      })
+      .sort((a, b) => {
+        const difference = +new Date(a.scheduledAt) - +new Date(b.scheduledAt);
+        return activeTab === 'past' ? -difference : difference;
+      });
+  }, [activeTab, bookings]);
 
   const handleBookAppointment = () => {
-    navigation.navigate('TelemedicineBooking', {});
-  };
-
-  const handleJoinCall = (appointment: (typeof upcomingAppointments)[0]) => {
-    navigation.navigate('VideoCall', {
-      appointmentId: appointment.id,
-      doctorName: appointment.doctor,
-      doctorSpecialty: appointment.specialty,
-    });
+    navigation.navigate('Services', { category: 'healthcare' });
   };
 
   return (
@@ -125,84 +107,62 @@ export default function ScheduleScreen() {
         )}
 
         {/* Appointments List */}
-        {appointments.length > 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={Colors.primary[600]} />
+            <Text style={styles.emptyStateText}>Loading your appointments…</Text>
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Icon name="cloud-offline-outline" size={48} color={Colors.gray[400]} />
+            <Text style={styles.emptyStateTitle}>Could not load appointments</Text>
+            <Text style={styles.emptyStateText}>Check your connection and try again.</Text>
+          </View>
+        ) : appointments.length > 0 ? (
           <View style={styles.appointmentsList}>
-            {appointments.map((appointment) => (
-              <TouchableOpacity key={appointment.id} style={styles.appointmentCard}>
-                <View style={styles.appointmentHeader}>
-                  <View style={styles.doctorAvatar}>
-                    <Text style={styles.doctorEmoji}>{appointment.emoji}</Text>
+            {appointments.map((appointment) => {
+              const providerName = appointment.provider?.name || 'Care provider';
+              const scheduledAt = new Date(appointment.scheduledAt);
+              return (
+                <View key={appointment.id} style={styles.appointmentCard}>
+                  <View style={styles.appointmentHeader}>
+                    <View style={styles.doctorAvatar}>
+                      <Icon name="person" size={24} color={Colors.primary[600]} />
+                    </View>
+                    <View style={styles.doctorInfo}>
+                      <Text style={styles.doctorName}>{providerName}</Text>
+                      <Text style={styles.doctorSpecialty}>
+                        {appointment.service?.name || 'Care appointment'}
+                      </Text>
+                    </View>
+                    <View style={[styles.typeBadge, styles.typeBadgeVideo]}>
+                      <Text style={[styles.typeBadgeText, styles.typeBadgeTextVideo]}>
+                        {appointment.status.toLowerCase().replace(/_/g, ' ')}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.doctorInfo}>
-                    <Text style={styles.doctorName}>{appointment.doctor}</Text>
-                    <Text style={styles.doctorSpecialty}>{appointment.specialty}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.typeBadge,
-                      appointment.type === 'video'
-                        ? styles.typeBadgeVideo
-                        : styles.typeBadgeInPerson,
-                    ]}
-                  >
-                    <Icon
-                      name={appointment.type === 'video' ? 'videocam' : 'location'}
-                      size={12}
-                      color={appointment.type === 'video' ? Colors.primary[700] : Colors.blue[700]}
-                    />
-                    <Text
-                      style={[
-                        styles.typeBadgeText,
-                        appointment.type === 'video'
-                          ? styles.typeBadgeTextVideo
-                          : styles.typeBadgeTextInPerson,
-                      ]}
-                    >
-                      {appointment.typeLabel}
-                    </Text>
+
+                  <View style={styles.appointmentDetails}>
+                    <View style={styles.appointmentDetail}>
+                      <Icon name="calendar-outline" size={16} color={Colors.gray[500]} />
+                      <Text style={styles.appointmentDetailText}>
+                        {scheduledAt.toLocaleDateString([], {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.appointmentDetail}>
+                      <Icon name="time-outline" size={16} color={Colors.gray[500]} />
+                      <Text style={styles.appointmentDetailText}>
+                        {scheduledAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.appointmentDetails}>
-                  <View style={styles.appointmentDetail}>
-                    <Icon name="calendar-outline" size={16} color={Colors.gray[500]} />
-                    <Text style={styles.appointmentDetailText}>{appointment.date}</Text>
-                  </View>
-                  <View style={styles.appointmentDetail}>
-                    <Icon name="time-outline" size={16} color={Colors.gray[500]} />
-                    <Text style={styles.appointmentDetailText}>{appointment.time}</Text>
-                  </View>
-                </View>
-
-                {activeTab === 'upcoming' && (
-                  <View style={styles.appointmentActions}>
-                    <TouchableOpacity style={styles.rescheduleButton}>
-                      <Text style={styles.rescheduleButtonText}>Reschedule</Text>
-                    </TouchableOpacity>
-                    {appointment.type === 'video' && (
-                      <TouchableOpacity
-                        style={styles.joinButton}
-                        onPress={() => handleJoinCall(appointment)}
-                      >
-                        <Icon name="videocam" size={16} color={Colors.white} />
-                        <Text style={styles.joinButtonText}>Join Call</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-
-                {activeTab === 'past' && (
-                  <View style={styles.appointmentActions}>
-                    <TouchableOpacity style={styles.viewNotesButton}>
-                      <Text style={styles.viewNotesButtonText}>View Notes</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.bookAgainButton}>
-                      <Text style={styles.bookAgainButtonText}>Book Again</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <View style={styles.emptyState}>

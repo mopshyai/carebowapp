@@ -14,6 +14,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,14 +22,22 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { CareBowLogo } from '@/components/icons/CareBowLogo';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
-import { useAuthStore } from '@/store/useAuthStore';
+import { USER_TYPES, useAuthStore } from '@/store/useAuthStore';
 import type { AuthStackParamList } from '@/navigation/types';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const {
+    login,
+    chooseLoginProfile,
+    cancelProfileSelection,
+    availableProfiles,
+    isLoading,
+    error,
+    clearError,
+  } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -73,12 +82,78 @@ export default function LoginScreen() {
       return;
     }
 
-    const success = await login(email, password);
+    await login(email, password);
     // Navigation will be handled by RootNavigator based on auth state
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Modal
+        visible={availableProfiles.length > 0}
+        transparent
+        animationType="slide"
+        onRequestClose={cancelProfileSelection}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.profileSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.profileSheetHeader}>
+              <View>
+                <Text style={styles.profileSheetTitle}>Choose how to sign in</Text>
+                <Text style={styles.profileSheetSubtitle}>
+                  This email has more than one CareBow profile.
+                </Text>
+              </View>
+              <Pressable
+                style={styles.closeButton}
+                onPress={cancelProfileSelection}
+                accessibilityRole="button"
+                accessibilityLabel="Close profile chooser"
+              >
+                <Icon name="x" size={22} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.profileOptions}>
+              {availableProfiles.map((profile) => {
+                const type = USER_TYPES.find((item) => item.slug === profile.userTypeSlug);
+                return (
+                  <Pressable
+                    key={profile.userTypeSlug}
+                    style={({ pressed }) => [
+                      styles.profileOption,
+                      pressed && styles.profileOptionPressed,
+                    ]}
+                    onPress={() => chooseLoginProfile(profile.userTypeSlug)}
+                    disabled={isLoading}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Continue as ${type?.title ?? profile.userTypeSlug}`}
+                  >
+                    <View style={styles.profileIcon}>
+                      <Icon
+                        name={profile.userTypeSlug === 'customer' ? 'heart' : 'briefcase'}
+                        size={20}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <View style={styles.profileOptionText}>
+                      <Text style={styles.profileOptionTitle}>
+                        {type?.title ?? profile.userTypeSlug}
+                      </Text>
+                      <Text style={styles.profileOptionDescription}>{type?.description}</Text>
+                    </View>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={colors.accent} />
+                    ) : (
+                      <Icon name="chevron-right" size={20} color={colors.textTertiary} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -111,10 +186,7 @@ export default function LoginScreen() {
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
-              <View style={[
-                styles.inputContainer,
-                emailError && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, emailError && styles.inputError]}>
                 <Icon name="mail" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -131,18 +203,13 @@ export default function LoginScreen() {
                   autoComplete="email"
                 />
               </View>
-              {emailError ? (
-                <Text style={styles.errorText}>{emailError}</Text>
-              ) : null}
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
             </View>
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <View style={[
-                styles.inputContainer,
-                passwordError && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, passwordError && styles.inputError]}>
                 <Icon name="lock" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -158,10 +225,7 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   autoComplete="password"
                 />
-                <Pressable
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={8}
-                >
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
                   <Icon
                     name={showPassword ? 'eye-off' : 'eye'}
                     size={20}
@@ -169,9 +233,7 @@ export default function LoginScreen() {
                   />
                 </Pressable>
               </View>
-              {passwordError ? (
-                <Text style={styles.errorText}>{passwordError}</Text>
-              ) : null}
+              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
             </View>
 
             {/* Forgot Password */}
@@ -228,6 +290,86 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.48)',
+  },
+  profileSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  profileSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  profileSheetTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+  },
+  profileSheetSubtitle: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileOptions: {
+    gap: spacing.sm,
+  },
+  profileOption: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
+  profileOptionPressed: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+  },
+  profileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentMuted,
+    marginRight: spacing.md,
+  },
+  profileOptionText: {
+    flex: 1,
+  },
+  profileOptionTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+  },
+  profileOptionDescription: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   scrollContent: {
     flexGrow: 1,

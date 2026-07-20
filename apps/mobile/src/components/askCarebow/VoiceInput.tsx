@@ -17,7 +17,7 @@ import {
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
-import { transcribeAudioNative, mockTranscribeAudio } from '../../lib/askCarebow/whisperTranscription';
+import { transcribeAudioNative } from '../../lib/askCarebow/whisperTranscription';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('VoiceInput');
@@ -46,7 +46,6 @@ export function VoiceInput({
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [recordPath, setRecordPath] = useState<string | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -93,9 +92,7 @@ export function VoiceInput({
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         ]);
 
-        if (
-          grants['android.permission.RECORD_AUDIO'] === PermissionsAndroid.RESULTS.GRANTED
-        ) {
+        if (grants['android.permission.RECORD_AUDIO'] === PermissionsAndroid.RESULTS.GRANTED) {
           return true;
         }
         Alert.alert(
@@ -127,8 +124,7 @@ export function VoiceInput({
         android: `${Date.now()}.mp4`,
       });
 
-      const uri = await audioRecorderPlayer.startRecorder(path);
-      setRecordPath(uri);
+      await audioRecorderPlayer.startRecorder(path);
 
       audioRecorderPlayer.addRecordBackListener((e) => {
         setRecordingDuration(Math.floor(e.currentPosition / 1000));
@@ -158,12 +154,12 @@ export function VoiceInput({
       }
 
       // Transcribe the audio
-      let result;
       if (useMock || !apiKey) {
-        result = await mockTranscribeAudio(uri, recordingDuration * 1000);
-      } else {
-        result = await transcribeAudioNative(uri, apiKey);
+        setError('Voice transcription is not configured yet. Please type your question.');
+        return;
       }
+
+      const result = await transcribeAudioNative(uri, apiKey);
 
       if (result.success && result.text) {
         onTranscriptionComplete(result.text);
@@ -176,7 +172,6 @@ export function VoiceInput({
     } finally {
       setRecordingState('idle');
       setRecordingDuration(0);
-      setRecordPath(null);
     }
   };
 
@@ -191,7 +186,6 @@ export function VoiceInput({
     } finally {
       setRecordingState('idle');
       setRecordingDuration(0);
-      setRecordPath(null);
       onRecordingEnd?.();
     }
   };

@@ -110,17 +110,14 @@ export default function SignupScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <Pressable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
 
           <View style={styles.headerContainer}>
             <Text style={styles.title}>Create account</Text>
             <Text style={styles.subtitle}>
-              Join CareBow to manage your family's health
+              Create a new CareBow profile or add another profile to your existing email
             </Text>
           </View>
 
@@ -160,10 +157,7 @@ export default function SignupScreen() {
             <View style={styles.nameRow}>
               <View style={[styles.inputGroup, styles.halfWidth]}>
                 <Text style={styles.label}>First name</Text>
-                <View style={[
-                  styles.inputContainer,
-                  errors.firstName && styles.inputError,
-                ]}>
+                <View style={[styles.inputContainer, errors.firstName && styles.inputError]}>
                   <TextInput
                     style={styles.input}
                     placeholder="First"
@@ -172,24 +166,19 @@ export default function SignupScreen() {
                     onChangeText={(text) => {
                       setFirstName(text);
                       if (errors.firstName) {
-                        setErrors(prev => ({ ...prev, firstName: undefined }));
+                        setErrors((prev) => ({ ...prev, firstName: undefined }));
                       }
                     }}
                     autoCapitalize="words"
                     autoCorrect={false}
                   />
                 </View>
-                {errors.firstName ? (
-                  <Text style={styles.errorText}>{errors.firstName}</Text>
-                ) : null}
+                {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
               </View>
 
               <View style={[styles.inputGroup, styles.halfWidth]}>
                 <Text style={styles.label}>Last name</Text>
-                <View style={[
-                  styles.inputContainer,
-                  errors.lastName && styles.inputError,
-                ]}>
+                <View style={[styles.inputContainer, errors.lastName && styles.inputError]}>
                   <TextInput
                     style={styles.input}
                     placeholder="Last"
@@ -198,26 +187,21 @@ export default function SignupScreen() {
                     onChangeText={(text) => {
                       setLastName(text);
                       if (errors.lastName) {
-                        setErrors(prev => ({ ...prev, lastName: undefined }));
+                        setErrors((prev) => ({ ...prev, lastName: undefined }));
                       }
                     }}
                     autoCapitalize="words"
                     autoCorrect={false}
                   />
                 </View>
-                {errors.lastName ? (
-                  <Text style={styles.errorText}>{errors.lastName}</Text>
-                ) : null}
+                {errors.lastName ? <Text style={styles.errorText}>{errors.lastName}</Text> : null}
               </View>
             </View>
 
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.email && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, errors.email && styles.inputError]}>
                 <Icon name="mail" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -227,7 +211,7 @@ export default function SignupScreen() {
                   onChangeText={(text) => {
                     setEmail(text);
                     if (errors.email) {
-                      setErrors(prev => ({ ...prev, email: undefined }));
+                      setErrors((prev) => ({ ...prev, email: undefined }));
                     }
                   }}
                   keyboardType="email-address"
@@ -236,18 +220,13 @@ export default function SignupScreen() {
                   autoComplete="email"
                 />
               </View>
-              {errors.email ? (
-                <Text style={styles.errorText}>{errors.email}</Text>
-              ) : null}
+              {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
             </View>
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.password && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, errors.password && styles.inputError]}>
                 <Icon name="lock" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -257,17 +236,14 @@ export default function SignupScreen() {
                   onChangeText={(text) => {
                     setPassword(text);
                     if (errors.password) {
-                      setErrors(prev => ({ ...prev, password: undefined }));
+                      setErrors((prev) => ({ ...prev, password: undefined }));
                     }
                   }}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <Pressable
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={8}
-                >
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
                   <Icon
                     name={showPassword ? 'eye-off' : 'eye'}
                     size={20}
@@ -275,18 +251,13 @@ export default function SignupScreen() {
                   />
                 </Pressable>
               </View>
-              {errors.password ? (
-                <Text style={styles.errorText}>{errors.password}</Text>
-              ) : null}
+              {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
             </View>
 
             {/* Confirm Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Confirm password</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.confirmPassword && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, errors.confirmPassword && styles.inputError]}>
                 <Icon name="lock" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -296,17 +267,14 @@ export default function SignupScreen() {
                   onChangeText={(text) => {
                     setConfirmPassword(text);
                     if (errors.confirmPassword) {
-                      setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                      setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
                     }
                   }}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <Pressable
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  hitSlop={8}
-                >
+                <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={8}>
                   <Icon
                     name={showConfirmPassword ? 'eye-off' : 'eye'}
                     size={20}
@@ -347,7 +315,7 @@ export default function SignupScreen() {
               {isLoading ? (
                 <ActivityIndicator color={colors.textInverse} />
               ) : (
-                <Text style={styles.signupButtonText}>Create Account</Text>
+                <Text style={styles.signupButtonText}>Create or Add Profile</Text>
               )}
             </Pressable>
           </View>

@@ -3,7 +3,7 @@
  * Professional checkout with order summary and payment
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -20,15 +19,8 @@ import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getServiceById, formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
-import { useOrdersStore } from '../store/ordersStore';
-import { processPayment } from '../utils/mockPayment';
-import { buildBookingCore } from '../lib/bookingDraft';
-import { BookingDraftInput, PricingModelType } from '../types/booking';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatPrice } from '../data/catalog';
-import { createLogger } from '../utils/logger';
-
-const logger = createLogger('Checkout');
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -37,15 +29,7 @@ export default function CheckoutScreen() {
   const { serviceId } = (route.params as { serviceId: string }) || {};
 
   // Store hooks
-  const { bookingDraft, clearBookingDraft } = useCartStore();
-  const createPendingOrder = useOrdersStore((state) => state.createPendingOrder);
-  const markPaymentSuccess = useOrdersStore((state) => state.markPaymentSuccess);
-  const markPaymentFailure = useOrdersStore((state) => state.markPaymentFailure);
-
-  // Local state
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const { bookingDraft } = useCartStore();
 
   // Get service data
   const service = getServiceById(serviceId || '');
@@ -61,108 +45,11 @@ export default function CheckoutScreen() {
     });
   };
 
-  // Build BookingCore from draft
-  const buildBookingCoreFromDraft = () => {
-    if (!bookingDraft || !service) return null;
-
-    // Determine pricing model type
-    let pricingModel: PricingModelType = 'fixed';
-    if (service.pricing.type === 'packages') pricingModel = 'packages';
-    else if (service.pricing.type === 'hourly') pricingModel = 'hourly';
-    else if (service.pricing.type === 'daily') pricingModel = 'daily';
-    else if (service.pricing.type === 'quote') pricingModel = 'quote';
-
-    // Get package details if applicable
-    let packagePrice: number | undefined;
-    let packageOriginalPrice: number | undefined;
-    if (service.pricing.type === 'packages' && bookingDraft.selectedPackageId) {
-      const selectedPkg = service.pricing.packages.find(p => p.id === bookingDraft.selectedPackageId);
-      if (selectedPkg) {
-        packagePrice = selectedPkg.price;
-        packageOriginalPrice = selectedPkg.originalPrice;
-      }
-    }
-
-    const input: BookingDraftInput = {
-      serviceId: bookingDraft.serviceId,
-      serviceTitle: bookingDraft.serviceTitle,
-      memberId: bookingDraft.memberId || '',
-      memberName: bookingDraft.memberName || undefined,
-      schedule: {
-        date: bookingDraft.date || '',
-        startTime: bookingDraft.startTime || '',
-        endTime: bookingDraft.endTime || undefined,
-        durationMinutes: bookingDraft.durationMinutes || undefined,
-      },
-      notes: bookingDraft.requestNotes,
-      pricingSelections: {
-        pricingModel,
-        packageId: bookingDraft.selectedPackageId || undefined,
-        packageLabel: bookingDraft.selectedPackageLabel || undefined,
-        packagePrice,
-        packageOriginalPrice,
-        hours: bookingDraft.hours || undefined,
-        days: bookingDraft.days || undefined,
-        hourlyRate: service.pricing.type === 'hourly' ? service.pricing.hourlyRate : undefined,
-        dailyRate: service.pricing.type === 'daily' ? service.pricing.dailyRate : undefined,
-        fixedPrice: service.pricing.type === 'fixed' ? service.pricing.price : undefined,
-        fixedOriginalPrice: service.pricing.type === 'fixed' ? service.pricing.originalPrice : undefined,
-      },
-    };
-
-    return buildBookingCore(input);
-  };
-
-  // Handle payment
-  const handlePayment = async () => {
-    if (!bookingDraft || !service) {
-      Alert.alert('Error', 'Missing booking information.');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const bookingCore = buildBookingCoreFromDraft();
-      if (!bookingCore) {
-        Alert.alert('Error', 'Failed to create order.');
-        setIsProcessing(false);
-        return;
-      }
-
-      const pendingOrder = createPendingOrder(bookingCore);
-      setCreatedOrderId(pendingOrder.id);
-
-      const result = await processPayment(bookingDraft.total);
-
-      if (result.success && result.paymentInfo) {
-        markPaymentSuccess(
-          pendingOrder.id,
-          result.paymentInfo.paymentId,
-          'mock'
-        );
-
-        clearBookingDraft();
-        setPaymentSuccess(true);
-
-        setTimeout(() => {
-          navigation.navigate('OrderSuccess', { orderId: pendingOrder.id });
-        }, 1500);
-      } else {
-        markPaymentFailure(pendingOrder.id, result.error || 'Payment declined');
-        Alert.alert('Payment Failed', result.error || 'Please try again.');
-      }
-    } catch (error) {
-      logger.error('Error during payment', error);
-
-      if (createdOrderId) {
-        markPaymentFailure(createdOrderId, 'Payment processing error');
-      }
-
-      Alert.alert('Error', 'Payment processing failed. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePayment = () => {
+    Alert.alert(
+      'Secure checkout unavailable',
+      'Mobile payment is not connected to the production payment service yet. No order was created and you have not been charged.'
+    );
   };
 
   // Error state
@@ -185,33 +72,13 @@ export default function CheckoutScreen() {
     );
   }
 
-  // Success state
-  if (paymentSuccess) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.successContainer}>
-          <View style={styles.successIconWrap}>
-            <Icon name="checkmark-circle" size={72} color={colors.success} />
-          </View>
-          <Text style={styles.successTitle}>Payment Successful!</Text>
-          <Text style={styles.successSubtitle}>Redirecting to your order...</Text>
-          <ActivityIndicator size="small" color={colors.accent} style={{ marginTop: 20 }} />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          disabled={isProcessing}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Checkout</Text>
@@ -343,35 +210,32 @@ export default function CheckoutScreen() {
             <View style={[styles.cardIconWrap, { backgroundColor: colors.accentSoft }]}>
               <Icon name="card-outline" size={20} color={colors.accent} />
             </View>
-            <Text style={styles.cardTitle}>Payment Method</Text>
+            <Text style={styles.cardTitle}>Secure Checkout</Text>
           </View>
 
-          <TouchableOpacity style={styles.paymentMethodRow}>
+          <View style={styles.paymentMethodRow}>
             <View style={styles.paymentMethodLeft}>
               <Icon name="card" size={24} color={colors.accent} />
               <View>
-                <Text style={styles.paymentMethodText}>Credit/Debit Card</Text>
-                <Text style={styles.paymentMethodSubtext}>Visa, Mastercard, RuPay</Text>
+                <Text style={styles.paymentMethodText}>Mobile payment unavailable</Text>
+                <Text style={styles.paymentMethodSubtext}>No payment method will be charged</Text>
               </View>
             </View>
-            <View style={styles.radioSelected}>
-              <Icon name="checkmark" size={14} color={colors.white} />
-            </View>
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.securityNote}>
             <Icon name="shield-checkmark" size={14} color={colors.success} />
             <Text style={styles.securityNoteText}>
-              Your payment information is encrypted and secure
+              Checkout will be enabled after the production payment connection is complete
             </Text>
           </View>
         </View>
 
-        {/* Demo Notice */}
+        {/* Payment availability notice */}
         <View style={styles.demoNotice}>
           <Icon name="information-circle-outline" size={16} color={colors.textTertiary} />
           <Text style={styles.demoNoticeText}>
-            This is a demo payment. No actual charges will be made.
+            This screen will not create an order or simulate a successful payment.
           </Text>
         </View>
       </ScrollView>
@@ -382,20 +246,9 @@ export default function CheckoutScreen() {
           <Text style={styles.footerPriceLabel}>Total</Text>
           <Text style={styles.footerPriceValue}>{formatPrice(bookingDraft.total)}</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
-          onPress={handlePayment}
-          disabled={isProcessing}
-          activeOpacity={0.8}
-        >
-          {isProcessing ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <>
-              <Icon name="lock-closed" size={18} color={colors.white} />
-              <Text style={styles.payButtonText}>Pay {formatPrice(bookingDraft.total)}</Text>
-            </>
-          )}
+        <TouchableOpacity style={styles.payButton} onPress={handlePayment} activeOpacity={0.8}>
+          <Icon name="information-circle" size={18} color={colors.white} />
+          <Text style={styles.payButtonText}>Payment unavailable</Text>
         </TouchableOpacity>
       </View>
     </View>
