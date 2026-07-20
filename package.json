@@ -50,7 +50,7 @@
     "prettier": "^3.2.4",
     "standard-version": "^9.5.0",
     "turbo": "^2.7.5",
-    "turbo-darwin-arm64": "^2.7.5",
+    "turbo-darwin-arm64": "^2.8.17",
     "typescript": "^5.3.3"
   },
   "packageManager": "pnpm@10.20.0",
