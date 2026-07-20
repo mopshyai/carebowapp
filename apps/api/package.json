@@ -18,7 +18,7 @@
   "dependencies": {
     "@carebow/shared": "workspace:*",
     "@auth/prisma-adapter": "^2.7.4",
-    "@prisma/client": "^6.2.1",
+    "@prisma/client": "^7.8.0",
     "bcryptjs": "^2.4.3",
     "next": "^15.1.4",
     "next-auth": "^5.0.0-beta.25",
