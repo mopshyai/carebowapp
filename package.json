@@ -51,7 +51,7 @@
     "standard-version": "^9.5.0",
     "turbo": "^2.7.5",
     "turbo-darwin-arm64": "^2.7.5",
-    "typescript": "^5.3.3"
+    "typescript": "^7.0.2"
   },
   "packageManager": "pnpm@10.20.0",
   "engines": {
