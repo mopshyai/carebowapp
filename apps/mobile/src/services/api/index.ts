@@ -9,12 +9,13 @@ export { ApiClient } from './ApiClient';
 export * from './types';
 
 // API Endpoints
-export { authApi, servicesApi, ordersApi } from './endpoints';
+export { authApi, servicesApi, bookingsApi, ordersApi } from './endpoints';
 
 // Convenience re-export
 import { ApiClient } from './ApiClient';
 import { authApi } from './endpoints/auth';
 import { servicesApi } from './endpoints/services';
+import { bookingsApi } from './endpoints/bookings';
 import { ordersApi } from './endpoints/orders';
 
 /**
@@ -24,6 +25,7 @@ export const api = {
   client: ApiClient,
   auth: authApi,
   services: servicesApi,
+  bookings: bookingsApi,
   orders: ordersApi,
 };
 
