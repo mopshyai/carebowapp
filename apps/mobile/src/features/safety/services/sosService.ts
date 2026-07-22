@@ -6,7 +6,11 @@
 import { Linking, Platform } from 'react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import { SafetyContact, SMS_TEMPLATES, createGoogleMapsLink } from '../types';
-import { LocationData, getLocationWithFallback } from './locationService';
+import {
+  LocationData,
+  getLocationWithFallback,
+  getAddressFromCoordinates,
+} from './locationService';
 import { createLogger } from '../../../utils/logger';
 
 const logger = createLogger('SOS');
@@ -101,10 +105,7 @@ export async function callPrimaryContact(contact: SafetyContact): Promise<boolea
  * Open SMS composer with pre-filled message
  * Note: Cannot auto-send SMS in Expo/React Native without native modules
  */
-export async function openSMSComposer(
-  phoneNumbers: string[],
-  message: string
-): Promise<boolean> {
+export async function openSMSComposer(phoneNumbers: string[], message: string): Promise<boolean> {
   if (phoneNumbers.length === 0) return false;
 
   // Clean phone numbers
@@ -156,11 +157,13 @@ export async function openSMSComposer(
 export function generateSOSMessage(
   userName: string,
   location: LocationData | null,
-  includeLocation: boolean
+  includeLocation: boolean,
+  address?: string | null
 ): string {
   if (includeLocation && location) {
     const mapsLink = createGoogleMapsLink(location.lat, location.lng);
-    return SMS_TEMPLATES.SOS_WITH_LOCATION(userName, mapsLink);
+    const base = SMS_TEMPLATES.SOS_WITH_LOCATION(userName, mapsLink);
+    return address ? `${base}\nNear: ${address}` : base;
   }
   return SMS_TEMPLATES.SOS_WITHOUT_LOCATION(userName);
 }
@@ -171,13 +174,27 @@ export function generateSOSMessage(
 export function generateMissedCheckInMessage(
   userName: string,
   location: LocationData | null,
-  includeLocation: boolean
+  includeLocation: boolean,
+  address?: string | null
 ): string {
   if (includeLocation && location) {
     const mapsLink = createGoogleMapsLink(location.lat, location.lng);
-    return SMS_TEMPLATES.MISSED_CHECKIN_WITH_LOCATION(userName, mapsLink);
+    const base = SMS_TEMPLATES.MISSED_CHECKIN_WITH_LOCATION(userName, mapsLink);
+    return address ? `${base}\nNear: ${address}` : base;
   }
   return SMS_TEMPLATES.MISSED_CHECKIN_WITHOUT_LOCATION(userName);
+}
+
+/**
+ * Best-effort reverse-geocode for an SOS/alert. Returns null when location
+ * isn't being shared or geocoding fails (message then just carries the map link).
+ */
+async function resolveAddress(
+  location: LocationData | null,
+  includeLocation: boolean
+): Promise<string | null> {
+  if (!includeLocation || !location) return null;
+  return getAddressFromCoordinates(location.lat, location.lng);
 }
 
 /**
@@ -189,7 +206,8 @@ export async function sendSOSSMSToPrimary(
   location: LocationData | null,
   includeLocation: boolean
 ): Promise<boolean> {
-  const message = generateSOSMessage(userName, location, includeLocation);
+  const address = await resolveAddress(location, includeLocation);
+  const message = generateSOSMessage(userName, location, includeLocation, address);
   return openSMSComposer([contact.phoneNumber], message);
 }
 
@@ -206,7 +224,8 @@ export async function sendSOSSMSToAll(
   if (smsContacts.length === 0) return false;
 
   const phoneNumbers = smsContacts.map((c) => c.phoneNumber);
-  const message = generateSOSMessage(userName, location, includeLocation);
+  const address = await resolveAddress(location, includeLocation);
+  const message = generateSOSMessage(userName, location, includeLocation, address);
 
   return openSMSComposer(phoneNumbers, message);
 }
@@ -224,7 +243,8 @@ export async function sendMissedCheckInAlert(
   if (smsContacts.length === 0) return false;
 
   const phoneNumbers = smsContacts.map((c) => c.phoneNumber);
-  const message = generateMissedCheckInMessage(userName, location, includeLocation);
+  const address = await resolveAddress(location, includeLocation);
+  const message = generateMissedCheckInMessage(userName, location, includeLocation, address);
 
   return openSMSComposer(phoneNumbers, message);
 }
@@ -251,9 +271,7 @@ export type SOSFlowResult = {
  * - Attempt to get location (non-blocking)
  * Returns location data for use in subsequent actions
  */
-export async function executeSOSTrigger(
-  config: SOSFlowConfig
-): Promise<SOSFlowResult> {
+export async function executeSOSTrigger(config: SOSFlowConfig): Promise<SOSFlowResult> {
   // Immediate haptic feedback
   await triggerSOSHaptic();
 
