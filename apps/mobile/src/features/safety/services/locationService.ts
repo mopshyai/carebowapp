@@ -186,14 +186,20 @@ export function createAppleMapsLink(lat: number, lng: number): string {
   return `https://maps.apple.com/?q=${lat},${lng}`;
 }
 
+/** Result of a reverse-geocode lookup. */
+export type ReverseGeocodeResult = {
+  /** Full human-readable address, or null if unavailable. */
+  address: string | null;
+  /** ISO 3166-1 alpha-2 country code (lowercase, e.g. "us", "in"), or null. */
+  countryCode: string | null;
+};
+
 /**
- * Get a human-readable address from coordinates (reverse geocoding).
- *
- * Uses OpenStreetMap Nominatim — keyless and free — so SOS alerts can show a
- * real street address instead of raw coordinates. Fails soft (returns null) on
- * timeout/error so the caller can fall back to coordinates; never throws.
+ * Reverse geocode coordinates via OpenStreetMap Nominatim — keyless and free.
+ * Returns both the address (for SOS messages) and the country code (to pick the
+ * correct local emergency number). Fails soft (nulls) on timeout/error; never throws.
  */
-export async function getAddressFromCoordinates(lat: number, lng: number): Promise<string | null> {
+export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -214,19 +220,42 @@ export async function getAddressFromCoordinates(lat: number, lng: number): Promi
 
     if (!response.ok) {
       logger.warn('Reverse geocoding failed', { status: response.status });
-      return null;
+      return { address: null, countryCode: null };
     }
 
     const data = await response.json();
-    const address: string | undefined = data?.display_name;
-    return address && address.trim().length > 0 ? address : null;
+    const rawAddress: string | undefined = data?.display_name;
+    const rawCountry: string | undefined = data?.address?.country_code;
+    return {
+      address: rawAddress && rawAddress.trim().length > 0 ? rawAddress : null,
+      countryCode: rawCountry ? rawCountry.toLowerCase() : null,
+    };
   } catch (error) {
-    // AbortError (timeout) or network failure — fall back to coordinates.
-    logger.warn('Reverse geocoding error; falling back to coordinates', {
+    // AbortError (timeout) or network failure — caller falls back gracefully.
+    logger.warn('Reverse geocoding error', {
       message: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return { address: null, countryCode: null };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Get a human-readable address from coordinates. Thin wrapper over reverseGeocode
+ * so SOS alerts can show a real street address instead of raw coordinates.
+ */
+export async function getAddressFromCoordinates(lat: number, lng: number): Promise<string | null> {
+  return (await reverseGeocode(lat, lng)).address;
+}
+
+/**
+ * Get the ISO country code for coordinates (used to select the local emergency
+ * number). Returns null on failure.
+ */
+export async function getCountryCodeFromCoordinates(
+  lat: number,
+  lng: number
+): Promise<string | null> {
+  return (await reverseGeocode(lat, lng)).countryCode;
 }

@@ -3,7 +3,7 @@
  * Bottom sheet for confirming SOS trigger and selecting actions
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,10 +24,17 @@ import {
   sendSOSSMSToPrimary,
   sendSOSSMSToAll,
   executeSOSTrigger,
-  triggerSOSHaptic,
 } from '../services/sosService';
 import { LocationData } from '../services/locationService';
+import {
+  EmergencyNumbers,
+  DEFAULT_EMERGENCY,
+  getEmergencyNumbersForCoordinates,
+} from '../services/emergencyNumbers';
 import { createLogger } from '../../../utils/logger';
+
+/** Seconds before the SOS auto-escalates to an emergency call (cancellable). */
+const AUTO_CALL_SECONDS = 10;
 
 const logger = createLogger('SOS');
 
@@ -66,14 +73,27 @@ export function SOSConfirmationSheet({
   const [isLoading, setIsLoading] = useState(false);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  // Region-resolved emergency numbers (911 US / 112 + 108 India); default until resolved.
+  const [emergency, setEmergency] = useState<EmergencyNumbers>(DEFAULT_EMERGENCY);
+  // Countdown to auto-escalation; null = not counting (cancelled or not started).
+  const [autoCallSeconds, setAutoCallSeconds] = useState<number | null>(null);
+
+  const stopAutoCall = useCallback(() => {
+    setAutoCallSeconds(null);
+  }, []);
 
   const resetState = useCallback(() => {
+    stopAutoCall();
     setPhase('confirm');
     setShareLocation(shareLocationDefault);
     setIsLoading(false);
     setLocation(null);
     setLocationError(null);
-  }, [shareLocationDefault]);
+    setEmergency(DEFAULT_EMERGENCY);
+  }, [shareLocationDefault, stopAutoCall]);
+
+  // Clean up the timer if the sheet unmounts mid-countdown.
+  useEffect(() => () => stopAutoCall(), [stopAutoCall]);
 
   const handleClose = useCallback(() => {
     resetState();
@@ -96,11 +116,20 @@ export function SOSConfirmationSheet({
         setLocationError(result.locationError);
       }
 
+      // Resolve the correct local emergency number from where the phone is.
+      if (result.location) {
+        getEmergencyNumbersForCoordinates(result.location.lat, result.location.lng)
+          .then(setEmergency)
+          .catch(() => setEmergency(DEFAULT_EMERGENCY));
+      }
+
       // Record the SOS event
       onSOSTriggered(result.location);
 
-      // Move to action selection phase
+      // Move to action selection phase and start the auto-call countdown so an
+      // unresponsive user still reaches emergency services (cancellable).
       setPhase('actions');
+      setAutoCallSeconds(AUTO_CALL_SECONDS);
     } catch (error) {
       logger.error('SOS trigger failed', error);
       setPhase('actions');
@@ -109,36 +138,55 @@ export function SOSConfirmationSheet({
     }
   }, [contacts, userName, shareLocation, onSOSTriggered]);
 
+  // Drives the auto-escalation countdown. At zero, opens the dialer to the
+  // region's emergency number. Cancels cleanly if the user acts or closes.
+  useEffect(() => {
+    if (autoCallSeconds === null) return;
+    if (autoCallSeconds <= 0) {
+      setAutoCallSeconds(null);
+      callEmergencyServices(emergency.call);
+      return;
+    }
+    const id = setTimeout(() => setAutoCallSeconds((s) => (s === null ? null : s - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [autoCallSeconds, emergency.call]);
+
   const handleCallPrimary = useCallback(async () => {
+    stopAutoCall();
     if (primaryContact) {
       await callPrimaryContact(primaryContact);
     }
-  }, [primaryContact]);
+  }, [primaryContact, stopAutoCall]);
 
-  const handleCall911 = useCallback(async () => {
-    await callEmergencyServices();
-  }, []);
+  const handleCallEmergency = useCallback(async () => {
+    stopAutoCall();
+    await callEmergencyServices(emergency.call);
+  }, [emergency.call, stopAutoCall]);
+
+  const handleCallAmbulance = useCallback(async () => {
+    stopAutoCall();
+    if (emergency.ambulance) {
+      await callEmergencyServices(emergency.ambulance);
+    }
+  }, [emergency.ambulance, stopAutoCall]);
 
   const handleSMSPrimary = useCallback(async () => {
+    stopAutoCall();
     if (primaryContact) {
       await sendSOSSMSToPrimary(primaryContact, userName, location, shareLocation);
     }
-  }, [primaryContact, userName, location, shareLocation]);
+  }, [primaryContact, userName, location, shareLocation, stopAutoCall]);
 
   const handleSMSAll = useCallback(async () => {
+    stopAutoCall();
     await sendSOSSMSToAll(contacts, userName, location, shareLocation);
-  }, [contacts, userName, location, shareLocation]);
+  }, [contacts, userName, location, shareLocation, stopAutoCall]);
 
   const hasContacts = contacts.length > 0;
   const smsContacts = contacts.filter((c) => c.canReceiveSMS);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <Pressable style={styles.overlay} onPress={handleClose}>
         <Pressable
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
@@ -178,22 +226,20 @@ export function SOSConfirmationSheet({
                 <View style={styles.warningBanner}>
                   <Icon name="warning" size={18} color={colors.warning} />
                   <Text style={styles.warningText}>
-                    No emergency contacts set. You can still call 911.
+                    No emergency contacts set. You can still call emergency services.
                   </Text>
                 </View>
               )}
 
               {/* Action buttons */}
               <View style={styles.actions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleClose}
-                >
+                <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.sosButton}
+                  style={[styles.sosButton, isLoading && styles.sosButtonDisabled]}
                   onPress={handleSendSOS}
+                  disabled={isLoading}
                 >
                   <Icon name="alert" size={20} color={colors.white} />
                   <Text style={styles.sosButtonText}>Send SOS</Text>
@@ -234,13 +280,25 @@ export function SOSConfirmationSheet({
                 </View>
               )}
 
+              {/* Auto-escalation countdown — reaches help if the user can't act */}
+              {autoCallSeconds !== null && (
+                <View style={styles.countdownBanner}>
+                  <View style={styles.countdownInfo}>
+                    <Icon name="alarm" size={18} color={colors.error} />
+                    <Text style={styles.countdownText}>
+                      Calling {emergency.call} in {autoCallSeconds}s
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.countdownCancel} onPress={stopAutoCall}>
+                    <Text style={styles.countdownCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Quick action buttons */}
               <View style={styles.quickActions}>
                 {primaryContact && (
-                  <TouchableOpacity
-                    style={styles.quickActionButton}
-                    onPress={handleCallPrimary}
-                  >
+                  <TouchableOpacity style={styles.quickActionButton} onPress={handleCallPrimary}>
                     <View style={[styles.quickActionIcon, { backgroundColor: colors.successSoft }]}>
                       <Icon name="call" size={24} color={colors.success} />
                     </View>
@@ -249,22 +307,26 @@ export function SOSConfirmationSheet({
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity
-                  style={styles.quickActionButton}
-                  onPress={handleCall911}
-                >
+                <TouchableOpacity style={styles.quickActionButton} onPress={handleCallEmergency}>
                   <View style={[styles.quickActionIcon, { backgroundColor: colors.errorSoft }]}>
                     <Icon name="medical" size={24} color={colors.error} />
                   </View>
-                  <Text style={styles.quickActionLabel}>Call 911</Text>
+                  <Text style={styles.quickActionLabel}>Call {emergency.call}</Text>
                   <Text style={styles.quickActionSub}>Emergency</Text>
                 </TouchableOpacity>
 
+                {emergency.ambulance && (
+                  <TouchableOpacity style={styles.quickActionButton} onPress={handleCallAmbulance}>
+                    <View style={[styles.quickActionIcon, { backgroundColor: colors.errorSoft }]}>
+                      <Icon name="car" size={24} color={colors.error} />
+                    </View>
+                    <Text style={styles.quickActionLabel}>Call {emergency.ambulance}</Text>
+                    <Text style={styles.quickActionSub}>Ambulance</Text>
+                  </TouchableOpacity>
+                )}
+
                 {primaryContact?.canReceiveSMS && (
-                  <TouchableOpacity
-                    style={styles.quickActionButton}
-                    onPress={handleSMSPrimary}
-                  >
+                  <TouchableOpacity style={styles.quickActionButton} onPress={handleSMSPrimary}>
                     <View style={[styles.quickActionIcon, { backgroundColor: colors.accentMuted }]}>
                       <Icon name="chatbubble" size={24} color={colors.accent} />
                     </View>
@@ -274,10 +336,7 @@ export function SOSConfirmationSheet({
                 )}
 
                 {smsContacts.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.quickActionButton}
-                    onPress={handleSMSAll}
-                  >
+                  <TouchableOpacity style={styles.quickActionButton} onPress={handleSMSAll}>
                     <View style={[styles.quickActionIcon, { backgroundColor: colors.infoSoft }]}>
                       <Icon name="people" size={24} color={colors.info} />
                     </View>
@@ -287,10 +346,7 @@ export function SOSConfirmationSheet({
                 )}
               </View>
 
-              <TouchableOpacity
-                style={styles.doneButton}
-                onPress={handleClose}
-              >
+              <TouchableOpacity style={styles.doneButton} onPress={handleClose}>
                 <Text style={styles.doneButtonText}>Done</Text>
               </TouchableOpacity>
             </>
@@ -404,6 +460,39 @@ const styles = StyleSheet.create({
     color: colors.info,
     flex: 1,
   },
+  countdownBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    backgroundColor: colors.errorSoft,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  countdownInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flex: 1,
+  },
+  countdownText: {
+    ...typography.label,
+    color: colors.error,
+    flex: 1,
+  },
+  countdownCancel: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+  },
+  countdownCancelText: {
+    ...typography.label,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -429,6 +518,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.error,
     ...shadows.button,
+  },
+  sosButtonDisabled: {
+    opacity: 0.6,
   },
   sosButtonText: {
     ...typography.label,
