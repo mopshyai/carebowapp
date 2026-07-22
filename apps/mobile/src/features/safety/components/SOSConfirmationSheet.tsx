@@ -25,12 +25,13 @@ import {
   sendSOSSMSToAll,
   executeSOSTrigger,
 } from '../services/sosService';
-import { LocationData } from '../services/locationService';
+import { LocationData, getAddressFromCoordinates } from '../services/locationService';
 import {
   EmergencyNumbers,
   DEFAULT_EMERGENCY,
   getEmergencyNumbersForCoordinates,
 } from '../services/emergencyNumbers';
+import { safetyApi } from '../../../services/api/endpoints/safety';
 import { createLogger } from '../../../utils/logger';
 
 /** Seconds before the SOS auto-escalates to an emergency call (cancellable). */
@@ -122,6 +123,19 @@ export function SOSConfirmationSheet({
           .then(setEmergency)
           .catch(() => setEmergency(DEFAULT_EMERGENCY));
       }
+
+      // Alert the on-call team (additive; never blocks the on-device SOS path).
+      void (async () => {
+        const loc = result.location;
+        const address =
+          loc && shareLocation ? await getAddressFromCoordinates(loc.lat, loc.lng) : null;
+        safetyApi.reportSosEvent({
+          lat: loc?.lat ?? null,
+          lng: loc?.lng ?? null,
+          address,
+          userName,
+        });
+      })();
 
       // Record the SOS event
       onSOSTriggered(result.location);
