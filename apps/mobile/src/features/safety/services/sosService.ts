@@ -82,12 +82,12 @@ export async function openPhoneDialer(phoneNumber: string): Promise<boolean> {
 }
 
 /**
- * Call emergency services (911 in US)
+ * Call emergency services. Pass the region-resolved number (911 in the US, 112
+ * in India — see emergencyNumbers.ts). Defaults to 112, the unified number that
+ * is native in India and redirected to 911 by US mobile carriers.
  */
-export async function callEmergencyServices(): Promise<boolean> {
-  // Note: In a production app, you'd want to detect the user's country
-  // and use the appropriate emergency number
-  return openPhoneDialer('911');
+export async function callEmergencyServices(emergencyNumber: string = '112'): Promise<boolean> {
+  return openPhoneDialer(emergencyNumber);
 }
 
 /**
