@@ -1,6 +1,10 @@
 /**
  * Forgot Password Screen
- * Request password reset email
+ *
+ * Requests a password-reset link via the live backend (POST /v1/auth/forgot).
+ * The emailed link deep-links back into ResetPasswordScreen
+ * (carebow://reset-password/:token) where the user sets a new password
+ * (POST /v1/auth/reset). This screen only handles the "send me the link" step.
  */
 
 import React, { useState } from 'react';
@@ -23,7 +27,10 @@ import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { AuthStackParamList } from '@/navigation/types';
 
-type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
+type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<
+  AuthStackParamList,
+  'ForgotPassword'
+>;
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
@@ -49,12 +56,10 @@ export default function ForgotPasswordScreen() {
 
   const handleSubmit = async () => {
     clearError();
-
     if (!validateEmail(email)) {
       return;
     }
-
-    const success = await requestPasswordReset(email);
+    const success = await requestPasswordReset(email.trim());
     if (success) {
       setIsSubmitted(true);
     }
@@ -67,6 +72,8 @@ export default function ForgotPasswordScreen() {
           <Pressable
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
@@ -77,18 +84,16 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={styles.successTitle}>Check your email</Text>
             <Text style={styles.successText}>
-              We've sent password reset instructions to{'\n'}
-              <Text style={styles.emailText}>{email}</Text>
+              If an account exists for{'\n'}
+              <Text style={styles.emailText}>{email}</Text>, we've sent a password reset link.
             </Text>
             <Text style={styles.successHint}>
-              If you don't see the email, check your spam folder.
+              Open the email and tap the link to set a new password. Don't forget to check your spam
+              folder.
             </Text>
 
             <Pressable
-              style={({ pressed }) => [
-                styles.backToLoginButton,
-                pressed && styles.buttonPressed,
-              ]}
+              style={({ pressed }) => [styles.backToLoginButton, pressed && styles.buttonPressed]}
               onPress={() => navigation.navigate('Login')}
             >
               <Text style={styles.backToLoginText}>Back to Sign In</Text>
@@ -127,6 +132,8 @@ export default function ForgotPasswordScreen() {
           <Pressable
             style={styles.backButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
@@ -137,7 +144,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={styles.title}>Forgot password?</Text>
             <Text style={styles.subtitle}>
-              No worries, we'll send you reset instructions.
+              No worries — enter your email and we'll send you a link to reset your password.
             </Text>
           </View>
 
@@ -146,10 +153,7 @@ export default function ForgotPasswordScreen() {
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
-              <View style={[
-                styles.inputContainer,
-                emailError && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, emailError && styles.inputError]}>
                 <Icon name="mail" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -166,11 +170,11 @@ export default function ForgotPasswordScreen() {
                   autoCorrect={false}
                   autoComplete="email"
                   autoFocus
+                  onSubmitEditing={handleSubmit}
+                  returnKeyType="send"
                 />
               </View>
-              {emailError ? (
-                <Text style={styles.errorText}>{emailError}</Text>
-              ) : null}
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
             </View>
 
             {/* API Error */}
@@ -194,16 +198,13 @@ export default function ForgotPasswordScreen() {
               {isLoading ? (
                 <ActivityIndicator color={colors.textInverse} />
               ) : (
-                <Text style={styles.submitButtonText}>Reset Password</Text>
+                <Text style={styles.submitButtonText}>Send reset link</Text>
               )}
             </Pressable>
           </View>
 
           {/* Back to Login */}
-          <Pressable
-            style={styles.loginLink}
-            onPress={() => navigation.navigate('Login')}
-          >
+          <Pressable style={styles.loginLink} onPress={() => navigation.navigate('Login')}>
             <Icon name="arrow-left" size={16} color={colors.textSecondary} />
             <Text style={styles.loginLinkText}>Back to Sign In</Text>
           </Pressable>
