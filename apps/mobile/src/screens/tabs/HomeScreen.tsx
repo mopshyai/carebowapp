@@ -3,17 +3,9 @@
 // Modern, polished UI like Practo/Cult.fit level
 // ============================================
 
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Dimensions,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
@@ -29,8 +21,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import type { IconName } from '@/components/icons/iconMap';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCareReadiness } from '@/store/useProfileStore';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { memberApi, V1Booking } from '@/services/api/endpoints/member';
 
 // ============================================
 // DESIGN TOKENS - CAREBOW BRAND
@@ -98,10 +89,7 @@ const AnimatedPressable = ({ children, onPress, style, delay = 0 }: any) => {
       }}
       onPress={onPress}
     >
-      <Animated.View
-        entering={FadeInDown.delay(delay).springify()}
-        style={[animatedStyle, style]}
-      >
+      <Animated.View entering={FadeInDown.delay(delay).springify()} style={[animatedStyle, style]}>
         {children}
       </Animated.View>
     </Pressable>
@@ -232,10 +220,7 @@ const EmergencyBanner = ({ navigation }: { navigation: any }) => (
       Haptics.trigger('impactLight');
       navigation.navigate('Safety', { screen: 'SafetyIndex' });
     }}
-    style={({ pressed }) => [
-      styles.emergencyBanner,
-      pressed && { opacity: 0.9 }
-    ]}
+    style={({ pressed }) => [styles.emergencyBanner, pressed && { opacity: 0.9 }]}
   >
     <View style={styles.emergencyGradientFallback}>
       <View style={styles.emergencyIconBg}>
@@ -290,7 +275,9 @@ const ExploreServicesCard = ({ navigation }: { navigation: any }) => {
       <View style={styles.exploreTop}>
         <View>
           <Text style={styles.exploreTitle}>Healthcare Services</Text>
-          <Text style={styles.exploreSubtitle}>Doctor visits, lab tests, nursing, equipment & more</Text>
+          <Text style={styles.exploreSubtitle}>
+            Doctor visits, lab tests, nursing, equipment & more
+          </Text>
         </View>
         <View style={styles.exploreArrow}>
           <Text style={styles.exploreArrowText}>→</Text>
@@ -314,47 +301,112 @@ const ExploreServicesCard = ({ navigation }: { navigation: any }) => {
 // ============================================
 // UPCOMING APPOINTMENT CARD
 // ============================================
-const UpcomingCard = () => (
-  <AnimatedPressable delay={800}>
-    <View style={styles.upcomingCard}>
-      <View style={styles.upcomingBadge}>
-        <View style={styles.upcomingDot} />
-        <Text style={styles.upcomingBadgeText}>Coming up</Text>
+const UpcomingCard = ({
+  booking,
+  loading,
+  navigation,
+}: {
+  booking: V1Booking | null;
+  loading: boolean;
+  navigation: any;
+}) => {
+  if (loading) {
+    return (
+      <View style={styles.upcomingEmptyCard}>
+        <Text style={styles.upcomingEmptyText}>Checking your schedule…</Text>
       </View>
+    );
+  }
 
-      <View style={styles.upcomingContent}>
-        <View style={styles.upcomingAvatar}>
-          <Text style={styles.upcomingAvatarText}>SC</Text>
+  if (!booking) {
+    return (
+      <AnimatedPressable delay={800} onPress={() => navigation.navigate('Schedule' as never)}>
+        <View style={styles.upcomingEmptyCard}>
+          <View style={styles.upcomingEmptyIcon}>
+            <AppIcon name="calendar" size={22} color={colors.accent} />
+          </View>
+          <View style={styles.upcomingEmptyContent}>
+            <Text style={styles.upcomingEmptyTitle}>No upcoming appointments</Text>
+            <Text style={styles.upcomingEmptyText}>Your confirmed bookings will appear here.</Text>
+          </View>
+          <Text style={styles.upcomingEmptyArrow}>›</Text>
+        </View>
+      </AnimatedPressable>
+    );
+  }
+
+  const providerName = booking.provider?.name || 'Care provider';
+  const when = new Date(booking.scheduledAt);
+  const initials = providerName
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <AnimatedPressable delay={800}>
+      <View style={styles.upcomingCard}>
+        <View style={styles.upcomingBadge}>
+          <View style={styles.upcomingDot} />
+          <Text style={styles.upcomingBadgeText}>Coming up</Text>
         </View>
 
-        <View style={styles.upcomingInfo}>
-          <Text style={styles.upcomingName}>Dr. Sarah Chen</Text>
-          <Text style={styles.upcomingSpecialty}>General Physician</Text>
-          <View style={styles.upcomingTimeRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <AppIcon name="calendar" size={12} color={colors.textTertiary} />
-              <Text style={styles.upcomingTime}>Jan 5, 2026 • </Text>
-              <AppIcon name="time" size={12} color={colors.textTertiary} />
-              <Text style={styles.upcomingTime}>2:00 PM</Text>
+        <View style={styles.upcomingContent}>
+          <View style={styles.upcomingAvatar}>
+            <Text style={styles.upcomingAvatarText}>{initials || 'CB'}</Text>
+          </View>
+
+          <View style={styles.upcomingInfo}>
+            <Text style={styles.upcomingName}>{providerName}</Text>
+            <Text style={styles.upcomingSpecialty}>
+              {booking.service?.name || 'Care appointment'}
+            </Text>
+            <View style={styles.upcomingTimeRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <AppIcon name="calendar" size={12} color={colors.textTertiary} />
+                <Text style={styles.upcomingTime}>
+                  {when.toLocaleDateString([], { month: 'short', day: 'numeric' })} •{' '}
+                </Text>
+                <AppIcon name="time" size={12} color={colors.textTertiary} />
+                <Text style={styles.upcomingTime}>
+                  {when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <Pressable style={styles.joinButton}>
-          <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.joinGradient}>
-            <AppIcon name="video" size={14} color={colors.textInverse} />
-            <Text style={styles.joinText}>Join</Text>
-          </LinearGradient>
-        </Pressable>
+          <Pressable
+            style={styles.joinButton}
+            onPress={() => navigation.navigate('Schedule' as never)}
+          >
+            <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.joinGradient}>
+              <AppIcon name="video" size={14} color={colors.textInverse} />
+              <Text style={styles.joinText}>Join</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
       </View>
-    </View>
-  </AnimatedPressable>
-);
+    </AnimatedPressable>
+  );
+};
 
 // ============================================
 // CARE PLAN CARD - Full Width
 // ============================================
-const CarePlanCard = ({ name, tagline, price, originalPrice, discount, benefits, color, colorSoft, iconName, onPress, delay }: any) => (
+const CarePlanCard = ({
+  name,
+  tagline,
+  price,
+  originalPrice,
+  discount,
+  benefits,
+  color,
+  colorSoft,
+  iconName,
+  onPress,
+  delay,
+}: any) => (
   <Animated.View entering={FadeInDown.delay(delay).springify()}>
     <AnimatedPressable style={styles.carePlanCard} onPress={onPress}>
       <View style={styles.carePlanHeader}>
@@ -398,14 +450,47 @@ const CarePlanCard = ({ name, tagline, price, originalPrice, discount, benefits,
 // QUICK ACTIONS
 // ============================================
 const QuickActions = ({ navigation }: { navigation: any }) => {
-  const actions: { iconName: IconName; label: string; color: string; iconColor: string; screen: string; nestedScreen?: string }[] = [
-    { iconName: 'receipt', label: 'Orders', color: colors.blueSoft, iconColor: colors.blue, screen: 'Orders' },
-    { iconName: 'document', label: 'Requests', color: colors.purpleSoft, iconColor: colors.purple, screen: 'Requests' },
-    { iconName: 'folder', label: 'Records', color: colors.accentSoft, iconColor: colors.accent, screen: 'Profile', nestedScreen: 'HealthRecords' },
-    { iconName: 'help', label: 'Support', color: colors.orangeSoft, iconColor: colors.orange, screen: 'Profile', nestedScreen: 'Help' },
+  const actions: {
+    iconName: IconName;
+    label: string;
+    color: string;
+    iconColor: string;
+    screen: string;
+    nestedScreen?: string;
+  }[] = [
+    {
+      iconName: 'receipt',
+      label: 'Orders',
+      color: colors.blueSoft,
+      iconColor: colors.blue,
+      screen: 'Orders',
+    },
+    {
+      iconName: 'document',
+      label: 'Requests',
+      color: colors.purpleSoft,
+      iconColor: colors.purple,
+      screen: 'Requests',
+    },
+    {
+      iconName: 'folder',
+      label: 'Records',
+      color: colors.accentSoft,
+      iconColor: colors.accent,
+      screen: 'Profile',
+      nestedScreen: 'HealthRecords',
+    },
+    {
+      iconName: 'help',
+      label: 'Support',
+      color: colors.orangeSoft,
+      iconColor: colors.orange,
+      screen: 'Profile',
+      nestedScreen: 'Help',
+    },
   ];
 
-  const handlePress = (item: typeof actions[0]) => {
+  const handlePress = (item: (typeof actions)[0]) => {
     Haptics.trigger('impactLight');
     if (item.nestedScreen) {
       navigation.navigate(item.screen, { screen: item.nestedScreen });
@@ -459,7 +544,9 @@ const CareReadinessCard = ({ navigation }: { navigation: any }) => {
     >
       <View style={styles.readinessHeader}>
         <View style={styles.readinessTextBlock}>
-          <Text style={styles.readinessTitle}>Your care profile is {careReadiness.score}% ready</Text>
+          <Text style={styles.readinessTitle}>
+            Your care profile is {careReadiness.score}% ready
+          </Text>
           <Text style={styles.readinessHint}>{topMissing.label} to personalize your care →</Text>
         </View>
         <View style={styles.readinessRing}>
@@ -478,12 +565,45 @@ const CareReadinessCard = ({ navigation }: { navigation: any }) => {
 // ============================================
 export default function HomeScreen() {
   const navigation = useNavigation<MainTabScreenProps<'Home'>['navigation']>();
+  const insets = useSafeAreaInsets();
+  const [nextBooking, setNextBooking] = useState<V1Booking | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    memberApi
+      .getBookings()
+      .then((response) => {
+        if (!active || !response.success) return;
+        const now = Date.now();
+        const next =
+          (response.bookings ?? [])
+            .filter(
+              (booking) =>
+                new Date(booking.scheduledAt).getTime() >= now &&
+                booking.status !== 'CANCELLED' &&
+                booking.status !== 'COMPLETED'
+            )
+            .sort((a, b) => +new Date(a.scheduledAt) - +new Date(b.scheduledAt))[0] ?? null;
+        setNextBooking(next);
+      })
+      .catch(() => {})
+      .finally(() => active && setScheduleLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          // Clear the bottom tab bar (icon row + label + home-indicator inset)
+          // so the last card / closing note is never crowded or hidden by it.
+          { paddingBottom: insets.bottom + spacing.xxl * 2 },
+        ]}
       >
         <Header navigation={navigation} />
 
@@ -501,13 +621,24 @@ export default function HomeScreen() {
         </View>
 
         {/* Upcoming */}
-        <SectionHeader title="Upcoming" action="View all" delay={500} />
+        <SectionHeader
+          title="Upcoming"
+          action="View all"
+          onPress={() => navigation.navigate('Schedule' as never)}
+          delay={500}
+        />
         <View style={styles.section}>
-          <UpcomingCard />
+          <UpcomingCard booking={nextBooking} loading={scheduleLoading} navigation={navigation} />
         </View>
 
         {/* Care Plans — full-width, prominent */}
-        <SectionHeader title="Care Plans" subtitle="Save with subscriptions" action="Compare" onPress={() => navigation.navigate('CarePlans' as never)} delay={600} />
+        <SectionHeader
+          title="Care Plans"
+          subtitle="Save with subscriptions"
+          action="Compare"
+          onPress={() => navigation.navigate('CarePlans' as never)}
+          delay={600}
+        />
         <View style={styles.section}>
           <CarePlanCard
             name="Ask CareBow"
@@ -515,11 +646,17 @@ export default function HomeScreen() {
             price={20}
             originalPrice={30}
             discount={33}
-            benefits={['Unlimited AI symptom checks', '24/7 health guidance', 'Personalized care recommendations']}
+            benefits={[
+              'Unlimited AI symptom checks',
+              '24/7 health guidance',
+              'Personalized care recommendations',
+            ]}
             color={colors.purple}
             colorSoft={colors.purpleSoft}
             iconName="sparkles"
-            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)}
+            onPress={() =>
+              navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)
+            }
             delay={650}
           />
           <CarePlanCard
@@ -528,7 +665,11 @@ export default function HomeScreen() {
             price={30}
             originalPrice={null}
             discount={0}
-            benefits={['Weekly check-in calls', 'Medication reminders', 'Dedicated CareBow coordinator']}
+            benefits={[
+              'Weekly check-in calls',
+              'Medication reminders',
+              'Dedicated CareBow coordinator',
+            ]}
             color={colors.accent}
             colorSoft={colors.accentSoft}
             iconName="calendar"
@@ -545,7 +686,9 @@ export default function HomeScreen() {
             color={colors.secondary}
             colorSoft={colors.secondarySoft}
             iconName="leaf"
-            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'half_yearly' } as never)}
+            onPress={() =>
+              navigation.navigate('PlanDetails' as never, { id: 'half_yearly' } as never)
+            }
             delay={750}
           />
           <CarePlanCard
@@ -554,7 +697,11 @@ export default function HomeScreen() {
             price={300}
             originalPrice={360}
             discount={17}
-            benefits={['Daily check-in calls', 'Daily family updates', 'Priority emergency support']}
+            benefits={[
+              'Daily check-in calls',
+              'Daily family updates',
+              'Priority emergency support',
+            ]}
             color={colors.orange}
             colorSoft={colors.orangeSoft}
             iconName="trophy"
@@ -574,8 +721,6 @@ export default function HomeScreen() {
 
         {/* Closing note */}
         <Text style={styles.closingNote}>That's everything for now — take care 👋</Text>
-
-        <View style={{ height: spacing.xxl }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -921,6 +1066,42 @@ const styles = StyleSheet.create({
   },
 
   // Upcoming Card
+  upcomingEmptyCard: {
+    minHeight: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+  },
+  upcomingEmptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  upcomingEmptyContent: {
+    flex: 1,
+  },
+  upcomingEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  upcomingEmptyText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+  upcomingEmptyArrow: {
+    fontSize: 26,
+    color: colors.textTertiary,
+    marginLeft: spacing.sm,
+  },
   upcomingCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,

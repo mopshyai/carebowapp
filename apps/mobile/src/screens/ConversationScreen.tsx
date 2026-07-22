@@ -9,7 +9,7 @@
  * - Support for image attachments
  */
 
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -30,12 +29,11 @@ import { colors, spacing, radius, typography, shadows } from '../theme';
 import { useAskCarebowStore } from '../store/askCarebowStore';
 import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
 import { Message, QuickOption } from '../types/askCarebow';
-import { MemoryCandidate } from '../types/healthMemory';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
 // AI Engine
 import { processUserInput } from '../lib/askCarebow';
-import { sendAskCareBowMessage, createMessagePayload } from '../lib/askCarebow/apiClient';
+import { askCareBowApi } from '../services/api/endpoints/askCareBow';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('Conversation');
@@ -54,12 +52,10 @@ import {
   FollowUpCheckIn,
   StillNeedCard,
 } from '../components/askCarebow';
-import { EnhancedChatBubble, EnhancedResponse, DEFAULT_ACTION_BUTTONS } from '../components/askCarebow/EnhancedChatBubble';
 import { MemoryCandidateCard } from '../components/askCarebow/MemoryCandidateCard';
 import { getTriageLevel, TriageLevel } from '../utils/triageCTAMapping';
 import { useEpisodeStore } from '../store/episodeStore';
 import { useFollowUpStore, useHasScheduledFollowUp } from '../store/followUpStore';
-import { getAgeGroupFromAge } from '../utils/episodeTitleGenerator';
 import { formatFollowUpDate } from '../types/followUp';
 import { resetShownExplanations } from '../utils/questionExplanations';
 import { detectMissingInfo } from '../utils/missingInfoDetector';
@@ -71,19 +67,7 @@ export default function ConversationScreen() {
   const params = (route.params as Record<string, string>) || {};
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Parse attached images from params
-  const attachedImages = useMemo<ImageAttachment[]>(() => {
-    try {
-      return params.attachedImages ? JSON.parse(params.attachedImages) : [];
-    } catch {
-      return [];
-    }
-  }, [params.attachedImages]);
-
-  // State for enhanced responses
-  const [enhancedResponses, setEnhancedResponses] = useState<Record<string, EnhancedResponse>>({});
   const [showActionButtons, setShowActionButtons] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
 
@@ -92,12 +76,11 @@ export default function ConversationScreen() {
     startEpisode,
     addMessage: addEpisodeMessage,
     setTriageLevel: setEpisodeTriageLevel,
-    getActiveEpisode,
     getEpisode,
   } = useEpisodeStore();
 
   // Follow-up store
-  const { scheduleFollowUp, getFollowUpsForEpisode } = useFollowUpStore();
+  const { scheduleFollowUp } = useFollowUpStore();
   const hasScheduledFollowUp = useHasScheduledFollowUp(currentEpisodeId || '');
   const [followUpScheduledLabel, setFollowUpScheduledLabel] = useState<string | null>(null);
 
@@ -126,13 +109,7 @@ export default function ConversationScreen() {
   } = useAskCarebowStore();
 
   // Health memory store
-  const {
-    addPendingCandidates,
-    saveCandidate,
-    dismissCandidate,
-    clearPendingCandidates,
-    getMemorySnapshot,
-  } = useHealthMemoryStore();
+  const { saveCandidate, dismissCandidate, clearPendingCandidates } = useHealthMemoryStore();
   const pendingCandidates = usePendingCandidates();
 
   // Initialize session on mount
@@ -142,7 +119,7 @@ export default function ConversationScreen() {
       resetShownExplanations();
 
       // Start a new session with the initial symptom
-      const session = startNewSession('user_1', 'member_1', params.memberName as string);
+      startNewSession('user_1', 'member_1', params.memberName as string);
 
       // If initial symptom provided, process it
       const initialSymptom = params.symptom as string;
@@ -177,7 +154,7 @@ export default function ConversationScreen() {
 
   // Handle sending a message
   const handleSendMessage = useCallback(
-    async (text: string, images?: ImageAttachment[]) => {
+    async (text: string, _images?: ImageAttachment[]) => {
       if (!currentSession || isProcessing) return;
 
       // Check subscription/free limit
@@ -208,38 +185,9 @@ export default function ConversationScreen() {
       setIsProcessing(true);
 
       try {
-        // Get memory snapshot for personalization
-        const memorySnapshot = getMemorySnapshot(
-          params.context === 'family' ? 'family' : 'me'
-        );
-
-        // Parse caregiver presence from params
-        const isCaregiverPresent = params.caregiverPresent === 'true';
-
-        // Create API payload
-        const payload = createMessagePayload(
-          'user_1',
-          text,
-          {
-            forWhom: (params.context as 'me' | 'family') || 'me',
-            ageGroup: params.age,
-            relationship: params.relation,
-            caregiverPresent: params.context === 'family' ? isCaregiverPresent : undefined,
-          },
-          images || [],
-          memorySnapshot,
-          conversationId || undefined
-        );
-
-        // Send to API (mock in dev)
-        const apiResponse = await sendAskCareBowMessage(payload);
-
-        // Update conversation ID
-        if (apiResponse.conversationId) {
-          setConversationId(apiResponse.conversationId);
-        }
-
-        // Process through existing AI engine for backward compatibility
+        // The deterministic on-device safety engine always creates the medical
+        // guidance first. The authenticated backend may improve wording, but it
+        // cannot remove safety advice or introduce new medical claims.
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
@@ -247,12 +195,34 @@ export default function ConversationScreen() {
           currentSession.conversationState.questionsAsked
         );
 
+        let displayMessages = response.messages;
+        const draftResponse = response.messages
+          .map((message) => message.text)
+          .filter(Boolean)
+          .join('\n\n');
+        if (draftResponse) {
+          try {
+            const liveResponse = await askCareBowApi.rewrite({
+              messageText: text,
+              draftResponse,
+              forWhom: params.context === 'family' ? 'family' : 'me',
+            });
+            if (liveResponse.success && liveResponse.assistantMessage) {
+              displayMessages = response.messages.map((message, index) =>
+                index === 0 ? { ...message, text: liveResponse.assistantMessage } : message
+              );
+            }
+          } catch (apiError) {
+            // Network/backend failure degrades to the local safety response.
+            logger.warn('Ask CareBow rewrite unavailable; using safety response', apiError);
+          }
+        }
+
         // Hide typing indicator
         setIsTyping(false);
 
         // Add assistant messages with enhanced response
-        const lastMessageId = `msg_${Date.now()}`;
-        for (const msg of response.messages) {
+        for (const msg of displayMessages) {
           addAssistantMessage(msg);
 
           // Save to episode
@@ -265,28 +235,13 @@ export default function ConversationScreen() {
           }
 
           // Small delay between multiple messages
-          if (response.messages.length > 1) {
+          if (displayMessages.length > 1) {
             await new Promise((resolve) => setTimeout(resolve, 300));
           }
         }
 
-        // Store enhanced response for the last message
-        if (apiResponse.enhancedResponse) {
-          setEnhancedResponses((prev) => ({
-            ...prev,
-            [lastMessageId]: apiResponse.enhancedResponse!,
-          }));
-        }
-
         // Calculate and set triage level
-        if (apiResponse.triageLevel) {
-          setTriageLevel(apiResponse.triageLevel as TriageLevel);
-          setShowActionButtons(true);
-          // Save to episode
-          if (currentEpisodeId) {
-            setEpisodeTriageLevel(currentEpisodeId, apiResponse.triageLevel as TriageLevel);
-          }
-        } else if (response.urgencyLevel) {
+        if (response.urgencyLevel) {
           // Fallback: calculate from local response
           const calculatedTriage = getTriageLevel({
             urgencyLevel: response.urgencyLevel,
@@ -299,11 +254,6 @@ export default function ConversationScreen() {
           if (currentEpisodeId) {
             setEpisodeTriageLevel(currentEpisodeId, calculatedTriage);
           }
-        }
-
-        // Add memory candidates if any
-        if (apiResponse.memoryCandidates && apiResponse.memoryCandidates.length > 0) {
-          addPendingCandidates(apiResponse.memoryCandidates);
         }
 
         // Update conversation state
@@ -340,41 +290,26 @@ export default function ConversationScreen() {
         setIsProcessing(false);
       }
     },
-    [currentSession, isProcessing, conversationId, params, trial, startTrial]
+    [currentSession, isProcessing, params, trial, startTrial]
   );
 
-  // Handle action button press
-  const handleActionPress = useCallback((action: string, buttonId: string) => {
-    switch (action) {
-      case 'connect_doctor':
-        navigation.navigate('Services' as never, { category: 'video-consult' });
-        break;
-      case 'book_home_visit':
-        navigation.navigate('Services' as never, { category: 'doctor-visit' });
-        break;
-      case 'save_summary':
-        Alert.alert(
-          'Summary Saved',
-          'Your conversation summary has been saved. You can view it in your Health Memory.',
-          [{ text: 'OK' }]
-        );
-        break;
-      default:
-        break;
-    }
-  }, [navigation]);
-
   // Handle memory candidate save
-  const handleSaveMemoryCandidate = useCallback((candidateId: string) => {
-    saveCandidate(candidateId, currentSession?.id);
-  }, [saveCandidate, currentSession?.id]);
+  const handleSaveMemoryCandidate = useCallback(
+    (candidateId: string) => {
+      saveCandidate(candidateId, currentSession?.id);
+    },
+    [saveCandidate, currentSession?.id]
+  );
 
   // Handle memory candidate edit
-  const handleEditMemoryCandidate = useCallback((candidateId: string, newValue: string) => {
-    // For now, just save with the new value
-    // In a full implementation, you'd update the candidate first
-    saveCandidate(candidateId, currentSession?.id);
-  }, [saveCandidate, currentSession?.id]);
+  const handleEditMemoryCandidate = useCallback(
+    (candidateId: string, _newValue: string) => {
+      // For now, just save with the new value
+      // In a full implementation, you'd update the candidate first
+      saveCandidate(candidateId, currentSession?.id);
+    },
+    [saveCandidate, currentSession?.id]
+  );
 
   // Handle quick option selection
   const handleQuickOptionSelect = (option: QuickOption) => {
@@ -382,21 +317,24 @@ export default function ConversationScreen() {
   };
 
   // Handle follow-up scheduling
-  const handleScheduleFollowUp = useCallback((days: number) => {
-    if (!currentEpisodeId) return;
+  const handleScheduleFollowUp = useCallback(
+    (days: number) => {
+      if (!currentEpisodeId) return;
 
-    const episode = getEpisode(currentEpisodeId);
-    if (!episode) return;
+      const episode = getEpisode(currentEpisodeId);
+      if (!episode) return;
 
-    const followUp = scheduleFollowUp({
-      episodeId: currentEpisodeId,
-      episodeTitle: episode.title,
-      daysFromNow: days,
-      reasonSnippet: episode.lastMessageSnippet,
-    });
+      const followUp = scheduleFollowUp({
+        episodeId: currentEpisodeId,
+        episodeTitle: episode.title,
+        daysFromNow: days,
+        reasonSnippet: episode.lastMessageSnippet,
+      });
 
-    setFollowUpScheduledLabel(formatFollowUpDate(followUp.followUpAt));
-  }, [currentEpisodeId, getEpisode, scheduleFollowUp]);
+      setFollowUpScheduledLabel(formatFollowUpDate(followUp.followUpAt));
+    },
+    [currentEpisodeId, getEpisode, scheduleFollowUp]
+  );
 
   const handleDismissFollowUp = useCallback(() => {
     // Just dismiss the UI, don't store anything
@@ -502,10 +440,11 @@ export default function ConversationScreen() {
               }}
             />
             {/* Still Need Card - shows missing info */}
-            {currentSession?.healthContext && (() => {
-              const missingField = detectMissingInfo(currentSession.healthContext);
-              return missingField ? <StillNeedCard missingField={missingField} /> : null;
-            })()}
+            {currentSession?.healthContext &&
+              (() => {
+                const missingField = detectMissingInfo(currentSession.healthContext);
+                return missingField ? <StillNeedCard missingField={missingField} /> : null;
+              })()}
             {/* Follow-up Check-in */}
             <FollowUpCheckIn
               onSchedule={handleScheduleFollowUp}
@@ -521,7 +460,9 @@ export default function ConversationScreen() {
           <SubscriptionGate
             freeQuestionsUsed={freeQuestionsUsed}
             maxFreeQuestions={maxFreeQuestions}
-            onSubscribe={() => navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)}
+            onSubscribe={() =>
+              navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)
+            }
             onViewPlans={() => navigation.navigate('Services')}
           />
         )}
@@ -553,17 +494,19 @@ interface MessageRendererProps {
   episodeId?: string;
 }
 
-function MessageRenderer({ message, onBookService, urgencyLevel, episodeId }: MessageRendererProps) {
+function MessageRenderer({
+  message,
+  onBookService,
+  urgencyLevel,
+  episodeId,
+}: MessageRendererProps) {
   switch (message.contentType) {
     case 'emergency_alert':
       return <EmergencyAlert message={message.text} />;
 
     case 'guidance':
       return message.guidance ? (
-        <GuidanceCard
-          guidance={message.guidance}
-          urgencyLevel={urgencyLevel as any}
-        />
+        <GuidanceCard guidance={message.guidance} urgencyLevel={urgencyLevel as any} />
       ) : (
         <ChatBubble message={message} episodeId={episodeId} />
       );

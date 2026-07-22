@@ -19,10 +19,9 @@ import {
   RecentRequest,
   ActiveSubscription,
   EntryPointContext,
-  EntryPointType,
-  createEmptyAskCareBowContext,
   createEmptyMemberProfile,
 } from '@/types/askCarebow';
+import { useProfileStore } from '@/store/useProfileStore';
 
 // ============================================
 // CONTEXT VALIDATION
@@ -89,17 +88,14 @@ export function validateContext(context: AskCareBowContext): ContextValidationRe
 
 /**
  * Load context for Ask CareBow
- * In production, this would fetch from API/database
+ * Loads the locally persisted member profile. Server-backed order, request,
+ * subscription, and usage history stays empty until those APIs are connected.
  */
 export async function loadAskCareBowContext(
   userId: string,
   memberId: string,
   entryPoint: EntryPointContext
 ): Promise<AskCareBowContext> {
-  // Simulate API call
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  // In production, fetch from actual data sources
   const memberProfile = await loadMemberProfile(memberId);
   const lastOrders = await loadRecentOrders(userId, memberId);
   const lastRequests = await loadRecentRequests(userId, memberId);
@@ -127,107 +123,44 @@ export async function loadAskCareBowContext(
 }
 
 // ============================================
-// DATA LOADERS (MOCK - REPLACE WITH REAL API)
+// DATA LOADERS
 // ============================================
 
 async function loadMemberProfile(memberId: string): Promise<MemberProfile> {
-  // Mock data - in production, fetch from user profile store
-  const mockProfiles: Record<string, MemberProfile> = {
-    member_self: {
-      id: 'member_self',
-      name: 'Me',
-      relationship: 'self',
-      age: 35,
-      gender: 'male',
-      conditions: ['Hypertension'],
-      medications: ['Lisinopril 10mg'],
-      allergies: ['Penicillin'],
-      mobilityStatus: 'fully_mobile',
-      carePreferences: ['home_care', 'video_consult'],
-      profileCompleteness: 85,
-    },
-    member_mother: {
-      id: 'member_mother',
-      name: 'Mom',
-      relationship: 'mother',
-      age: 68,
-      gender: 'female',
-      conditions: ['Diabetes Type 2', 'Arthritis'],
-      medications: ['Metformin 500mg', 'Ibuprofen as needed'],
-      allergies: [],
-      mobilityStatus: 'needs_assistance',
-      carePreferences: ['home_care'],
-      profileCompleteness: 90,
-    },
-    member_father: {
-      id: 'member_father',
-      name: 'Dad',
-      relationship: 'father',
-      age: 72,
-      gender: 'male',
-      conditions: ['Heart Disease', 'High Cholesterol'],
-      medications: ['Aspirin 81mg', 'Atorvastatin 20mg'],
-      allergies: ['Sulfa drugs'],
-      mobilityStatus: 'needs_assistance',
-      carePreferences: ['home_care', 'clinic_visit'],
-      profileCompleteness: 75,
-    },
+  const member = useProfileStore.getState().members.find((item) => item.id === memberId);
+  if (!member) return createEmptyMemberProfile();
+
+  return {
+    id: member.id,
+    name: [member.firstName, member.lastName].filter(Boolean).join(' '),
+    relationship: member.relationship,
+    age: member.age || 0,
+    gender: member.gender,
+    conditions: member.healthInfo.conditions.map((condition) => condition.name),
+    medications: member.healthInfo.medications.map((medication) =>
+      [medication.name, medication.dosage].filter(Boolean).join(' ')
+    ),
+    allergies: member.healthInfo.allergies.map((allergy) => allergy.name),
+    mobilityStatus: member.healthInfo.mobilityStatus,
+    carePreferences: member.carePreferences.preferredCareType,
+    profileCompleteness: member.profileCompleteness,
   };
-
-  return mockProfiles[memberId] || createEmptyMemberProfile();
 }
 
-async function loadRecentOrders(
-  userId: string,
-  memberId: string
-): Promise<RecentOrder[]> {
-  // Mock data - in production, fetch from orders store
-  return [
-    {
-      id: 'order_001',
-      serviceTitle: 'Doctor Home Visit',
-      date: '2024-01-10',
-      status: 'completed',
-    },
-    {
-      id: 'order_002',
-      serviceTitle: 'Blood Test - Home Collection',
-      date: '2024-01-05',
-      status: 'completed',
-    },
-  ];
+async function loadRecentOrders(_userId: string, _memberId: string): Promise<RecentOrder[]> {
+  return [];
 }
 
-async function loadRecentRequests(
-  userId: string,
-  memberId: string
-): Promise<RecentRequest[]> {
-  // Mock data - in production, fetch from requests store
-  return [
-    {
-      id: 'request_001',
-      serviceTitle: 'Nursing Care',
-      date: '2024-01-08',
-      status: 'submitted',
-    },
-  ];
+async function loadRecentRequests(_userId: string, _memberId: string): Promise<RecentRequest[]> {
+  return [];
 }
 
-async function loadActiveSubscriptions(userId: string): Promise<ActiveSubscription[]> {
-  // Mock data - in production, fetch from subscription store
-  return [
-    // Uncomment to simulate having Ask CareBow plan:
-    // {
-    //   planId: 'ask-carebow',
-    //   planName: 'Ask CareBow',
-    //   expiresAt: '2024-12-31',
-    // },
-  ];
+async function loadActiveSubscriptions(_userId: string): Promise<ActiveSubscription[]> {
+  return [];
 }
 
-async function getConversationCountThisMonth(userId: string): Promise<number> {
-  // Mock data - in production, fetch from analytics/session store
-  return 1; // User has had 1 conversation this month
+async function getConversationCountThisMonth(_userId: string): Promise<number> {
+  return 0;
 }
 
 // ============================================
@@ -284,7 +217,9 @@ export function buildSystemContextMessage(context: AskCareBowContext): string {
 
   // Allergies - CRITICAL
   if (profile.allergies.length > 0) {
-    parts.push(`ALLERGIES (avoid recommendations involving these): ${profile.allergies.join(', ')}.`);
+    parts.push(
+      `ALLERGIES (avoid recommendations involving these): ${profile.allergies.join(', ')}.`
+    );
   }
 
   // Mobility
@@ -294,7 +229,9 @@ export function buildSystemContextMessage(context: AskCareBowContext): string {
 
   // Care preferences
   if (profile.carePreferences && profile.carePreferences.length > 0) {
-    parts.push(`Preferred care settings: ${profile.carePreferences.join(', ').replace(/_/g, ' ')}.`);
+    parts.push(
+      `Preferred care settings: ${profile.carePreferences.join(', ').replace(/_/g, ' ')}.`
+    );
   }
 
   // Recent care

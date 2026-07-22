@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SecureStorage } from '@/services/storage/SecureStorage';
 import { authApi, extractTokens, extractUser } from '@/services/api/endpoints/auth';
 import { ApiClient } from '@/services/api/ApiClient';
-import { ApiError, UserTypeSlug } from '@/services/api/types';
+import { AccessProfileSummary, ApiError, UserTypeSlug } from '@/services/api/types';
 
 // ============================================
 // TYPES
@@ -41,20 +41,20 @@ export type { UserTypeSlug };
 
 export const USER_TYPES: Array<{ slug: UserTypeSlug; title: string; description: string }> = [
   { slug: 'customer', title: 'Customer', description: 'Get care for yourself or family' },
-  { slug: 'healthcare_provider', title: 'Healthcare Provider', description: 'Doctors, nurses & clinicians' },
-  { slug: 'service_provider', title: 'Service Provider', description: 'Home care & support services' },
-  { slug: 'service_partner', title: 'Service Partner', description: 'Labs, pharmacies & partners' },
+  {
+    slug: 'service_provider',
+    title: 'Caregiver',
+    description: 'Provide home care & personal support',
+  },
+  { slug: 'healthcare_provider', title: 'Provider', description: 'Doctors, nurses & clinicians' },
+  { slug: 'service_partner', title: 'Partner', description: 'Labs, pharmacies & care businesses' },
 ];
 
 /** Provider accounts use the provider dashboard and skip customer onboarding. */
 export const isProviderUserType = (userType: UserTypeSlug | null): boolean =>
   userType != null && userType !== 'customer';
 
-export type OnboardingStep =
-  | 'slides'
-  | 'role_selection'
-  | 'create_profile'
-  | 'complete';
+export type OnboardingStep = 'slides' | 'role_selection' | 'create_profile' | 'complete';
 
 interface AuthState {
   // User
@@ -64,6 +64,8 @@ interface AuthState {
 
   // Which of the 4 backend user types this account belongs to
   userType: UserTypeSlug;
+  availableProfiles: AccessProfileSummary[];
+  passwordSetupEmail: string | null;
 
   // Session
   accessToken: string | null;
@@ -83,7 +85,10 @@ interface AuthState {
 
 interface AuthActions {
   // Auth actions
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, userTypeSlug?: UserTypeSlug) => Promise<boolean>;
+  chooseLoginProfile: (userTypeSlug: UserTypeSlug) => Promise<boolean>;
+  cancelProfileSelection: () => void;
+  dismissPasswordSetup: () => void;
   signup: (data: SignupData) => Promise<boolean>;
   logout: () => Promise<void>;
 
@@ -99,6 +104,8 @@ interface AuthActions {
   // Password reset
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  /** Passwordless recovery: email a one-time sign-in code for an existing account. */
+  requestLoginCode: (email: string) => Promise<boolean>;
 
   // Onboarding
   setUserRole: (role: UserRole) => void;
@@ -133,6 +140,8 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   userType: 'customer',
+  availableProfiles: [],
+  passwordSetupEmail: null,
   accessToken: null,
   refreshToken: null,
   hasCompletedOnboarding: false,
@@ -151,6 +160,7 @@ const initialState: AuthState = {
  * OTP verification if the backend doesn't issue a session on verify.
  */
 let pendingSignupPassword: string | null = null;
+let pendingLoginCredentials: { email: string; password: string } | null = null;
 
 /** Map the backend's (loosely-shaped) user object onto the store's User. */
 const normalizeUser = (raw: Record<string, unknown> | null, fallbackEmail: string): User => {
@@ -168,12 +178,24 @@ const normalizeUser = (raw: Record<string, unknown> | null, fallbackEmail: strin
   };
 };
 
-const VALID_USER_TYPES: UserTypeSlug[] = ['customer', 'healthcare_provider', 'service_provider', 'service_partner'];
+const VALID_USER_TYPES: UserTypeSlug[] = [
+  'customer',
+  'healthcare_provider',
+  'service_provider',
+  'service_partner',
+];
 
 /** Pull a valid userTypeSlug out of the auth response user object. */
-const extractUserType = (payload: { user?: Record<string, unknown>; data?: { user?: Record<string, unknown> } } | null | undefined): UserTypeSlug | null => {
+const extractUserType = (
+  payload:
+    | { user?: Record<string, unknown>; data?: { user?: Record<string, unknown> } }
+    | null
+    | undefined
+): UserTypeSlug | null => {
   const raw = payload?.user?.userTypeSlug ?? payload?.data?.user?.userTypeSlug;
-  return typeof raw === 'string' && (VALID_USER_TYPES as string[]).includes(raw) ? (raw as UserTypeSlug) : null;
+  return typeof raw === 'string' && (VALID_USER_TYPES as string[]).includes(raw)
+    ? (raw as UserTypeSlug)
+    : null;
 };
 
 /**
@@ -229,7 +251,7 @@ export const useAuthStore = create<AuthStore>()(
       // AUTH ACTIONS
       // ========================================
 
-      login: async (email: string, password: string) => {
+      login: async (email: string, password: string, userTypeSlug?: UserTypeSlug) => {
         set({ isLoading: true, error: null });
 
         try {
@@ -237,11 +259,21 @@ export const useAuthStore = create<AuthStore>()(
             method: 'email-password',
             email,
             password,
-            userTypeSlug: get().userType,
+            userTypeSlug,
           });
 
           if (envelope.success === false) {
             set({ isLoading: false, error: envelope.error || 'Invalid email or password' });
+            return false;
+          }
+
+          if (envelope.requiresProfileSelection && envelope.availableProfiles?.length) {
+            pendingLoginCredentials = { email, password };
+            set({
+              availableProfiles: envelope.availableProfiles,
+              isLoading: false,
+              error: null,
+            });
             return false;
           }
 
@@ -264,14 +296,49 @@ export const useAuthStore = create<AuthStore>()(
             refreshToken: tokens?.refreshToken ?? null,
             isLoading: false,
             error: null,
+            availableProfiles: [],
+            passwordSetupEmail: null,
           });
+          pendingLoginCredentials = null;
           syncProfileStore(user);
 
           return true;
         } catch (error) {
-          set({ isLoading: false, error: messageFromError(error, 'Login failed. Please try again.') });
+          if (error instanceof ApiError && error.status === 409) {
+            set({
+              isLoading: false,
+              error: null,
+              passwordSetupEmail: email.trim().toLowerCase(),
+            });
+            return false;
+          }
+          set({
+            isLoading: false,
+            error: messageFromError(error, 'Login failed. Please try again.'),
+          });
           return false;
         }
+      },
+
+      chooseLoginProfile: async (userTypeSlug: UserTypeSlug) => {
+        if (!pendingLoginCredentials) {
+          set({
+            error: 'Your login session expired. Please enter your password again.',
+            availableProfiles: [],
+          });
+          return false;
+        }
+        const { email, password } = pendingLoginCredentials;
+        return get().login(email, password, userTypeSlug);
+      },
+
+      cancelProfileSelection: () => {
+        pendingLoginCredentials = null;
+        set({ availableProfiles: [], error: null });
+      },
+
+      dismissPasswordSetup: () => {
+        set({ passwordSetupEmail: null, error: null });
       },
 
       signup: async (data: SignupData) => {
@@ -324,19 +391,20 @@ export const useAuthStore = create<AuthStore>()(
 
           return true;
         } catch (error) {
-          set({ isLoading: false, error: messageFromError(error, 'Signup failed. Please try again.') });
+          set({
+            isLoading: false,
+            error: messageFromError(error, 'Signup failed. Please try again.'),
+          });
           return false;
         }
       },
 
       logout: async () => {
         pendingSignupPassword = null;
+        pendingLoginCredentials = null;
 
         // SECURITY: Clear tokens from secure storage and the API client
-        await Promise.all([
-          SecureStorage.clearAuthTokens(),
-          ApiClient.clearTokens(),
-        ]);
+        await Promise.all([SecureStorage.clearAuthTokens(), ApiClient.clearTokens()]);
 
         // Also clear the local profile store so no account data lingers.
         try {
@@ -372,7 +440,7 @@ export const useAuthStore = create<AuthStore>()(
 
           set({
             pendingVerificationEmail: email,
-            isLoading: false
+            isLoading: false,
           });
           return true;
         } catch (error) {
@@ -482,7 +550,9 @@ export const useAuthStore = create<AuthStore>()(
             set({
               isLoading: false,
               // Most common cause: they haven't actually clicked the link yet.
-              error: envelope.error || 'Please tap the verification link in your email first, then try again.',
+              error:
+                envelope.error ||
+                'Please tap the verification link in your email first, then try again.',
             });
             return false;
           }
@@ -516,6 +586,36 @@ export const useAuthStore = create<AuthStore>()(
       // ========================================
       // PASSWORD RESET
       // ========================================
+
+      requestLoginCode: async (email: string) => {
+        set({ isLoading: true, error: null });
+
+        try {
+          const envelope = await authApi.requestEmailCode(email);
+
+          if (envelope.success === false) {
+            set({
+              isLoading: false,
+              error:
+                envelope.error ||
+                "We couldn't send a code to that email. Check the address and try again.",
+            });
+            return false;
+          }
+
+          // Code login has no password to fall back on; clear any stale one so
+          // verifyEmail() takes the token-issuing path rather than a password login.
+          pendingSignupPassword = null;
+          set({ pendingVerificationEmail: email, isLoading: false, error: null });
+          return true;
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: messageFromError(error, "Couldn't send a sign-in code. Please try again."),
+          });
+          return false;
+        }
+      },
 
       requestPasswordReset: async (email: string) => {
         set({ isLoading: true, error: null });
@@ -597,7 +697,7 @@ export const useAuthStore = create<AuthStore>()(
           // NOTE: /auth/me not yet verified against the live backend; keeps
           // the cached user on failure rather than logging out.
           const response = await authApi.getCurrentUser();
-          const raw = (response as unknown as Record<string, unknown>);
+          const raw = response as unknown as Record<string, unknown>;
           const user = normalizeUser(
             (raw.user as Record<string, unknown>) ?? raw,
             get().user?.email || ''

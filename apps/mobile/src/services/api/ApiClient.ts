@@ -318,7 +318,16 @@ class ApiClientImpl {
 
         // Don't retry on certain errors
         if (error instanceof ApiError) {
-          if (['UNAUTHORIZED', 'FORBIDDEN', 'NOT_FOUND', 'VALIDATION_ERROR'].includes(error.code)) {
+          if (
+            [
+              'UNAUTHORIZED',
+              'FORBIDDEN',
+              'NOT_FOUND',
+              'VALIDATION_ERROR',
+              'CONFLICT',
+              'RATE_LIMITED',
+            ].includes(error.code)
+          ) {
             throw error;
           }
         }

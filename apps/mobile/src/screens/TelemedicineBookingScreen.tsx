@@ -4,15 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -35,50 +27,10 @@ interface Doctor {
   languages: string[];
 }
 
-interface TimeSlot {
-  time: string;
-  available: boolean;
-}
-
-// ============================================
-// MOCK DATA
-// ============================================
-
-const MOCK_DOCTORS: Doctor[] = [
-  {
-    id: '1',
-    name: 'Dr. Sarah Chen',
-    specialty: 'General Practitioner',
-    rating: 4.9,
-    reviewCount: 324,
-    experience: '15 years',
-    availableSlots: ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '03:30 PM'],
-    consultationFee: 75,
-    languages: ['English', 'Mandarin'],
-  },
-  {
-    id: '2',
-    name: 'Dr. James Wilson',
-    specialty: 'Internal Medicine',
-    rating: 4.8,
-    reviewCount: 256,
-    experience: '12 years',
-    availableSlots: ['10:30 AM', '01:00 PM', '02:30 PM', '04:00 PM'],
-    consultationFee: 85,
-    languages: ['English', 'Spanish'],
-  },
-  {
-    id: '3',
-    name: 'Dr. Emily Park',
-    specialty: 'Family Medicine',
-    rating: 4.9,
-    reviewCount: 189,
-    experience: '10 years',
-    availableSlots: ['09:30 AM', '11:00 AM', '12:30 PM', '03:00 PM'],
-    consultationFee: 70,
-    languages: ['English', 'Korean'],
-  },
-];
+// Provider discovery is not available in the v1 API yet. Never substitute
+// fabricated clinicians; render an honest empty state until live providers
+// and availability are returned by the backend.
+const AVAILABLE_DOCTORS: Doctor[] = [];
 
 const generateDates = (): { date: Date; label: string; dayLabel: string }[] => {
   const dates = [];
@@ -88,8 +40,12 @@ const generateDates = (): { date: Date; label: string; dayLabel: string }[] => {
     const date = new Date(today);
     date.setDate(today.getDate() + i);
 
-    const dayLabel = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' :
-      date.toLocaleDateString('en-US', { weekday: 'short' });
+    const dayLabel =
+      i === 0
+        ? 'Today'
+        : i === 1
+          ? 'Tomorrow'
+          : date.toLocaleDateString('en-US', { weekday: 'short' });
     const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     dates.push({ date, label, dayLabel });
@@ -109,7 +65,7 @@ export default function TelemedicineBookingScreen() {
 
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(
     route.params?.doctorId
-      ? MOCK_DOCTORS.find(d => d.id === route.params?.doctorId) || null
+      ? AVAILABLE_DOCTORS.find((d) => d.id === route.params?.doctorId) || null
       : null
   );
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -145,9 +101,10 @@ export default function TelemedicineBookingScreen() {
     // TODO: Integrate with API to create appointment
     Alert.alert(
       'Appointment Booked!',
-      `Your video consultation with ${selectedDoctor?.name} is scheduled for ${
-        selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-      } at ${selectedTime}.`,
+      `Your video consultation with ${selectedDoctor?.name} is scheduled for ${selectedDate.toLocaleDateString(
+        'en-US',
+        { weekday: 'long', month: 'long', day: 'numeric' }
+      )} at ${selectedTime}.`,
       [
         {
           text: 'View Schedule',
@@ -166,7 +123,12 @@ export default function TelemedicineBookingScreen() {
       <View style={[styles.stepDot, step === 'doctor' && styles.stepDotActive]}>
         <Text style={[styles.stepNumber, step === 'doctor' && styles.stepNumberActive]}>1</Text>
       </View>
-      <View style={[styles.stepLine, (step === 'datetime' || step === 'confirm') && styles.stepLineActive]} />
+      <View
+        style={[
+          styles.stepLine,
+          (step === 'datetime' || step === 'confirm') && styles.stepLineActive,
+        ]}
+      />
       <View style={[styles.stepDot, step === 'datetime' && styles.stepDotActive]}>
         <Text style={[styles.stepNumber, step === 'datetime' && styles.stepNumberActive]}>2</Text>
       </View>
@@ -183,7 +145,17 @@ export default function TelemedicineBookingScreen() {
       <Text style={styles.sectionSubtitle}>Choose from our verified healthcare providers</Text>
 
       <View style={styles.doctorList}>
-        {MOCK_DOCTORS.map((doctor) => (
+        {AVAILABLE_DOCTORS.length === 0 && (
+          <View style={styles.providerEmptyState}>
+            <Icon name="calendar-outline" size={40} color={colors.textTertiary} />
+            <Text style={styles.providerEmptyTitle}>Online booking is not available yet</Text>
+            <Text style={styles.providerEmptyText}>
+              Verified clinicians and live time slots will appear here when provider scheduling is
+              connected.
+            </Text>
+          </View>
+        )}
+        {AVAILABLE_DOCTORS.map((doctor) => (
           <TouchableOpacity
             key={doctor.id}
             style={[
@@ -359,7 +331,8 @@ export default function TelemedicineBookingScreen() {
       <View style={styles.infoNote}>
         <Icon name="information-circle" size={20} color={colors.accent} />
         <Text style={styles.infoNoteText}>
-          You'll receive a reminder 30 minutes before your appointment with a link to join the video call.
+          You'll receive a reminder 30 minutes before your appointment with a link to join the video
+          call.
         </Text>
       </View>
     </View>
@@ -384,9 +357,11 @@ export default function TelemedicineBookingScreen() {
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {step === 'doctor' ? 'Book Consultation' :
-           step === 'datetime' ? 'Select Date & Time' :
-           'Confirm Booking'}
+          {step === 'doctor'
+            ? 'Book Consultation'
+            : step === 'datetime'
+              ? 'Select Date & Time'
+              : 'Confirm Booking'}
         </Text>
         <View style={styles.headerButton} />
       </View>
@@ -517,6 +492,28 @@ const styles = StyleSheet.create({
   // Doctor Selection
   doctorList: {
     gap: spacing.md,
+  },
+  providerEmptyState: {
+    minHeight: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  providerEmptyTitle: {
+    ...typography.h4,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  providerEmptyText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   doctorCard: {
     flexDirection: 'row',

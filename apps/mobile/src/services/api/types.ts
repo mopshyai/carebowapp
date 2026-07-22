@@ -138,7 +138,7 @@ export interface LoginRequest {
   method: AuthMethod;
   email: string;
   password: string;
-  userTypeSlug: UserTypeSlug;
+  userTypeSlug?: UserTypeSlug;
 }
 
 export type LoginResponse = AuthEnvelope;
@@ -168,10 +168,19 @@ export interface AuthEnvelope {
   tokens?: Partial<AuthTokens> & { expiresIn?: number };
   accessToken?: string;
   refreshToken?: string;
+  requiresProfileSelection?: boolean;
+  availableProfiles?: AccessProfileSummary[];
   data?: {
     user?: Record<string, unknown>;
     tokens?: Partial<AuthTokens> & { expiresIn?: number };
   };
+}
+
+export interface AccessProfileSummary {
+  userTypeSlug: UserTypeSlug;
+  userRoleSlug?: string | null;
+  userPlanSlug?: string | null;
+  onboardingCompleted?: boolean;
 }
 
 export type SignupResponse = AuthEnvelope;

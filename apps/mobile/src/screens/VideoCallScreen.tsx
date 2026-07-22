@@ -4,15 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -47,7 +39,7 @@ export default function VideoCallScreen() {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
 
-  const { doctorName = 'Dr. Sarah Chen', doctorSpecialty = 'General Practitioner' } = route.params || {};
+  const { doctorName = 'Care provider', doctorSpecialty = 'Care appointment' } = route.params || {};
 
   const [callState, setCallState] = useState<CallState>({
     isConnecting: true,
@@ -67,7 +59,7 @@ export default function VideoCallScreen() {
   // Simulate connection
   useEffect(() => {
     const connectTimeout = setTimeout(() => {
-      setCallState(prev => ({ ...prev, isConnecting: false, isConnected: true }));
+      setCallState((prev) => ({ ...prev, isConnecting: false, isConnected: true }));
     }, 2000);
 
     return () => clearTimeout(connectTimeout);
@@ -77,7 +69,7 @@ export default function VideoCallScreen() {
   useEffect(() => {
     if (callState.isConnected) {
       durationInterval.current = setInterval(() => {
-        setCallState(prev => ({ ...prev, duration: prev.duration + 1 }));
+        setCallState((prev) => ({ ...prev, duration: prev.duration + 1 }));
       }, 1000);
     }
 
@@ -125,35 +117,31 @@ export default function VideoCallScreen() {
   };
 
   const toggleMute = () => {
-    setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
+    setCallState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
   };
 
   const toggleVideo = () => {
-    setCallState(prev => ({ ...prev, isVideoEnabled: !prev.isVideoEnabled }));
+    setCallState((prev) => ({ ...prev, isVideoEnabled: !prev.isVideoEnabled }));
   };
 
   const toggleSpeaker = () => {
-    setCallState(prev => ({ ...prev, isSpeakerOn: !prev.isSpeakerOn }));
+    setCallState((prev) => ({ ...prev, isSpeakerOn: !prev.isSpeakerOn }));
   };
 
   const handleEndCall = () => {
-    Alert.alert(
-      'End Call',
-      'Are you sure you want to end this consultation?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Call',
-          style: 'destructive',
-          onPress: () => {
-            if (durationInterval.current) {
-              clearInterval(durationInterval.current);
-            }
-            navigation.goBack();
-          },
+    Alert.alert('End Call', 'Are you sure you want to end this consultation?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Call',
+        style: 'destructive',
+        onPress: () => {
+          if (durationInterval.current) {
+            clearInterval(durationInterval.current);
+          }
+          navigation.goBack();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleChat = () => {
@@ -197,11 +185,7 @@ export default function VideoCallScreen() {
   }
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={1}
-      onPress={handleScreenTap}
-    >
+    <TouchableOpacity style={styles.container} activeOpacity={1} onPress={handleScreenTap}>
       {/* Remote Video (Full Screen) */}
       <View style={styles.remoteVideo}>
         {/* Placeholder for actual video stream */}
@@ -241,9 +225,7 @@ export default function VideoCallScreen() {
           <View style={styles.callInfo}>
             <View style={styles.callStatusBadge}>
               <View style={styles.callStatusDot} />
-              <Text style={styles.callStatusText}>
-                {formatDuration(callState.duration)}
-              </Text>
+              <Text style={styles.callStatusText}>{formatDuration(callState.duration)}</Text>
             </View>
             <Text style={styles.callDoctorName}>{doctorName}</Text>
           </View>
@@ -301,9 +283,7 @@ export default function VideoCallScreen() {
                 size={26}
                 color={colors.textInverse}
               />
-              <Text style={styles.controlButtonLabel}>
-                {callState.isMuted ? 'Unmute' : 'Mute'}
-              </Text>
+              <Text style={styles.controlButtonLabel}>{callState.isMuted ? 'Unmute' : 'Mute'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
