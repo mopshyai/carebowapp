@@ -4,22 +4,14 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useTranslation, LANGUAGES, type SupportedLanguage } from '../../localization';
+import { useTranslation, type SupportedLanguage } from '../../localization';
 import { createLogger } from '../../utils/logger';
 
 const logger = createLogger('Settings');
@@ -42,37 +34,37 @@ export default function SettingsScreen() {
         onPress: () => {
           logger.debug('Setting theme to light');
           updateAppSettings({ theme: 'light' });
-        }
+        },
       },
       {
         text: 'Dark',
         onPress: () => {
           logger.debug('Setting theme to dark');
           updateAppSettings({ theme: 'dark' });
-        }
+        },
       },
       {
         text: 'System',
         onPress: () => {
           logger.debug('Setting theme to system');
           updateAppSettings({ theme: 'system' });
-        }
+        },
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
   const handleLanguageChange = () => {
-    const languageOptions = (Object.entries(languages) as [SupportedLanguage, typeof languages[SupportedLanguage]][]).map(
-      ([code, meta]) => ({
-        text: `${meta.nativeName} (${meta.name})`,
-        onPress: () => {
-          logger.debug('Setting language to', code);
-          setLanguage(code);
-          updateAppSettings({ language: code });
-        },
-      })
-    );
+    const languageOptions = (
+      Object.entries(languages) as [SupportedLanguage, (typeof languages)[SupportedLanguage]][]
+    ).map(([code, meta]) => ({
+      text: `${meta.nativeName} (${meta.name})`,
+      onPress: () => {
+        logger.debug('Setting language to', code);
+        setLanguage(code);
+        updateAppSettings({ language: code });
+      },
+    }));
 
     Alert.alert(t('settings.language'), 'Choose your preferred language', [
       ...languageOptions,
@@ -84,21 +76,16 @@ export default function SettingsScreen() {
     const newUnit = appSettings.measurementUnit === 'imperial' ? 'metric' : 'imperial';
     logger.debug('Changing measurement', { from: appSettings.measurementUnit, to: newUnit });
     updateAppSettings({ measurementUnit: newUnit });
-    Alert.alert('Updated', `Measurement units set to ${newUnit === 'imperial' ? 'Imperial' : 'Metric'}`);
+    Alert.alert(
+      'Updated',
+      `Measurement units set to ${newUnit === 'imperial' ? 'Imperial' : 'Metric'}`
+    );
   };
 
   const handleUpgrade = () => {
-    Alert.alert(
-      'Upgrade to Premium',
-      'Get unlimited AI health consultations, priority support, and exclusive features for $20/month.',
-      [
-        { text: 'Maybe Later', style: 'cancel' },
-        {
-          text: 'Subscribe Now',
-          onPress: () => Alert.alert('Coming Soon', 'In-app subscriptions will be available soon!')
-        },
-      ]
-    );
+    // Route into the real Care Plans flow (Ask CareBow premium, $20/mo) instead
+    // of a dead "coming soon" alert. PlanDetails handles plan selection → checkout.
+    navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never);
   };
 
   const handleLogout = () => {

@@ -84,9 +84,7 @@ export async function getLocationPermissionStatus(): Promise<PermissionStatus> {
  * Get current location with timeout
  * Returns result object to handle both success and failure gracefully
  */
-export async function getCurrentLocation(
-  timeoutMs: number = 10000
-): Promise<LocationResult> {
+export async function getCurrentLocation(timeoutMs: number = 10000): Promise<LocationResult> {
   return new Promise((resolve) => {
     Geolocation.getCurrentPosition(
       (position) => {
@@ -153,9 +151,7 @@ export async function getLastKnownLocation(): Promise<LocationResult> {
  * Get location with fallback to last known
  * Tries current location first, falls back to last known if that fails
  */
-export async function getLocationWithFallback(
-  timeoutMs: number = 8000
-): Promise<LocationResult> {
+export async function getLocationWithFallback(timeoutMs: number = 8000): Promise<LocationResult> {
   // Try current location first
   const currentResult = await getCurrentLocation(timeoutMs);
   if (currentResult.success) {
@@ -191,15 +187,46 @@ export function createAppleMapsLink(lat: number, lng: number): string {
 }
 
 /**
- * Get formatted address from coordinates (reverse geocoding)
- * Note: For RN CLI, you would need to use a geocoding API like Google Maps Geocoding API
+ * Get a human-readable address from coordinates (reverse geocoding).
+ *
+ * Uses OpenStreetMap Nominatim — keyless and free — so SOS alerts can show a
+ * real street address instead of raw coordinates. Fails soft (returns null) on
+ * timeout/error so the caller can fall back to coordinates; never throws.
  */
-export async function getAddressFromCoordinates(
-  lat: number,
-  lng: number
-): Promise<string | null> {
-  // In RN CLI, reverse geocoding requires an external API
-  // For now, return null - you can implement using Google Maps Geocoding API
-  logger.debug('Reverse geocoding not implemented in RN CLI. Coordinates:', { lat, lng });
-  return null;
+export async function getAddressFromCoordinates(lat: number, lng: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
+      `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}` +
+      `&zoom=18&addressdetails=1`;
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        // Nominatim usage policy requires an identifying User-Agent.
+        'User-Agent': 'CareBow/1.0 (https://www.carebow.com)',
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      logger.warn('Reverse geocoding failed', { status: response.status });
+      return null;
+    }
+
+    const data = await response.json();
+    const address: string | undefined = data?.display_name;
+    return address && address.trim().length > 0 ? address : null;
+  } catch (error) {
+    // AbortError (timeout) or network failure — fall back to coordinates.
+    logger.warn('Reverse geocoding error; falling back to coordinates', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
