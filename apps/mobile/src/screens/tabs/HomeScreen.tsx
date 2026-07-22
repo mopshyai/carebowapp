@@ -180,7 +180,7 @@ const AIHeroCard = ({ navigation }: { navigation: any }) => (
 
           <Text style={styles.heroTitle}>Ask CareBow</Text>
           <Text style={styles.heroSubtitle}>
-            Describe symptoms & get instant{'\n'}personalized health guidance
+            Describe symptoms & get instant personalized health guidance
           </Text>
 
           {/* CTA Button */}
@@ -392,61 +392,6 @@ const UpcomingCard = ({
 };
 
 // ============================================
-// CARE PLAN CARD - Full Width
-// ============================================
-const CarePlanCard = ({
-  name,
-  tagline,
-  price,
-  originalPrice,
-  discount,
-  benefits,
-  color,
-  colorSoft,
-  iconName,
-  onPress,
-  delay,
-}: any) => (
-  <Animated.View entering={FadeInDown.delay(delay).springify()}>
-    <AnimatedPressable style={styles.carePlanCard} onPress={onPress}>
-      <View style={styles.carePlanHeader}>
-        <View style={[styles.carePlanIcon, { backgroundColor: colorSoft }]}>
-          <AppIcon name={iconName} size={24} color={color} />
-        </View>
-        <View style={styles.carePlanHeaderText}>
-          <Text style={styles.carePlanName}>{name}</Text>
-          <Text style={styles.carePlanTagline}>{tagline}</Text>
-        </View>
-        <View style={styles.carePlanPriceBlock}>
-          <View style={styles.carePlanPriceRow}>
-            <Text style={[styles.carePlanPrice, { color }]}>${price}</Text>
-            {originalPrice && originalPrice > price ? (
-              <Text style={styles.carePlanOriginal}>${originalPrice}</Text>
-            ) : null}
-          </View>
-          {discount > 0 && (
-            <View style={[styles.discountBadge, { backgroundColor: color + '15' }]}>
-              <Text style={[styles.discountText, { color }]}>Save {discount}%</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {benefits && benefits.length > 0 && (
-        <View style={styles.carePlanBenefits}>
-          {benefits.slice(0, 3).map((b: string, i: number) => (
-            <View key={i} style={styles.carePlanBenefitItem}>
-              <AppIcon name="check" size={14} color={color} />
-              <Text style={styles.carePlanBenefitText}>{b}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </AnimatedPressable>
-  </Animated.View>
-);
-
-// ============================================
 // QUICK ACTIONS
 // ============================================
 const QuickActions = ({ navigation }: { navigation: any }) => {
@@ -634,80 +579,29 @@ export default function HomeScreen() {
         {/* Care Plans — full-width, prominent */}
         <SectionHeader
           title="Care Plans"
-          subtitle="Save with subscriptions"
-          action="Compare"
+          subtitle="Published plans will appear here"
+          action="Learn more"
           onPress={() => navigation.navigate('CarePlans' as never)}
           delay={600}
         />
         <View style={styles.section}>
-          <CarePlanCard
-            name="Ask CareBow"
-            tagline="AI Assistant · $20/mo"
-            price={20}
-            originalPrice={30}
-            discount={33}
-            benefits={[
-              'Unlimited AI symptom checks',
-              '24/7 health guidance',
-              'Personalized care recommendations',
-            ]}
-            color={colors.purple}
-            colorSoft={colors.purpleSoft}
-            iconName="sparkles"
-            onPress={() =>
-              navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)
-            }
+          <AnimatedPressable
             delay={650}
-          />
-          <CarePlanCard
-            name="Monthly Plan"
-            tagline="Short-term care · $30/mo"
-            price={30}
-            originalPrice={null}
-            discount={0}
-            benefits={[
-              'Weekly check-in calls',
-              'Medication reminders',
-              'Dedicated CareBow coordinator',
-            ]}
-            color={colors.accent}
-            colorSoft={colors.accentSoft}
-            iconName="calendar"
-            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'monthly' } as never)}
-            delay={700}
-          />
-          <CarePlanCard
-            name="6-Month Plan"
-            tagline="Most popular · $150/6mo"
-            price={150}
-            originalPrice={180}
-            discount={17}
-            benefits={['Twice a week check-ins', 'Priority doctor visits', '24/7 care support']}
-            color={colors.secondary}
-            colorSoft={colors.secondarySoft}
-            iconName="leaf"
-            onPress={() =>
-              navigation.navigate('PlanDetails' as never, { id: 'half_yearly' } as never)
-            }
-            delay={750}
-          />
-          <CarePlanCard
-            name="Yearly Plan"
-            tagline="Best value · $300/yr"
-            price={300}
-            originalPrice={360}
-            discount={17}
-            benefits={[
-              'Daily check-in calls',
-              'Daily family updates',
-              'Priority emergency support',
-            ]}
-            color={colors.orange}
-            colorSoft={colors.orangeSoft}
-            iconName="trophy"
-            onPress={() => navigation.navigate('PlanDetails' as never, { id: 'yearly' } as never)}
-            delay={800}
-          />
+            style={styles.carePlanCard}
+            onPress={() => navigation.navigate('CarePlans' as never)}
+          >
+            <View style={styles.carePlanHeader}>
+              <View style={[styles.carePlanIcon, { backgroundColor: colors.accentSoft }]}>
+                <AppIcon name="shield" size={24} color={colors.accent} />
+              </View>
+              <View style={styles.carePlanHeaderText}>
+                <Text style={styles.carePlanName}>No plans published yet</Text>
+                <Text style={styles.carePlanTagline}>
+                  CareBow will show verified pricing and benefits here.
+                </Text>
+              </View>
+            </View>
+          </AnimatedPressable>
         </View>
 
         {/* Quick Actions */}
@@ -822,7 +716,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.xxl,
     padding: spacing.xl,
     overflow: 'hidden',
-    minHeight: 220,
+    // LinearGradient doesn't reliably grow to its content height on iOS, so the
+    // CTA button gets clipped when the subtitle wraps to 3 lines. Reserve enough
+    // height for the tallest (iOS 3-line) layout.
+    minHeight: 264,
   },
   heroCircle: {
     position: 'absolute',
@@ -1310,13 +1207,15 @@ const styles = StyleSheet.create({
   readinessCard: {
     backgroundColor: colors.accentMuted,
     borderRadius: radius.xl,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg + spacing.xs,
   },
   readinessHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   readinessTextBlock: {
     flex: 1,
@@ -1339,6 +1238,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   readinessRingText: {
     fontSize: 12,
