@@ -176,10 +176,11 @@ export function ToastProvider({
       AccessibilityInfo.announceForAccessibility(`${toast.type}: ${toast.message}`);
 
       // Auto-dismiss
-      if (toast.duration > 0) {
+      if (toast.duration && toast.duration > 0) {
+        const duration = toast.duration;
         const timeout = setTimeout(() => {
           hideToast(id);
-        }, toast.duration);
+        }, duration);
         timeoutRefs.current.set(id, timeout);
       }
 

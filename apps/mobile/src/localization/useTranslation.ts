@@ -11,8 +11,9 @@ import hi from './languages/hi';
 
 import type { TranslationKey } from './languages/en';
 
-// All translations indexed by language code
-const translations: Record<SupportedLanguage, typeof en> = {
+// All translations indexed by language code. Typed by key→string (not `typeof en`,
+// whose literal value types would reject the string-valued es/hi maps).
+const translations: Record<SupportedLanguage, Record<TranslationKey, string>> = {
   en,
   es,
   hi,

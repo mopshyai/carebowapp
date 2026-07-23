@@ -32,8 +32,9 @@ export const LANGUAGES: Record<SupportedLanguage, { name: string; nativeName: st
   hi: { name: 'Hindi', nativeName: 'हिंदी', direction: 'ltr' },
 };
 
-// All translations indexed by language code
-const translations: Record<SupportedLanguage, typeof en> = {
+// All translations indexed by language code. Typed by key→string (not `typeof en`,
+// whose literal value types would reject the string-valued es/hi maps).
+const translations: Record<SupportedLanguage, Record<TranslationKeys, string>> = {
   en,
   es,
   hi,

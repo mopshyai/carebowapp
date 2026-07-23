@@ -46,9 +46,13 @@ export interface NotificationTrigger {
   repeatDays?: number[];
   /** Custom interval in milliseconds */
   repeatInterval?: number;
+  /** One-off interval trigger, in milliseconds (mapped to Notifee INTERVAL). */
+  intervalMs?: number;
 }
 
 export interface NotificationContent {
+  /** Optional explicit notification id (defaults to a generated one). */
+  id?: string;
   /** Notification title */
   title: string;
   /** Notification body text */

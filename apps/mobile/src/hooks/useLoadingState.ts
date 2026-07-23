@@ -74,7 +74,7 @@ export function useLoadingState<T>({
   const [state, setState] = useState<LoadingState>('idle');
   const [data, setData] = useState<T | null>(initialData);
   const [error, setError] = useState<Error | null>(null);
-  const { isConnected } = useNetwork();
+  const { isOnline: isConnected } = useNetwork();
   const asyncFnRef = useRef(asyncFn);
   const mountedRef = useRef(true);
 
@@ -240,7 +240,7 @@ export function useMutation<T, TVariables = void>(
   const [state, setState] = useState<LoadingState>('idle');
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const { isConnected } = useNetwork();
+  const { isOnline: isConnected } = useNetwork();
 
   const mutate = useCallback(
     async (variables: TVariables): Promise<T | null> => {
