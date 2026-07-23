@@ -10,6 +10,7 @@ import {
   Text,
   StyleSheet,
   ViewStyle,
+  DimensionValue,
   Animated,
   Easing,
 } from 'react-native';
@@ -183,7 +184,7 @@ const fullScreenStyles = StyleSheet.create({
 
 interface SkeletonProps {
   /** Width of skeleton */
-  width?: number | string;
+  width?: DimensionValue;
   /** Height of skeleton */
   height?: number;
   /** Border radius */
@@ -272,7 +273,7 @@ interface SkeletonTextProps {
   /** Gap between lines */
   gap?: number;
   /** Last line width percentage */
-  lastLineWidth?: string;
+  lastLineWidth?: DimensionValue;
   /** Enable animation */
   animated?: boolean;
   /** Container style */
@@ -339,7 +340,7 @@ export function SkeletonAvatar({
 
 interface SkeletonButtonProps {
   /** Width of button */
-  width?: number | string;
+  width?: DimensionValue;
   /** Height of button */
   height?: number;
   /** Enable animation */

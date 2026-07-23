@@ -142,7 +142,7 @@ export const CachedImage = memo(function CachedImage({
   return (
     <View style={[containerStyle, styles.container, style]} testID={testID}>
       <FastImage
-        style={[styles.image, { borderRadius }, imageStyle]}
+        style={[styles.image, { borderRadius }, imageStyle] as FastImageProps['style']}
         source={{
           uri,
           priority: priorityMap[priority],

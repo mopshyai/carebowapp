@@ -25,7 +25,6 @@ import {
   ScheduledNotification,
   NotificationTrigger,
   NOTIFICATION_CHANNELS,
-  NotificationChannel,
 } from './types';
 
 // ============================================
@@ -97,7 +96,7 @@ class NotificationServiceImpl implements INotificationService {
 
   private async createChannels(): Promise<void> {
     try {
-      const channels = NOTIFICATION_CHANNELS.map((channel: NotificationChannel) => ({
+      const channels = NOTIFICATION_CHANNELS.map((channel) => ({
         id: channel.id,
         name: channel.name,
         description: channel.description,
@@ -193,7 +192,7 @@ class NotificationServiceImpl implements INotificationService {
         title: notification.content.title,
         body: notification.content.body,
         subtitle: notification.content.subtitle,
-        data: notification.content.data,
+        data: notification.content.data as Record<string, string | number | object> | undefined,
         android: {
           channelId: notification.content.channelId || 'general',
           smallIcon: 'ic_notification',
@@ -352,7 +351,7 @@ class NotificationServiceImpl implements INotificationService {
         title: content.title,
         body: content.body,
         subtitle: content.subtitle,
-        data: content.data,
+        data: content.data as Record<string, string | number | object> | undefined,
         android: {
           channelId: content.channelId || 'general',
           smallIcon: 'ic_notification',

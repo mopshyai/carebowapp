@@ -66,9 +66,12 @@ function generateSecureRandomBytes(length: number): Uint8Array {
     return bytes;
   }
 
-  // Check window.crypto (web environments)
-  if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === 'function') {
-    window.crypto.getRandomValues(bytes);
+  // Check globalThis.crypto (web / polyfilled environments)
+  const globalScope = globalThis as unknown as {
+    crypto?: { getRandomValues?: (arr: Uint8Array) => Uint8Array };
+  };
+  if (globalScope.crypto && typeof globalScope.crypto.getRandomValues === 'function') {
+    globalScope.crypto.getRandomValues(bytes);
     return bytes;
   }
 

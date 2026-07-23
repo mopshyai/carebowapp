@@ -280,7 +280,10 @@ class SentryServiceClass {
     Component: React.ComponentType<P>,
     fallback?: React.ReactNode
   ): React.ComponentType<P> {
-    return Sentry.wrap(Component);
+    // Sentry.wrap is typed for ComponentType<Record<string, unknown>>; bridge the generic.
+    return Sentry.wrap(
+      Component as React.ComponentType<Record<string, unknown>>
+    ) as React.ComponentType<P>;
   }
 
   /**
@@ -297,7 +300,7 @@ class SentryServiceClass {
     if (!this.isInitialized) return false;
 
     try {
-      await Sentry.flush(timeout);
+      await (Sentry.flush as (timeout?: number) => Promise<boolean>)(timeout);
       return true;
     } catch {
       return false;
