@@ -33,26 +33,8 @@ target 'CareBow' do
       :mac_catalyst_enabled => false
     )
 
-    # Enable Swift for the main app to fix Swift runtime linking
-    main_project = installer.aggregate_targets.first.user_project
-    main_project.targets.each do |target|
-      if target.name == 'CareBow'
-        target.build_configurations.each do |config|
-          config.build_settings['SWIFT_VERSION'] = '5.0'
-          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
-          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-        end
-
-        # Add Swift.swift file to the project if not already added
-        swift_file_path = 'CareBow/Swift.swift'
-        swift_file_ref = main_project.main_group.find_subpath('CareBow').files.find { |f| f.path == 'Swift.swift' }
-        if swift_file_ref.nil?
-          group = main_project.main_group.find_subpath('CareBow')
-          file_ref = group.new_file(swift_file_path)
-          target.source_build_phase.add_file_reference(file_ref)
-        end
-      end
-    end
-    main_project.save
+    # NOTE: post_install must never mutate or save the app's .xcodeproj.
+    # The Swift.swift reference and SWIFT_VERSION build settings are committed
+    # in project.pbxproj; CI enforces pod-install idempotency with git status.
   end
 end

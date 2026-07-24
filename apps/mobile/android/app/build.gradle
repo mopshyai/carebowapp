@@ -48,7 +48,9 @@ react {
 
     /* Hermes Commands */
     //   The hermes compiler command to run. By default it is 'hermesc'
-    hermesCommand = "/Users/manvendrakumar/Downloads/Personal/CareBow/Carebow/node_modules/react-native/sdks/hermesc/osx-bin/hermesc"
+    //   Deps hoist to the REPO ROOT node_modules (pnpm node-linker=hoisted),
+    //   same base path as settings.gradle. Never hardcode a machine path here.
+    hermesCommand = "$rootDir/../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
