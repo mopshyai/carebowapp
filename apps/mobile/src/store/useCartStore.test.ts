@@ -10,25 +10,31 @@ import { Service } from '@/data/types';
 const mockService: Service = {
   id: 'service-1',
   title: 'Test Service',
-  shortDescription: 'A test service',
-  description: 'Full description of test service',
   categoryId: 'category-1',
-  thumbnail: 'https://example.com/image.jpg',
+  image: 'test-service',
+  rating: 4.5,
+  reviewCount: 10,
+  shortTagline: 'A test service',
+  description: 'Full description of test service',
+  benefits: [],
+  fulfillment: {
+    mode: 'checkout',
+    requiresPayment: true,
+  },
   pricing: {
     type: 'packages',
     packages: [
-      { id: 'pkg-1', label: 'Basic', price: 500, description: 'Basic package' },
-      { id: 'pkg-2', label: 'Premium', price: 1000, description: 'Premium package' },
+      { id: 'pkg-1', label: 'Basic', price: 500 },
+      { id: 'pkg-2', label: 'Premium', price: 1000 },
     ],
   },
   booking: {
     requiresMember: true,
+    requiresDate: true,
+    requiresTime: true,
     defaultDurationMinutes: 60,
-    availableSlots: ['09:00', '10:00', '11:00'],
+    availableTimeSlots: ['09:00', '10:00', '11:00'],
   },
-  featured: false,
-  popular: false,
-  tags: ['test'],
 };
 
 const mockHourlyService: Service = {
@@ -37,7 +43,7 @@ const mockHourlyService: Service = {
   title: 'Hourly Service',
   pricing: {
     type: 'hourly',
-    ratePerHour: 200,
+    hourlyRate: 200,
     minHours: 2,
     maxHours: 8,
   },
@@ -49,7 +55,7 @@ const mockDailyService: Service = {
   title: 'Daily Service',
   pricing: {
     type: 'daily',
-    ratePerDay: 1500,
+    dailyRate: 1500,
     minDays: 1,
     maxDays: 30,
   },

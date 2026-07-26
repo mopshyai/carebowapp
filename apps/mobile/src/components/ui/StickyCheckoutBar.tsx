@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDiscountPercentage } from '../../data/services';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { formatInr } from '../../lib/liveServiceCatalog';
 
 interface StickyCheckoutBarProps {
   price: number;
@@ -42,9 +43,9 @@ export function StickyCheckoutBar({
             <Text style={styles.onRequestLabel}>On Request</Text>
           ) : (
             <>
-              <Text style={styles.currentPrice}>${price}</Text>
+              <Text style={styles.currentPrice}>{formatInr(price)}</Text>
               {originalPrice && (
-                <Text style={styles.originalPrice}>${originalPrice}</Text>
+                <Text style={styles.originalPrice}>{formatInr(originalPrice)}</Text>
               )}
             </>
           )}

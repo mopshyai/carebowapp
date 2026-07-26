@@ -3,11 +3,7 @@
  * Routes users to appropriate healthcare services based on assessment
  */
 
-import {
-  HealthContext,
-  UrgencyLevel,
-  ServiceRecommendation,
-} from '@/types/askCarebow';
+import { HealthContext, UrgencyLevel, ServiceRecommendation } from '@/types/askCarebow';
 
 // ============================================
 // SERVICE DEFINITIONS
@@ -116,18 +112,17 @@ export function getServiceRecommendations(
   urgencyLevel: UrgencyLevel
 ): ServiceRecommendation[] {
   const recommendations: ServiceRecommendation[] = [];
-  const symptomText = [
-    context.primarySymptom,
-    ...context.associatedSymptoms,
-  ].join(' ').toLowerCase();
+  const symptomText = [context.primarySymptom, ...context.associatedSymptoms]
+    .join(' ')
+    .toLowerCase();
 
   // Filter services by urgency level
-  const eligibleServices = AVAILABLE_SERVICES.filter(service =>
+  const eligibleServices = AVAILABLE_SERVICES.filter((service) =>
     service.urgencyLevels.includes(urgencyLevel)
   );
 
   // Score each service based on symptom match
-  const scoredServices = eligibleServices.map(service => {
+  const scoredServices = eligibleServices.map((service) => {
     let score = 10 - service.priority; // Base score from priority
 
     // Boost score for symptom keyword matches
@@ -174,7 +169,7 @@ function createRecommendation(
 function generateRecommendationReason(
   service: ServiceDefinition,
   context: HealthContext,
-  urgencyLevel: UrgencyLevel
+  _urgencyLevel: UrgencyLevel
 ): string {
   const symptom = context.primarySymptom.toLowerCase();
 
@@ -287,43 +282,23 @@ function getDurationText(duration: string): string {
 // SERVICE AVAILABILITY CHECK
 // ============================================
 
-export function checkServiceAvailability(serviceId: string): {
+export function checkServiceAvailability(_serviceId: string): {
   available: boolean;
   nextAvailable?: string;
   estimatedWait?: string;
 } {
-  // In a real implementation, this would check actual availability
-  // For now, return mock availability
+  // Availability is only truthful after querying the authenticated catalog.
+  // This synchronous safety helper therefore fails closed.
   return {
-    available: true,
-    estimatedWait: getEstimatedWait(serviceId),
+    available: false,
   };
-}
-
-function getEstimatedWait(serviceId: string): string {
-  const waitTimes: Record<string, string> = {
-    emergency: 'Immediate',
-    urgent_care: '15-30 minutes',
-    video_consult: '5-15 minutes',
-    in_person_visit: '1-2 days',
-    specialist_referral: '3-5 days',
-    mental_health: '1-3 days',
-    pharmacy_consult: 'Same day',
-    lab_test: 'Same day',
-    self_care_guidance: 'Immediate',
-  };
-
-  return waitTimes[serviceId] || 'Varies';
 }
 
 // ============================================
 // SERVICE BOOKING HELPERS
 // ============================================
 
-export function getBookingDeepLink(
-  serviceId: string,
-  context: HealthContext
-): string {
+export function getBookingDeepLink(serviceId: string, context: HealthContext): string {
   // Generate deep link for booking the service
   const params = new URLSearchParams({
     service: serviceId,

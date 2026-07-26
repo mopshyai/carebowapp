@@ -3,7 +3,7 @@
  * Professional checkout with order summary and payment
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { getServiceById, formatTime, formatDuration } from '../data/services';
+import { formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
 import { colors, spacing, radius, typography, shadows } from '../theme';
-import { formatPrice } from '../data/catalog';
+import { formatInr } from '../lib/liveServiceCatalog';
+import { memberApi } from '../services/api/endpoints/member';
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -30,9 +31,7 @@ export default function CheckoutScreen() {
 
   // Store hooks
   const { bookingDraft } = useCartStore();
-
-  // Get service data
-  const service = getServiceById(serviceId || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Format date for display
   const formatDate = (dateStr: string | null) => {
@@ -45,15 +44,37 @@ export default function CheckoutScreen() {
     });
   };
 
-  const handlePayment = () => {
-    Alert.alert(
-      'Secure checkout unavailable',
-      'Mobile payment is not connected to the production payment service yet. No order was created and you have not been charged.'
-    );
+  const handleBooking = async () => {
+    if (!bookingDraft?.memberId || !bookingDraft.date || !bookingDraft.startTime) return;
+    setIsSubmitting(true);
+    try {
+      const scheduledAt = new Date(
+        `${bookingDraft.date}T${bookingDraft.startTime}:00`
+      ).toISOString();
+      const result = await memberApi.createBooking({
+        serviceId: bookingDraft.serviceId,
+        profileId: bookingDraft.memberId,
+        scheduledAt,
+        notes: bookingDraft.requestNotes || undefined,
+      });
+      if (!result.success) throw new Error(result.error || 'Booking could not be submitted');
+      Alert.alert(
+        'Booking requested',
+        'Your request was saved to CareBow. The care team will confirm the provider and time.',
+        [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+      );
+    } catch (error) {
+      Alert.alert(
+        'Could not submit booking',
+        error instanceof Error ? error.message : 'Check your connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Error state
-  if (!bookingDraft || !service) {
+  if (!bookingDraft || bookingDraft.serviceId !== serviceId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.errorContainer}>
@@ -179,19 +200,19 @@ export default function CheckoutScreen() {
             <View style={[styles.cardIconWrap, { backgroundColor: colors.successSoft }]}>
               <Icon name="wallet-outline" size={20} color={colors.success} />
             </View>
-            <Text style={styles.cardTitle}>Payment Details</Text>
+            <Text style={styles.cardTitle}>Price</Text>
           </View>
 
           <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>{bookingDraft.pricingLabel}</Text>
-            <Text style={styles.pricingValue}>{formatPrice(bookingDraft.subtotal)}</Text>
+            <Text style={styles.pricingValue}>{formatInr(bookingDraft.subtotal)}</Text>
           </View>
 
           {bookingDraft.discount > 0 && (
             <View style={styles.pricingRow}>
               <Text style={[styles.pricingLabel, styles.discountLabel]}>Discount</Text>
               <Text style={[styles.pricingValue, styles.discountValue]}>
-                -{formatPrice(bookingDraft.discount)}
+                -{formatInr(bookingDraft.discount)}
               </Text>
             </View>
           )}
@@ -200,25 +221,27 @@ export default function CheckoutScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{formatPrice(bookingDraft.total)}</Text>
+            <Text style={styles.totalValue}>{formatInr(bookingDraft.total)}</Text>
           </View>
         </View>
 
-        {/* Payment Method */}
+        {/* Confirmation behavior */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconWrap, { backgroundColor: colors.accentSoft }]}>
               <Icon name="card-outline" size={20} color={colors.accent} />
             </View>
-            <Text style={styles.cardTitle}>Secure Checkout</Text>
+            <Text style={styles.cardTitle}>Booking confirmation</Text>
           </View>
 
           <View style={styles.paymentMethodRow}>
             <View style={styles.paymentMethodLeft}>
               <Icon name="card" size={24} color={colors.accent} />
               <View>
-                <Text style={styles.paymentMethodText}>Mobile payment unavailable</Text>
-                <Text style={styles.paymentMethodSubtext}>No payment method will be charged</Text>
+                <Text style={styles.paymentMethodText}>No charge at this step</Text>
+                <Text style={styles.paymentMethodSubtext}>
+                  This submits a pending booking request
+                </Text>
               </View>
             </View>
           </View>
@@ -226,16 +249,17 @@ export default function CheckoutScreen() {
           <View style={styles.securityNote}>
             <Icon name="shield-checkmark" size={14} color={colors.success} />
             <Text style={styles.securityNoteText}>
-              Checkout will be enabled after the production payment connection is complete
+              The provider, final availability, and payment instructions are confirmed by CareBow
             </Text>
           </View>
         </View>
 
-        {/* Payment availability notice */}
-        <View style={styles.demoNotice}>
+        {/* Booking notice */}
+        <View style={styles.bookingNotice}>
           <Icon name="information-circle-outline" size={16} color={colors.textTertiary} />
-          <Text style={styles.demoNoticeText}>
-            This screen will not create an order or simulate a successful payment.
+          <Text style={styles.bookingNoticeText}>
+            Submitting creates a real pending booking. It does not claim that a provider is
+            assigned.
           </Text>
         </View>
       </ScrollView>
@@ -244,11 +268,18 @@ export default function CheckoutScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerPriceRow}>
           <Text style={styles.footerPriceLabel}>Total</Text>
-          <Text style={styles.footerPriceValue}>{formatPrice(bookingDraft.total)}</Text>
+          <Text style={styles.footerPriceValue}>{formatInr(bookingDraft.total)}</Text>
         </View>
-        <TouchableOpacity style={styles.payButton} onPress={handlePayment} activeOpacity={0.8}>
-          <Icon name="information-circle" size={18} color={colors.white} />
-          <Text style={styles.payButtonText}>Payment unavailable</Text>
+        <TouchableOpacity
+          style={[styles.payButton, isSubmitting && styles.buttonDisabled]}
+          onPress={handleBooking}
+          activeOpacity={0.8}
+          disabled={isSubmitting}
+        >
+          <Icon name="calendar" size={18} color={colors.white} />
+          <Text style={styles.payButtonText}>
+            {isSubmitting ? 'Submitting…' : 'Request booking'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -482,13 +513,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     flex: 1,
   },
-  demoNotice: {
+  bookingNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
-  demoNoticeText: {
+  bookingNoticeText: {
     ...typography.caption,
     color: colors.textTertiary,
     flex: 1,
@@ -530,6 +561,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     ...shadows.button,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   payButtonDisabled: {
     backgroundColor: colors.textTertiary,

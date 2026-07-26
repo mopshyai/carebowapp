@@ -1,118 +1,48 @@
-/**
- * Services API Endpoints
- */
-
+/** JWT-authenticated production services catalog. */
 import { ApiClient } from '../ApiClient';
-import {
-  ServiceCategory,
-  ServiceListItem,
-  ServiceDetails,
-  ServicesListResponse,
-  ServiceFilters,
-} from '../types';
+
+export interface V1Service {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  basePrice: number;
+  priceUnit: string;
+  estimatedDuration?: number | null;
+  isAvailable: boolean;
+}
+
+interface V1ServicesResponse {
+  success: boolean;
+  error?: string;
+  services?: V1Service[];
+}
 
 export const servicesApi = {
-  /**
-   * Get all service categories
-   */
-  getCategories: async (): Promise<ServiceCategory[]> => {
-    const response = await ApiClient.get<{ categories: ServiceCategory[] }>('/services/categories');
-    return response.data.categories;
+  getServices: async (filters?: { category?: string; search?: string }): Promise<V1Service[]> => {
+    const response = await ApiClient.get<V1ServicesResponse>('/v1/services', { params: filters });
+    if (!response.data.success) throw new Error(response.data.error || 'Unable to load services');
+    return response.data.services ?? [];
   },
 
-  /**
-   * Get services list with filters
-   */
-  getServices: async (filters?: ServiceFilters): Promise<ServicesListResponse> => {
-    const response = await ApiClient.get<ServicesListResponse>('/services', {
-      params: filters as Record<string, string | number | boolean | undefined>,
-    });
-    return response.data;
+  getCategories: async (): Promise<string[]> => {
+    const services = await servicesApi.getServices();
+    return [...new Set(services.map((service) => service.category))];
   },
 
-  /**
-   * Get services by category
-   */
   getServicesByCategory: async (
-    categoryId: string,
-    filters?: Omit<ServiceFilters, 'categoryId'>
-  ): Promise<ServicesListResponse> => {
-    const response = await ApiClient.get<ServicesListResponse>(`/services/category/${categoryId}`, {
-      params: filters as Record<string, string | number | boolean | undefined>,
-    });
-    return response.data;
-  },
+    category: string,
+    filters?: { search?: string }
+  ): Promise<V1Service[]> => servicesApi.getServices({ category, ...filters }),
 
-  /**
-   * Search services
-   */
-  searchServices: async (query: string, filters?: ServiceFilters): Promise<ServicesListResponse> => {
-    const response = await ApiClient.get<ServicesListResponse>('/services/search', {
-      params: {
-        q: query,
-        ...filters,
-      } as Record<string, string | number | boolean | undefined>,
-    });
-    return response.data;
-  },
+  searchServices: async (search: string): Promise<V1Service[]> =>
+    servicesApi.getServices({ search }),
 
-  /**
-   * Get service details
-   */
-  getServiceDetails: async (serviceId: string): Promise<ServiceDetails> => {
-    const response = await ApiClient.get<ServiceDetails>(`/services/${serviceId}`);
-    return response.data;
-  },
-
-  /**
-   * Get available time slots for a service
-   */
-  getAvailableSlots: async (
-    serviceId: string,
-    date: string,
-    packageId?: string
-  ): Promise<{ slots: Array<{ time: string; available: boolean }> }> => {
-    const response = await ApiClient.get<{ slots: Array<{ time: string; available: boolean }> }>(
-      `/services/${serviceId}/slots`,
-      {
-        params: { date, packageId },
-      }
-    );
-    return response.data;
-  },
-
-  /**
-   * Get popular services
-   */
-  getPopularServices: async (limit = 10): Promise<ServiceListItem[]> => {
-    const response = await ApiClient.get<{ services: ServiceListItem[] }>('/services/popular', {
-      params: { limit },
-    });
-    return response.data.services;
-  },
-
-  /**
-   * Get recommended services based on user profile
-   */
-  getRecommendedServices: async (): Promise<ServiceListItem[]> => {
-    const response = await ApiClient.get<{ services: ServiceListItem[] }>('/services/recommended');
-    return response.data.services;
-  },
-
-  /**
-   * Check service availability at address
-   */
-  checkServiceAvailability: async (
-    serviceId: string,
-    addressId: string
-  ): Promise<{ available: boolean; reason?: string }> => {
-    const response = await ApiClient.get<{ available: boolean; reason?: string }>(
-      `/services/${serviceId}/availability`,
-      {
-        params: { addressId },
-      }
-    );
-    return response.data;
+  getServiceDetails: async (serviceId: string): Promise<V1Service> => {
+    const services = await servicesApi.getServices();
+    const service = services.find((item) => item.id === serviceId);
+    if (!service) throw new Error('Service not found');
+    return service;
   },
 };
 

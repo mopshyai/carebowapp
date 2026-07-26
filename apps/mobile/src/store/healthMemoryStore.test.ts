@@ -55,9 +55,8 @@ describe('healthMemoryStore', () => {
     it('addMemoryItem creates a new memory item', () => {
       const { result } = renderHook(() => useHealthMemoryStore());
 
-      let newItem: ReturnType<typeof result.current.addMemoryItem>;
       act(() => {
-        newItem = result.current.addMemoryItem(
+        result.current.addMemoryItem(
           'allergy',
           'Allergy',
           'Penicillin',
@@ -100,12 +99,7 @@ describe('healthMemoryStore', () => {
 
       let item: ReturnType<typeof result.current.addMemoryItem>;
       act(() => {
-        item = result.current.addMemoryItem(
-          'medication',
-          'Medication',
-          'Aspirin',
-          'user_input'
-        );
+        item = result.current.addMemoryItem('medication', 'Medication', 'Aspirin', 'user_input');
       });
 
       act(() => {
@@ -148,7 +142,6 @@ describe('healthMemoryStore', () => {
           label: 'Medication',
           value: 'Inhaler',
           confidence: 'high',
-          extractedAt: new Date().toISOString(),
         });
       });
 
@@ -171,11 +164,10 @@ describe('healthMemoryStore', () => {
       act(() => {
         result.current.addPendingCandidate({
           id: 'candidate-1',
-          type: 'symptom',
+          type: 'past_episode',
           label: 'Symptom',
           value: 'Headache',
           confidence: 'medium',
-          extractedAt: new Date().toISOString(),
         });
       });
 
@@ -190,19 +182,17 @@ describe('healthMemoryStore', () => {
         result.current.addPendingCandidates([
           {
             id: 'candidate-1',
-            type: 'symptom',
+            type: 'past_episode',
             label: 'Symptom',
             value: 'Fever',
             confidence: 'high',
-            extractedAt: new Date().toISOString(),
           },
           {
             id: 'candidate-2',
-            type: 'symptom',
+            type: 'past_episode',
             label: 'Symptom',
             value: 'Cough',
             confidence: 'medium',
-            extractedAt: new Date().toISOString(),
           },
         ]);
       });
@@ -220,7 +210,6 @@ describe('healthMemoryStore', () => {
           label: 'Medication',
           value: 'Vitamin D',
           confidence: 'high',
-          extractedAt: new Date().toISOString(),
         });
       });
 
@@ -247,7 +236,6 @@ describe('healthMemoryStore', () => {
           label: 'Allergy',
           value: 'Dust',
           confidence: 'low',
-          extractedAt: new Date().toISOString(),
         });
       });
 
@@ -266,19 +254,17 @@ describe('healthMemoryStore', () => {
         result.current.addPendingCandidates([
           {
             id: 'c1',
-            type: 'symptom',
+            type: 'past_episode',
             label: 'S',
             value: 'V1',
             confidence: 'high',
-            extractedAt: new Date().toISOString(),
           },
           {
             id: 'c2',
-            type: 'symptom',
+            type: 'past_episode',
             label: 'S',
             value: 'V2',
             confidence: 'high',
-            extractedAt: new Date().toISOString(),
           },
         ]);
       });
@@ -344,9 +330,17 @@ describe('healthMemoryStore', () => {
 
       act(() => {
         result.current.addMemoryItem('allergy', 'Allergy', 'Nuts', 'user_input', 'me');
-        result.current.addMemoryItem('allergy', 'Allergy', 'Milk', 'user_input', 'family', 'medium', {
-          familyMemberId: 'family-1',
-        });
+        result.current.addMemoryItem(
+          'allergy',
+          'Allergy',
+          'Milk',
+          'user_input',
+          'family',
+          'medium',
+          {
+            familyMemberId: 'family-1',
+          }
+        );
       });
 
       const myItems = result.current.getItemsForPerson('me');
@@ -364,7 +358,7 @@ describe('healthMemoryStore', () => {
       expect(result.current.hasAnyMemory()).toBe(false);
 
       act(() => {
-        result.current.addMemoryItem('symptom', 'Symptom', 'Fatigue', 'user_input');
+        result.current.addMemoryItem('past_episode', 'Symptom', 'Fatigue', 'user_input');
       });
 
       expect(result.current.hasAnyMemory()).toBe(true);
@@ -426,14 +420,7 @@ describe('healthMemoryStore', () => {
       const { result } = renderHook(() => useHealthMemoryStore());
 
       act(() => {
-        result.current.importFromProfile(
-          ['Peanuts'],
-          [],
-          [],
-          'family',
-          'member-123',
-          'John Doe'
-        );
+        result.current.importFromProfile(['Peanuts'], [], [], 'family', 'member-123', 'John Doe');
       });
 
       expect(result.current.items[0].forWhom).toBe('family');

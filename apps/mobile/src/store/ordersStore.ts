@@ -13,7 +13,6 @@ import {
   BookingCore,
   PaymentInfo,
   PaymentProvider,
-  money,
   generateBookingId,
 } from '@/types/booking';
 import { createLogger } from '../utils/logger';
@@ -73,7 +72,7 @@ export const useOrdersStore = create<OrdersStore>()(
         const now = new Date().toISOString();
 
         const pendingPayment: PaymentInfo = {
-          provider: 'mock',
+          provider: 'razorpay',
           status: 'pending',
           amount: draft.pricing.total,
         };
@@ -159,9 +158,7 @@ export const useOrdersStore = create<OrdersStore>()(
 
         set((state) => ({
           orders: state.orders.map((order) =>
-            order.id === orderId
-              ? { ...order, orderStatus: status, updatedAtISO: now }
-              : order
+            order.id === orderId ? { ...order, orderStatus: status, updatedAtISO: now } : order
           ),
         }));
       },

@@ -7,18 +7,12 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { memberApi, V1Booking } from '@/services/api/endpoints/member';
+import { inventoryApi } from '@/services/api/endpoints/inventory';
 
 export type MemberListVariant = 'patients' | 'assignments' | 'tests' | 'inventory';
 
@@ -30,10 +24,16 @@ interface Row {
 
 const clientName = (b: V1Booking) => b.profile?.name || b.user?.name || b.user?.email || 'Client';
 const whenLabel = (iso: string) =>
-  new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  new Date(iso).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
-// All variants derive from the JWT-accessible /v1/bookings surface (member/*
-// endpoints are web-session only). Inventory has no v1 source yet → coming soon.
+// Patient/assignment/test variants derive from the JWT-accessible /v1/bookings
+// surface (member/* endpoints are web-session only). Inventory has its own
+// service-partner /v1/inventory endpoint.
 const VARIANT: Record<
   MemberListVariant,
   { title: string; icon: string; empty: string; load: () => Promise<Row[]>; stub?: boolean }
@@ -47,7 +47,8 @@ const VARIANT: Record<
       const seen = new Map<string, Row>();
       for (const b of res.bookings ?? []) {
         const name = clientName(b);
-        if (!seen.has(name)) seen.set(name, { id: b.id, title: name, subtitle: b.service?.name ?? undefined });
+        if (!seen.has(name))
+          seen.set(name, { id: b.id, title: name, subtitle: b.service?.name ?? undefined });
       }
       return [...seen.values()];
     },
@@ -81,9 +82,16 @@ const VARIANT: Record<
   inventory: {
     title: 'Inventory',
     icon: 'cube-outline',
-    empty: 'Inventory management is coming soon.',
-    stub: true,
-    load: async () => [],
+    empty: 'No inventory items yet.',
+    load: async () => {
+      const res = await inventoryApi.list();
+      if (!res.success) throw new Error(res.error || 'Inventory is unavailable for this account.');
+      return (res.items ?? []).map((item) => ({
+        id: item.id,
+        title: item.name,
+        subtitle: `${item.quantity} ${item.unit} · ${item.isAvailable ? 'available' : 'out of stock'}`,
+      }));
+    },
   },
 };
 
@@ -126,7 +134,16 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
           data={rows}
           keyExtractor={(r) => r.id}
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={colors.accent}
+            />
+          }
           renderItem={({ item }) => (
             <View style={styles.row}>
               <View style={styles.rowIcon}>
@@ -186,7 +203,13 @@ const styles = StyleSheet.create({
   rowInfo: { flex: 1 },
   rowTitle: { ...typography.label, color: colors.textPrimary },
   rowSubtitle: { ...typography.caption, color: colors.textSecondary },
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxxl, gap: spacing.sm },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.xxxl,
+    gap: spacing.sm,
+  },
   emptyText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   stubNote: { ...typography.caption, color: colors.textTertiary },
 });

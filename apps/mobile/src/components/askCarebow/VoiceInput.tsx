@@ -27,7 +27,6 @@ type VoiceInputProps = {
   onRecordingStart?: () => void;
   onRecordingEnd?: () => void;
   apiKey?: string;
-  useMock?: boolean;
   disabled?: boolean;
 };
 
@@ -40,7 +39,6 @@ export function VoiceInput({
   onRecordingStart,
   onRecordingEnd,
   apiKey,
-  useMock = false,
   disabled = false,
 }: VoiceInputProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
@@ -154,7 +152,7 @@ export function VoiceInput({
       }
 
       // Transcribe the audio
-      if (useMock || !apiKey) {
+      if (!apiKey) {
         setError('Voice transcription is not configured yet. Please type your question.');
         return;
       }

@@ -4,7 +4,20 @@
  */
 
 // API Service
-export { ApiClient, api, authApi, servicesApi, ordersApi } from './api';
+export {
+  ApiClient,
+  api,
+  authApi,
+  servicesApi,
+  memberApi,
+  profilesApi,
+  safetyApi,
+  inventoryApi,
+  notificationsApi,
+  vitalsApi,
+  preferencesApi,
+  deviceTokenApi,
+} from './api';
 export { ApiError } from './api';
 export type {
   ApiResponse,
@@ -16,6 +29,24 @@ export type {
   OrderResponse,
   ServiceDetails,
   ServiceListItem,
+  MemberOverview,
+  MemberOverviewResponse,
+  V1Profile,
+  V1ProfileResponse,
+  V1ProfileShareResponse,
+  InventoryItem,
+  InventoryListResponse,
+  InventoryItemResponse,
+  InventoryDeleteResponse,
+  AppNotification,
+  NotificationsListResponse,
+  NotificationsMutateResponse,
+  Vital,
+  VitalsListResponse,
+  VitalResponse,
+  AppPreferences,
+  PreferencesResponse,
+  DeviceTokenResponse,
 } from './api';
 
 // Notification Service
@@ -41,8 +72,8 @@ export {
   sendMissedCheckInAlert,
 } from './notifications';
 
-// Payment Service
-export { PaymentService } from './payments';
+// Payment types only. Payment execution stays disabled until the authenticated
+// mobile Razorpay contract is deployed; no local payment implementation.
 export type {
   PaymentMethodType,
   SavedCard,

@@ -24,7 +24,15 @@ const createMockDraft = (overrides?: Partial<BookingDraft>): BookingDraft => ({
   startTime: '09:00',
   endTime: '17:00',
   durationMinutes: 480,
+  selectedPackageId: null,
+  selectedPackageLabel: null,
+  hours: null,
+  days: null,
   requestNotes: 'Patient needs assistance with daily activities',
+  subtotal: 5000,
+  discount: 0,
+  total: 5000,
+  pricingLabel: '8 Hours',
   ...overrides,
 });
 
@@ -148,10 +156,10 @@ describe('useServiceRequestStore', () => {
       });
 
       act(() => {
-        result.current.updateRequestStatus(request!.id, 'confirmed');
+        result.current.updateRequestStatus(request!.id, 'scheduled');
       });
 
-      expect(result.current.requests[0].status).toBe('confirmed');
+      expect(result.current.requests[0].status).toBe('scheduled');
     });
 
     it('updateRequestStatus updates timestamp', () => {
@@ -166,7 +174,7 @@ describe('useServiceRequestStore', () => {
       const originalUpdatedAt = new Date(result.current.requests[0].updatedAt).getTime();
 
       act(() => {
-        result.current.updateRequestStatus(request!.id, 'confirmed');
+        result.current.updateRequestStatus(request!.id, 'scheduled');
       });
 
       const newUpdatedAt = new Date(result.current.requests[0].updatedAt).getTime();
@@ -176,14 +184,9 @@ describe('useServiceRequestStore', () => {
     it('updateRequestStatus handles all status types', () => {
       const { result } = renderHook(() => useServiceRequestStore());
 
-      const statuses: Array<'submitted' | 'quoted' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'> = [
-        'submitted',
-        'quoted',
-        'confirmed',
-        'in_progress',
-        'completed',
-        'cancelled',
-      ];
+      const statuses: Array<
+        'submitted' | 'in_review' | 'quoted' | 'scheduled' | 'completed' | 'closed'
+      > = ['submitted', 'in_review', 'quoted', 'scheduled', 'completed', 'closed'];
 
       for (const status of statuses) {
         const draft = createMockDraft();
@@ -301,11 +304,11 @@ describe('useServiceRequestStore', () => {
       });
 
       act(() => {
-        result.current.updateRequestStatus(req1!.id, 'confirmed');
-        result.current.updateRequestStatus(req2!.id, 'confirmed');
+        result.current.updateRequestStatus(req1!.id, 'scheduled');
+        result.current.updateRequestStatus(req2!.id, 'scheduled');
       });
 
-      const confirmed = result.current.getRequestsByStatus('confirmed');
+      const confirmed = result.current.getRequestsByStatus('scheduled');
       expect(confirmed).toHaveLength(2);
     });
 
@@ -320,11 +323,11 @@ describe('useServiceRequestStore', () => {
       });
 
       act(() => {
-        result.current.updateRequestStatus(req1!.id, 'confirmed');
+        result.current.updateRequestStatus(req1!.id, 'scheduled');
       });
 
       const pending = result.current.getPendingRequests();
-      expect(pending).toHaveLength(2); // 2 still submitted, 1 confirmed
+      expect(pending).toHaveLength(2); // 2 still submitted, 1 scheduled
     });
   });
 
@@ -355,6 +358,21 @@ describe('useServiceRequestStore', () => {
       const minimalDraft: BookingDraft = {
         serviceId: 'service-123',
         serviceTitle: 'Basic Service',
+        memberId: null,
+        memberName: null,
+        date: null,
+        startTime: null,
+        endTime: null,
+        durationMinutes: null,
+        selectedPackageId: null,
+        selectedPackageLabel: null,
+        hours: null,
+        days: null,
+        requestNotes: '',
+        subtotal: 0,
+        discount: 0,
+        total: 0,
+        pricingLabel: '',
       };
 
       let request: ServiceRequest;
@@ -373,7 +391,7 @@ describe('useServiceRequestStore', () => {
 
       expect(() => {
         act(() => {
-          result.current.updateRequestStatus('non-existent', 'confirmed');
+          result.current.updateRequestStatus('non-existent', 'scheduled');
         });
       }).not.toThrow();
     });

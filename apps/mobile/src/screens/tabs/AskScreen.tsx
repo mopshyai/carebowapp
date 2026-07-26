@@ -646,7 +646,7 @@ export default function AskCareBowScreen() {
                 <Text style={styles.waitingText}>Waiting for speech...</Text>
               ) : null}
 
-              {/* Alternative: Use VoiceInput component */}
+              {/* Voice input */}
               <View style={styles.voiceInputDivider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>OR</Text>
@@ -663,10 +663,6 @@ export default function AskCareBowScreen() {
                 />
                 <Text style={styles.dividerText}>Press To Speak</Text>
               </TouchableOpacity>
-              {/* <VoiceInput
-                onTranscriptionComplete={(text) => { setSymptomInput(text); setInputMode('text'); }}
-                useMock={true} // Set to false and provide apiKey for real transcription
-              /> */}
             </View>
           )}
         </View>

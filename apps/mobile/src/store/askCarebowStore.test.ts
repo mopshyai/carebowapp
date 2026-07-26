@@ -241,15 +241,20 @@ describe('askCarebowStore', () => {
         result.current.startNewSession('user-1', 'member-1');
       });
 
-      const initialRemaining = result.current.currentSession?.conversationState.questionsRemaining.length || 0;
+      const initialRemaining =
+        result.current.currentSession?.conversationState.questionsRemaining.length || 0;
 
       act(() => {
         result.current.markQuestionAsked('duration');
       });
 
       expect(result.current.currentSession?.conversationState.questionsAsked).toContain('duration');
-      expect(result.current.currentSession?.conversationState.questionsRemaining).not.toContain('duration');
-      expect(result.current.currentSession?.conversationState.questionsRemaining.length).toBe(initialRemaining - 1);
+      expect(result.current.currentSession?.conversationState.questionsRemaining).not.toContain(
+        'duration'
+      );
+      expect(result.current.currentSession?.conversationState.questionsRemaining.length).toBe(
+        initialRemaining - 1
+      );
     });
 
     it('setCurrentQuestion sets the current question type', () => {
@@ -263,7 +268,9 @@ describe('askCarebowStore', () => {
         result.current.setCurrentQuestion('severity');
       });
 
-      expect(result.current.currentSession?.conversationState.currentQuestion?.type).toBe('severity');
+      expect(result.current.currentSession?.conversationState.currentQuestion?.type).toBe(
+        'severity'
+      );
     });
 
     it('markGuidanceProvided sets guidance flag and phase', () => {
@@ -293,13 +300,13 @@ describe('askCarebowStore', () => {
       act(() => {
         result.current.updateHealthContext({
           primarySymptom: 'Headache',
-          duration: '3 days',
+          duration: '3_7_days',
           severity: 7,
         });
       });
 
       expect(result.current.currentSession?.healthContext.primarySymptom).toBe('Headache');
-      expect(result.current.currentSession?.healthContext.duration).toBe('3 days');
+      expect(result.current.currentSession?.healthContext.duration).toBe('3_7_days');
       expect(result.current.currentSession?.healthContext.severity).toBe(7);
     });
 
@@ -329,7 +336,9 @@ describe('askCarebowStore', () => {
         result.current.addAssociatedSymptom('nausea');
       });
 
-      const symptoms = result.current.currentSession?.healthContext.associatedSymptoms.filter(s => s === 'nausea');
+      const symptoms = result.current.currentSession?.healthContext.associatedSymptoms.filter(
+        (s) => s === 'nausea'
+      );
       expect(symptoms).toHaveLength(1);
     });
 
@@ -344,7 +353,9 @@ describe('askCarebowStore', () => {
         result.current.addRiskFactor('high blood pressure');
       });
 
-      expect(result.current.currentSession?.healthContext.riskFactors).toContain('high blood pressure');
+      expect(result.current.currentSession?.healthContext.riskFactors).toContain(
+        'high blood pressure'
+      );
     });
 
     it('addChronicCondition adds condition to list', () => {
@@ -371,10 +382,10 @@ describe('askCarebowStore', () => {
       });
 
       act(() => {
-        result.current.setUrgencyLevel('high');
+        result.current.setUrgencyLevel('urgent');
       });
 
-      expect(result.current.currentSession?.urgencyLevel).toBe('high');
+      expect(result.current.currentSession?.urgencyLevel).toBe('urgent');
     });
 
     it('addServiceRecommendation adds recommendation', () => {
@@ -387,14 +398,17 @@ describe('askCarebowStore', () => {
       act(() => {
         result.current.addServiceRecommendation({
           serviceId: 'service-1',
-          serviceName: 'Doctor consultation',
+          serviceTitle: 'Doctor consultation',
           reason: 'Persistent symptoms',
-          priority: 'high',
+          urgency: 'urgent',
+          prefilledNotes: '',
         });
       });
 
       expect(result.current.currentSession?.recommendedServices).toHaveLength(1);
-      expect(result.current.currentSession?.recommendedServices[0].serviceName).toBe('Doctor consultation');
+      expect(result.current.currentSession?.recommendedServices[0].serviceTitle).toBe(
+        'Doctor consultation'
+      );
     });
 
     it('setRiskLevel sets the risk level', () => {
@@ -467,14 +481,13 @@ describe('askCarebowStore', () => {
         result.current.provideDetailedFeedback({
           rating: 5,
           wasHelpful: true,
-          wouldRecommend: true,
-          comment: 'Very helpful!',
+          feedbackNote: 'Very helpful!',
         });
       });
 
       expect(result.current.currentSession?.feedback?.rating).toBe(5);
       expect(result.current.currentSession?.feedback?.wasHelpful).toBe(true);
-      expect(result.current.currentSession?.feedback?.comment).toBe('Very helpful!');
+      expect(result.current.currentSession?.feedback?.feedbackNote).toBe('Very helpful!');
     });
   });
 
@@ -614,8 +627,8 @@ describe('askCarebowStore', () => {
       });
 
       const daysRemaining = result.current.getTrialDaysRemaining();
-      expect(daysRemaining).toBeGreaterThanOrEqual(2); // At least 2 days (could be 3)
-      expect(daysRemaining).toBeLessThanOrEqual(3);
+      expect(daysRemaining).toBeGreaterThanOrEqual(6); // 7-day trial (ceil could yield 6 near a day boundary)
+      expect(daysRemaining).toBeLessThanOrEqual(7);
     });
 
     it('getTrialDaysRemaining returns 0 when no trial', () => {
@@ -887,7 +900,7 @@ describe('askCarebowStore', () => {
       });
 
       expect(result.current.currentSession).toBeNull();
-      const finalizedSession = result.current.sessions.find(s => s.id === sessionId);
+      const finalizedSession = result.current.sessions.find((s) => s.id === sessionId);
       expect(finalizedSession?.isActive).toBe(false);
       expect(finalizedSession?.sessionSummary).toBeDefined();
     });

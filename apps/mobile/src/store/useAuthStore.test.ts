@@ -3,7 +3,120 @@
  * Unit tests for authentication state management
  */
 
-import { act } from '@testing-library/react-native';
+import type { AuthEnvelope, LoginRequest, SignupRequest } from '@/services/api/types';
+
+// The store now calls the real backend via `authApi`. There's no network in
+// jest, so we mock the endpoint module and simulate the shapes the real
+// backend returns (see src/services/api/endpoints/auth.ts + types.ts).
+// `extractTokens`/`extractUser` are kept real (requireActual) so the store's
+// envelope-parsing logic is exercised exactly as in production.
+jest.mock('@/services/api/endpoints/auth', () => {
+  const actual = jest.requireActual('@/services/api/endpoints/auth');
+
+  const MIN_PASSWORD_LENGTH = 8;
+
+  const mockTokens = {
+    accessToken: 'mock_access_token',
+    refreshToken: 'mock_refresh_token',
+    expiresIn: 900,
+  };
+
+  const login = jest.fn(async (data: LoginRequest): Promise<AuthEnvelope> => {
+    if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
+      return { success: false, error: 'Invalid email or password' };
+    }
+    return {
+      success: true,
+      tokens: mockTokens,
+      user: {
+        id: `user_${data.email}`,
+        email: data.email,
+        firstName: 'Test',
+        lastName: 'User',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  });
+
+  const signup = jest.fn(async (data: SignupRequest): Promise<AuthEnvelope> => {
+    if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
+      return { success: false, error: 'Password must be at least 8 characters' };
+    }
+    // Mirrors the email-otp path (no tokens issued yet) so the store falls
+    // into "pendingVerificationEmail" rather than auto-login, matching what
+    // the "successful signup" test expects.
+    return { success: true };
+  });
+
+  const verifyEmail = jest.fn(async (data: { token: string }): Promise<AuthEnvelope> => {
+    if (!data.token || data.token.length !== 6) {
+      return { success: false, error: 'Invalid verification code' };
+    }
+    return {
+      success: true,
+      tokens: mockTokens,
+      // No `email` field on purpose: the store falls back to the in-memory
+      // `pendingVerificationEmail` via normalizeUser's fallbackEmail param.
+      user: {
+        id: 'user_verified',
+        firstName: 'Test',
+        lastName: 'User',
+      },
+    };
+  });
+
+  const resendVerificationCode = jest.fn(
+    async (): Promise<{ message: string }> => ({
+      message: 'Verification code sent',
+    })
+  );
+
+  const requestPasswordReset = jest.fn(
+    async (): Promise<{ message: string }> => ({
+      message: 'Password reset email sent',
+    })
+  );
+
+  const resetPassword = jest.fn(
+    async (_token: string, newPassword: string): Promise<{ message: string }> => {
+      // The store's resetPassword() has no success-flag branch — it treats
+      // any resolved promise as success and any thrown error as failure —
+      // so short passwords must reject rather than resolve.
+      if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new Error('Password must be at least 8 characters');
+      }
+      return { message: 'Password reset successful' };
+    }
+  );
+
+  const getCurrentUser = jest.fn(
+    async (): Promise<AuthEnvelope> => ({
+      success: true,
+      user: {
+        id: 'user_current',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+      },
+    })
+  );
+
+  return {
+    ...actual,
+    authApi: {
+      ...actual.authApi,
+      login,
+      signup,
+      verifyEmail,
+      resendVerificationCode,
+      requestPasswordReset,
+      resetPassword,
+      getCurrentUser,
+    },
+  };
+});
+
 import { useAuthStore } from './useAuthStore';
 
 // Reset store before each test

@@ -28,7 +28,15 @@ export {
 
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
 export { Input, type InputProps, type InputType } from './Input';
-export { Card, CardHeader, CardBody, CardFooter, type CardProps, type CardVariant, type CardPadding } from './Card';
+export {
+  Card,
+  CardHeader,
+  CardBody,
+  CardFooter,
+  type CardProps,
+  type CardVariant,
+  type CardPadding,
+} from './Card';
 export { BottomSheet, type BottomSheetProps } from './BottomSheet';
 
 // Feedback Components
@@ -106,7 +114,6 @@ export { FormInput, type FormInputProps } from './FormInput';
 export { CategorySection } from './CategorySection';
 export { ServiceRowCard } from './ServiceRowCard';
 export { PackageSelectorList } from './PackageSelectorList';
-export { SubscriptionPlanCard } from './SubscriptionPlanCard';
 export { StickyCheckoutBar } from './StickyCheckoutBar';
 
 // Layout Components

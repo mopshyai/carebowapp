@@ -152,7 +152,7 @@ export type PaymentInfo = {
   paymentId: string;
   status: 'pending' | 'paid' | 'failed' | 'refunded';
   paidAt: string | null; // ISO date string
-  method: string; // e.g., "mock", "stripe", etc.
+  method: string; // Payment provider identifier from the payment gateway.
   amount: number;
 };
 
@@ -191,7 +191,13 @@ export type Order = {
 // SERVICE REQUEST TYPES (On-Request Flow)
 // ============================================
 
-export type ServiceRequestStatus = 'submitted' | 'in_review' | 'quoted' | 'scheduled' | 'completed' | 'closed';
+export type ServiceRequestStatus =
+  | 'submitted'
+  | 'in_review'
+  | 'quoted'
+  | 'scheduled'
+  | 'completed'
+  | 'closed';
 
 export type ServiceRequest = {
   id: string;

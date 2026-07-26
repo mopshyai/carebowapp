@@ -233,7 +233,7 @@ export const authApi = {
     currentPassword: string,
     newPassword: string
   ): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/change-password', {
+    const response = await ApiClient.post<{ message: string }>('/v1/auth/change-password', {
       currentPassword,
       newPassword,
     });
@@ -258,7 +258,7 @@ export const authApi = {
    * Delete account
    */
   deleteAccount: async (password: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/auth/delete-account', {
+    const response = await ApiClient.post<{ message: string }>('/v1/auth/delete-account', {
       password,
     });
     await ApiClient.clearTokens();

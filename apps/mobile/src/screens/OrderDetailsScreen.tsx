@@ -1,529 +1,157 @@
-/**
- * Order Details Screen
- * Shows full details of an order with professional styling
- */
-
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-  Alert,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useOrdersStore } from '../store/ordersStore';
-import { Order, formatMoney } from '../types/booking';
-import { colors, spacing, radius, typography, shadows } from '../theme';
+import { memberApi, V1Booking } from '../services/api/endpoints/member';
+import { colors, radius, spacing, typography } from '../theme';
 
-// Status config
-const statusConfig: Record<Order['orderStatus'], { bg: string; text: string; label: string }> = {
-  created: { bg: colors.warningSoft, text: colors.warning, label: 'Pending' },
-  paid: { bg: colors.successSoft, text: colors.success, label: 'Paid' },
-  fulfilled: { bg: colors.accentSoft, text: colors.accent, label: 'Completed' },
-  cancelled: { bg: colors.errorSoft, text: colors.error, label: 'Cancelled' },
-  refunded: { bg: colors.surface2, text: colors.textTertiary, label: 'Refunded' },
-};
-
-const paymentStatusConfig: Record<string, { bg: string; text: string }> = {
-  paid: { bg: colors.successSoft, text: colors.success },
-  pending: { bg: colors.warningSoft, text: colors.warning },
-  failed: { bg: colors.errorSoft, text: colors.error },
-  refunded: { bg: colors.surface2, text: colors.textTertiary },
-};
-
-// Format date for display
-const formatDate = (dateISO: string) => {
-  const date = new Date(dateISO);
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-};
-
-// Format time for display
-const formatTime = (time: string) => {
-  if (!time) return '';
-  const [hours, minutes] = time.split(':');
-  const hour = parseInt(hours);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${minutes} ${ampm}`;
-};
-
-// Format ISO datetime
-const formatDateTime = (isoString: string) => {
-  const date = new Date(isoString);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-};
+const money = (paise: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format((paise || 0) / 100);
 
 export default function OrderDetailsScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = (route.params as { id: string }) || {};
+  const id = (route.params as { id?: string } | undefined)?.id;
+  const [booking, setBooking] = useState<V1Booking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const order = useOrdersStore((state) => state.getOrderById(id || ''));
-  const cancelOrder = useOrdersStore((state) => state.cancelOrder);
+  const load = useCallback(async () => {
+    if (!id) {
+      setError('Booking ID is missing.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await memberApi.getBooking(id);
+      if (!response.success || !response.booking)
+        throw new Error(response.error || 'Booking not found');
+      setBooking(response.booking);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load booking');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-  if (!order) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.errorContainer}>
-          <View style={styles.errorIconWrap}>
-            <Icon name="alert-circle-outline" size={48} color={colors.textTertiary} />
-          </View>
-          <Text style={styles.errorTitle}>Order not found</Text>
-          <Text style={styles.errorSubtitle}>
-            This order may have been removed or doesn't exist.
-          </Text>
-          <TouchableOpacity style={styles.errorButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.errorButtonText}>Go back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const status = statusConfig[order.orderStatus];
-  const paymentStatus = paymentStatusConfig[order.payment.status] || { bg: colors.surface2, text: colors.textTertiary };
-
-  const handleCancel = () => {
-    Alert.alert(
-      'Cancel Order',
-      'Are you sure you want to cancel this order? This action cannot be undone.',
-      [
-        { text: 'Keep Order', style: 'cancel' },
-        {
-          text: 'Cancel Order',
-          style: 'destructive',
-          onPress: () => {
-            cancelOrder(order.id);
-            navigation.goBack();
-          },
-        },
-      ]
-    );
+  const cancel = async () => {
+    if (!id) return;
+    try {
+      const response = await memberApi.cancelBooking(id);
+      if (!response.success) throw new Error(response.error || 'Cancellation failed');
+      await load();
+    } catch (err) {
+      Alert.alert('Could not cancel', err instanceof Error ? err.message : 'Try again later.');
+    }
   };
 
+  if (loading)
+    return (
+      <View style={styles.state}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.body}>Loading booking…</Text>
+      </View>
+    );
+  if (!booking)
+    return (
+      <View style={styles.state}>
+        <Icon name="alert-circle-outline" size={48} color={colors.textTertiary} />
+        <Text style={styles.title}>Booking unavailable</Text>
+        <Text style={styles.body}>{error}</Text>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+          <Text style={styles.buttonText}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+
+  const when = new Date(booking.scheduledAt);
+  const cancellable = booking.status === 'PENDING' || booking.status === 'CONFIRMED';
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
-        <View style={styles.headerSpacer} />
+      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+        <Icon name="arrow-back" size={24} color={colors.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.title}>{booking.service?.name || 'Care booking'}</Text>
+      <Text style={styles.status}>{booking.status.toLowerCase().replace(/_/g, ' ')}</Text>
+      <View style={styles.card}>
+        <Text style={styles.label}>Care recipient</Text>
+        <Text style={styles.value}>{booking.profile?.name || 'Not provided'}</Text>
+        <Text style={styles.label}>Preferred time</Text>
+        <Text style={styles.value}>{when.toLocaleString()}</Text>
+        <Text style={styles.label}>Amount</Text>
+        <Text style={styles.value}>{money(booking.amount)}</Text>
+        <Text style={styles.label}>Provider</Text>
+        <Text style={styles.value}>{booking.provider?.name || 'Not assigned yet'}</Text>
       </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 100 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Order ID & Status */}
-        <View style={styles.card}>
-          <View style={styles.orderIdRow}>
-            <View>
-              <Text style={styles.orderIdLabel}>Order ID</Text>
-              <Text style={styles.orderId}>#{order.id.slice(-8).toUpperCase()}</Text>
-            </View>
-            <View style={styles.badgeRow}>
-              <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Service Details */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: colors.medicalSoft }]}>
-              <Icon name="medical" size={18} color={colors.medical} />
-            </View>
-            <Text style={styles.cardTitle}>Service Details</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Service</Text>
-            <Text style={styles.infoValue}>{order.serviceTitle}</Text>
-          </View>
-          {order.memberName && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Patient</Text>
-              <Text style={styles.infoValue}>{order.memberName}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Schedule */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: colors.infoSoft }]}>
-              <Icon name="calendar" size={18} color={colors.info} />
-            </View>
-            <Text style={styles.cardTitle}>Schedule</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Date</Text>
-            <Text style={styles.infoValue}>{formatDate(order.schedule.dateISO)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Time</Text>
-            <Text style={styles.infoValue}>{formatTime(order.schedule.timeStart)}</Text>
-          </View>
-          {order.schedule.durationMinutes && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Duration</Text>
-              <Text style={styles.infoValue}>{order.schedule.durationMinutes} minutes</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Notes */}
-        {order.notes && order.notes.trim() && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardIconWrap, { backgroundColor: colors.accentSoft }]}>
-                <Icon name="document-text" size={18} color={colors.accent} />
-              </View>
-              <Text style={styles.cardTitle}>Special Requests</Text>
-            </View>
-            <Text style={styles.notesText}>{order.notes}</Text>
-          </View>
-        )}
-
-        {/* Pricing Breakdown */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: colors.successSoft }]}>
-              <Icon name="wallet" size={18} color={colors.success} />
-            </View>
-            <Text style={styles.cardTitle}>Payment Details</Text>
-          </View>
-
-          <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Subtotal</Text>
-            <Text style={styles.pricingValue}>{formatMoney(order.pricing.subtotal)}</Text>
-          </View>
-
-          {order.pricing.discount.amount > 0 && (
-            <View style={styles.pricingRow}>
-              <Text style={[styles.pricingLabel, { color: colors.success }]}>Discount</Text>
-              <Text style={[styles.pricingValue, { color: colors.success }]}>
-                -{formatMoney(order.pricing.discount)}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.divider} />
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Paid</Text>
-            <Text style={styles.totalValue}>{formatMoney(order.pricing.total)}</Text>
-          </View>
-
-          <View style={styles.paymentStatusRow}>
-            <View style={[styles.paymentBadge, { backgroundColor: paymentStatus.bg }]}>
-              <Icon name="card" size={12} color={paymentStatus.text} />
-              <Text style={[styles.paymentBadgeText, { color: paymentStatus.text }]}>
-                Payment {order.payment.status}
-              </Text>
-            </View>
-            {order.payment.paidAtISO && (
-              <Text style={styles.paidAtText}>
-                {formatDateTime(order.payment.paidAtISO)}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Activity */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardIconWrap, { backgroundColor: colors.surface2 }]}>
-              <Icon name="time" size={18} color={colors.textTertiary} />
-            </View>
-            <Text style={styles.cardTitle}>Activity</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Created</Text>
-            <Text style={styles.infoValue}>{formatDateTime(order.createdAtISO)}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Last Updated</Text>
-            <Text style={styles.infoValue}>{formatDateTime(order.updatedAtISO)}</Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Footer Actions */}
-      {order.orderStatus !== 'cancelled' && order.orderStatus !== 'refunded' && order.orderStatus !== 'fulfilled' && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-            <Icon name="close-circle-outline" size={20} color={colors.error} />
-            <Text style={styles.cancelButtonText}>Cancel Order</Text>
-          </TouchableOpacity>
-        </View>
+      {cancellable && (
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() =>
+            Alert.alert('Cancel booking?', 'This updates the real CareBow booking.', [
+              { text: 'Keep booking', style: 'cancel' },
+              { text: 'Cancel booking', style: 'destructive', onPress: cancel },
+            ])
+          }
+        >
+          <Text style={styles.cancelText}>Cancel booking</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: colors.surface2, padding: spacing.xl, paddingTop: 64 },
+  state: {
     flex: 1,
-    backgroundColor: colors.surface2,
-  },
-  header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: -8,
-  },
-  headerTitle: {
-    ...typography.h3,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
     gap: spacing.md,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  errorIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    padding: spacing.xl,
     backgroundColor: colors.surface2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
   },
-  errorTitle: {
-    ...typography.h2,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  errorSubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-  errorButton: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.md,
-  },
-  errorButtonText: {
-    ...typography.labelLarge,
-    color: colors.white,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  cardIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardTitle: {
-    ...typography.h4,
-  },
-  orderIdRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    rowGap: spacing.xs,
-    columnGap: spacing.sm,
-  },
-  orderIdLabel: {
-    ...typography.caption,
-    marginBottom: 2,
-  },
-  orderId: {
-    ...typography.h3,
-    color: colors.accent,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.xs,
-  },
-  statusText: {
-    ...typography.tiny,
-    textTransform: 'uppercase',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-    rowGap: spacing.xxs,
-    columnGap: spacing.sm,
-  },
-  infoLabel: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  infoValue: {
+  back: { width: 44, height: 44, justifyContent: 'center' },
+  title: { ...typography.h2, color: colors.textPrimary, textAlign: 'center' },
+  body: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  status: {
     ...typography.label,
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  notesText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  pricingRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
-    rowGap: spacing.xxs,
-    columnGap: spacing.sm,
-  },
-  pricingLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  pricingValue: {
-    ...typography.body,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
+    color: colors.accent,
+    textTransform: 'capitalize',
+    textAlign: 'center',
     marginVertical: spacing.sm,
   },
-  totalRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    rowGap: spacing.xxs,
-    columnGap: spacing.sm,
-  },
-  totalLabel: {
-    ...typography.h4,
-  },
-  totalValue: {
-    ...typography.h2,
-    color: colors.accent,
-  },
-  paymentStatusRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    rowGap: spacing.xs,
-    columnGap: spacing.sm,
-  },
-  paymentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
-    borderRadius: radius.xs,
-  },
-  paymentBadgeText: {
-    ...typography.tiny,
-    textTransform: 'capitalize',
-  },
-  paidAtText: {
-    ...typography.caption,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     gap: spacing.xs,
-    backgroundColor: colors.errorSoft,
+  },
+  label: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.sm },
+  value: { ...typography.body, color: colors.textPrimary },
+  button: {
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
   },
-  cancelButtonText: {
-    ...typography.labelLarge,
-    color: colors.error,
+  buttonText: { ...typography.labelLarge, color: colors.textInverse },
+  cancelButton: {
+    marginTop: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
   },
+  cancelText: { ...typography.labelLarge, color: colors.error },
 });

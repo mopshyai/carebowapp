@@ -16,15 +16,15 @@ export type TranscriptionResult = {
  */
 function getMimeType(extension: string): string {
   const mimeTypes: Record<string, string> = {
-    'm4a': 'audio/m4a',
-    'mp3': 'audio/mpeg',
-    'mp4': 'audio/mp4',
-    'mpeg': 'audio/mpeg',
-    'mpga': 'audio/mpeg',
-    'wav': 'audio/wav',
-    'webm': 'audio/webm',
-    'ogg': 'audio/ogg',
-    'flac': 'audio/flac',
+    m4a: 'audio/m4a',
+    mp3: 'audio/mpeg',
+    mp4: 'audio/mp4',
+    mpeg: 'audio/mpeg',
+    mpga: 'audio/mpeg',
+    wav: 'audio/wav',
+    webm: 'audio/webm',
+    ogg: 'audio/ogg',
+    flac: 'audio/flac',
   };
 
   return mimeTypes[extension] || 'audio/m4a';
@@ -68,7 +68,7 @@ export async function transcribeAudioNative(
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         // Don't set Content-Type - fetch will set it with boundary
       },
       body: formData,
@@ -104,30 +104,4 @@ export async function transcribeAudioNative(
       error: errorMessage,
     };
   }
-}
-
-/**
- * Mock transcription for development/testing without API key
- */
-export async function mockTranscribeAudio(
-  _audioUri: string,
-  durationMs: number
-): Promise<TranscriptionResult> {
-  // Simulate processing time based on audio duration
-  await new Promise(resolve => setTimeout(resolve, Math.min(durationMs / 2, 2000)));
-
-  // Return a mock result
-  const mockResponses = [
-    "I've had a headache for the past two days",
-    "My stomach has been hurting since this morning",
-    "I feel very tired and have a slight fever",
-    "I noticed a rash on my arm yesterday",
-  ];
-
-  const randomIndex = Math.floor(Math.random() * mockResponses.length);
-
-  return {
-    text: mockResponses[randomIndex],
-    success: true,
-  };
 }

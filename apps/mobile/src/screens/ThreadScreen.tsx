@@ -16,7 +16,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
 
 // A thread is only rendered when a real messaging API supplies it. Keeping
-// this empty prevents demo clinicians and fabricated medical messages from
+// this empty prevents unverified clinicians and medical messages from
 // appearing in production builds.
 interface ConversationMessage {
   id: string;

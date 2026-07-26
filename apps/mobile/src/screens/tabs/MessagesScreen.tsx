@@ -4,13 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../../navigation/types';
@@ -22,7 +16,7 @@ import { EpisodeCard, FollowUpCard } from '../../components/episodes';
 import { Episode } from '../../types/episode';
 
 // Doctor conversations. Empty until a real messaging backend is wired — the app
-// no longer ships fake sample conversations to users.
+// Conversations remain empty until the messaging backend returns real threads.
 interface DoctorConversation {
   id: string;
   name: string;
@@ -80,10 +74,7 @@ export default function MessagesScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 96 + insets.bottom },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 96 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Ask CareBow Banner */}
@@ -97,9 +88,7 @@ export default function MessagesScreen() {
           </View>
           <View style={styles.askBannerContent}>
             <Text style={styles.askBannerTitle}>New symptoms?</Text>
-            <Text style={styles.askBannerText}>
-              Start a conversation with Ask CareBow
-            </Text>
+            <Text style={styles.askBannerText}>Start a conversation with Ask CareBow</Text>
           </View>
           <Icon name="add-circle" size={24} color={colors.accent} />
         </TouchableOpacity>

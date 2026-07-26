@@ -47,13 +47,13 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'I have a headache',
-          forWhom: 'self',
+          forWhom: 'me',
           age: 35,
         });
       });
 
       expect(result.current.episodes).toHaveLength(1);
-      expect(episode!.forWhom).toBe('self');
+      expect(episode!.forWhom).toBe('me');
       expect(episode!.isActive).toBe(true);
     });
 
@@ -64,7 +64,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Feeling dizzy',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -78,7 +78,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'My back hurts',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -95,13 +95,13 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Child has fever',
-          forWhom: 'family_member',
+          forWhom: 'family',
           age: 5,
           relationship: 'child',
         });
       });
 
-      expect(episode!.forWhom).toBe('family_member');
+      expect(episode!.forWhom).toBe('family');
       expect(episode!.relationship).toBe('child');
     });
 
@@ -112,7 +112,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Severe stomach pain after eating',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -129,7 +129,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -149,7 +149,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -170,15 +170,15 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Chest pain',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
       act(() => {
-        result.current.setTriageLevel(episode!.id, 'emergent');
+        result.current.setTriageLevel(episode!.id, 'emergency');
       });
 
-      expect(result.current.episodes[0].triageLevel).toBe('emergent');
+      expect(result.current.episodes[0].triageLevel).toBe('emergency');
     });
   });
 
@@ -190,7 +190,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -208,7 +208,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -230,7 +230,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -250,7 +250,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -270,7 +270,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -290,7 +290,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Initial symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -314,7 +314,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Initial symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -336,7 +336,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Initial symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -365,7 +365,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -387,7 +387,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -408,7 +408,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -426,9 +426,9 @@ describe('episodeStore', () => {
       const { result } = renderHook(() => useEpisodeStore());
 
       act(() => {
-        result.current.startEpisode({ symptomText: 'Symptom 1', forWhom: 'self' });
-        result.current.startEpisode({ symptomText: 'Symptom 2', forWhom: 'self' });
-        result.current.startEpisode({ symptomText: 'Symptom 3', forWhom: 'self' });
+        result.current.startEpisode({ symptomText: 'Symptom 1', forWhom: 'me' });
+        result.current.startEpisode({ symptomText: 'Symptom 2', forWhom: 'me' });
+        result.current.startEpisode({ symptomText: 'Symptom 3', forWhom: 'me' });
       });
 
       const all = result.current.getAllEpisodes();
@@ -439,9 +439,9 @@ describe('episodeStore', () => {
       const { result } = renderHook(() => useEpisodeStore());
 
       act(() => {
-        result.current.startEpisode({ symptomText: 'Symptom 1', forWhom: 'self' });
-        result.current.startEpisode({ symptomText: 'Symptom 2', forWhom: 'self' });
-        result.current.startEpisode({ symptomText: 'Symptom 3', forWhom: 'self' });
+        result.current.startEpisode({ symptomText: 'Symptom 1', forWhom: 'me' });
+        result.current.startEpisode({ symptomText: 'Symptom 2', forWhom: 'me' });
+        result.current.startEpisode({ symptomText: 'Symptom 3', forWhom: 'me' });
       });
 
       const recent = result.current.getRecentEpisodes(2);
@@ -457,7 +457,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -481,7 +481,7 @@ describe('episodeStore', () => {
       act(() => {
         episode = result.current.startEpisode({
           symptomText: 'Test symptom',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -515,16 +515,15 @@ describe('episodeStore', () => {
     it('handles multiple episodes correctly', () => {
       const { result } = renderHook(() => useEpisodeStore());
 
-      let episode1: Episode;
       let episode2: Episode;
       act(() => {
-        episode1 = result.current.startEpisode({
+        result.current.startEpisode({
           symptomText: 'Headache',
-          forWhom: 'self',
+          forWhom: 'me',
         });
         episode2 = result.current.startEpisode({
           symptomText: 'Back pain',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 
@@ -541,11 +540,11 @@ describe('episodeStore', () => {
       act(() => {
         episode1 = result.current.startEpisode({
           symptomText: 'Headache',
-          forWhom: 'self',
+          forWhom: 'me',
         });
         episode2 = result.current.startEpisode({
           symptomText: 'Back pain',
-          forWhom: 'self',
+          forWhom: 'me',
         });
       });
 

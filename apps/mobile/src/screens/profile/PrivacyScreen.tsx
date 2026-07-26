@@ -4,20 +4,13 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { preferencesApi } from '../../services/api/endpoints/preferences';
 
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
@@ -26,45 +19,45 @@ export default function PrivacyScreen() {
   const settings = useProfileStore((state) => state.privacySettings);
   const updateSettings = useProfileStore((state) => state.updatePrivacySettings);
 
+  // Hydrate the biometric toggle from the server-side preference on mount.
+  React.useEffect(() => {
+    let active = true;
+    preferencesApi
+      .get()
+      .then((res) => {
+        if (active && res.success && res.preferences) {
+          updateSettings({ biometricEnabled: res.preferences.biometricEnabled });
+        }
+      })
+      .catch(() => {
+        // Non-blocking: fall back to the locally-stored value.
+      });
+    return () => {
+      active = false;
+    };
+  }, [updateSettings]);
+
   const handleToggle = (id: string, value: boolean) => {
     updateSettings({ [id]: value });
+    // biometricEnabled is backed by /v1/auth/preferences; persist it server-side.
+    if (id === 'biometricEnabled') {
+      preferencesApi.update({ biometricEnabled: value }).catch(() => {
+        // Non-blocking: the local toggle already reflects the user's choice.
+      });
+    }
   };
 
   const handleDataExport = () => {
     Alert.alert(
-      'Request Data Export',
-      'We will prepare a copy of your data and email it to you within 48 hours. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Request',
-          onPress: () => {
-            updateSettings({ dataExportRequestedAt: new Date().toISOString() });
-            Alert.alert('Request Submitted', 'You will receive an email with your data within 48 hours.');
-          },
-        },
-      ]
+      'Data export unavailable',
+      'The production data-export endpoint is not connected to this mobile build. No request was submitted.'
     );
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Confirm Deletion',
-              'Please type DELETE to confirm account deletion.',
-              [{ text: 'Cancel', style: 'cancel' }]
-            );
-          },
-        },
-      ]
+      'Account deletion unavailable',
+      'The production account-deletion endpoint is not connected to this mobile build. Your account was not changed.'
     );
   };
 
@@ -202,7 +195,9 @@ export default function PrivacyScreen() {
               </View>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: colors.error }]}>Delete Account</Text>
-                <Text style={styles.settingDescription}>Permanently delete your account and data</Text>
+                <Text style={styles.settingDescription}>
+                  Permanently delete your account and data
+                </Text>
               </View>
               <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>

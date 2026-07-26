@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -19,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
-import { formatPrice } from '../data/catalog';
 import { StarRating } from '../components/ui/StarRating';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../components/icons';
 import { PackageSelectorList } from '../components/ui/PackageSelectorList';
@@ -29,18 +29,13 @@ import { RequestTextArea } from '../components/ui/RequestTextArea';
 import { StickyCheckoutBar } from '../components/ui/StickyCheckoutBar';
 import { TimePicker } from '../components/ui/TimePicker';
 import { QuantityStepper } from '../components/ui/QuantityStepper';
-import {
-  getServiceById,
-  getCategoryByServiceId,
-  calculatePrice,
-  defaultTimeSlots as serviceTimeSlots,
-} from '../data/services';
+import { calculatePrice } from '../data/services';
 import { Member, PackageOption } from '../data/types';
 import { useCartStore } from '../store/useCartStore';
-import { useRequestsStore } from '../store/requestsStore';
-import { buildBookingCore } from '../lib/bookingDraft';
-import { BookingDraftInput, PricingModelType } from '../types/booking';
-import { useMembers } from '../store/useProfileStore';
+import { servicesApi } from '../services/api/endpoints/services';
+import { profilesApi } from '../services/api/endpoints/profiles';
+import { formatInr, preferredTimeOptions, toBookingService } from '../lib/liveServiceCatalog';
+import type { Service } from '../data/types';
 
 // Icon mapping for service categories
 const getServiceIcon = (imageKey: string): IconName => {
@@ -71,24 +66,46 @@ export default function ServiceDetailsScreen() {
 
   // Store hooks
   const { bookingDraft, initBookingDraft, updateBookingDraft, clearBookingDraft } = useCartStore();
-  const createRequest = useRequestsStore((state) => state.createRequest);
-  const profileMembers = useMembers();
-  const bookingMembers = useMemo<Member[]>(
-    () =>
-      profileMembers.map((member) => ({
-        id: member.id,
-        name: [member.firstName, member.lastName].filter(Boolean).join(' '),
-        relationship: member.relationship,
-      })),
-    [profileMembers]
-  );
+  const [service, setService] = useState<Service | null>(null);
+  const [bookingMembers, setBookingMembers] = useState<Member[]>([]);
+  const [isLoadingService, setIsLoadingService] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const category = service
+    ? {
+        title: service.categoryId
+          .toLowerCase()
+          .split('_')
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' '),
+      }
+    : null;
 
-  // Local state
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // Get service data
-  const service = getServiceById(id || '');
-  const category = getCategoryByServiceId(id || '');
+  useEffect(() => {
+    let active = true;
+    setIsLoadingService(true);
+    setLoadError(null);
+    Promise.all([servicesApi.getServiceDetails(id || ''), profilesApi.getProfiles()])
+      .then(([liveService, profiles]) => {
+        if (!active) return;
+        setService(toBookingService(liveService));
+        setBookingMembers(
+          profiles.map((profile) => ({
+            id: profile.id,
+            name: profile.name,
+            relationship: profile.relationship,
+          }))
+        );
+      })
+      .catch(() => {
+        if (active) setLoadError('We could not load this service from CareBow.');
+      })
+      .finally(() => {
+        if (active) setIsLoadingService(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   // Initialize booking draft when service loads
   useEffect(() => {
@@ -211,98 +228,14 @@ export default function ServiceDetailsScreen() {
     navigation.navigate('Checkout' as never, { serviceId: service.id });
   };
 
-  // Handle on-request submission
-  const handleSubmitRequest = async () => {
-    if (!service || !bookingDraft || !isValid) {
-      Alert.alert('Missing Information', 'Please complete all required fields to continue.');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      await submitRequestWithoutFee();
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Build BookingCore from current draft
-  const buildBookingCoreFromDraft = () => {
-    if (!bookingDraft || !service) return null;
-
-    let pricingModel: PricingModelType = 'fixed';
-    if (service.pricing.type === 'packages') pricingModel = 'packages';
-    else if (service.pricing.type === 'hourly') pricingModel = 'hourly';
-    else if (service.pricing.type === 'daily') pricingModel = 'daily';
-    else if (service.pricing.type === 'quote') pricingModel = 'quote';
-
-    let packagePrice: number | undefined;
-    let packageOriginalPrice: number | undefined;
-    if (service.pricing.type === 'packages' && bookingDraft.selectedPackageId) {
-      const selectedPkg = service.pricing.packages.find(
-        (p) => p.id === bookingDraft.selectedPackageId
-      );
-      if (selectedPkg) {
-        packagePrice = selectedPkg.price;
-        packageOriginalPrice = selectedPkg.originalPrice;
-      }
-    }
-
-    const input: BookingDraftInput = {
-      serviceId: bookingDraft.serviceId,
-      serviceTitle: bookingDraft.serviceTitle,
-      memberId: bookingDraft.memberId || '',
-      memberName: bookingDraft.memberName || undefined,
-      schedule: {
-        date: bookingDraft.date || '',
-        startTime: bookingDraft.startTime || '',
-        endTime: bookingDraft.endTime || undefined,
-        durationMinutes: bookingDraft.durationMinutes || undefined,
-      },
-      notes: bookingDraft.requestNotes,
-      pricingSelections: {
-        pricingModel,
-        packageId: bookingDraft.selectedPackageId || undefined,
-        packageLabel: bookingDraft.selectedPackageLabel || undefined,
-        packagePrice,
-        packageOriginalPrice,
-        hours: bookingDraft.hours || undefined,
-        days: bookingDraft.days || undefined,
-        hourlyRate: service.pricing.type === 'hourly' ? service.pricing.hourlyRate : undefined,
-        dailyRate: service.pricing.type === 'daily' ? service.pricing.dailyRate : undefined,
-        fixedPrice: service.pricing.type === 'fixed' ? service.pricing.price : undefined,
-        fixedOriginalPrice:
-          service.pricing.type === 'fixed' ? service.pricing.originalPrice : undefined,
-      },
-    };
-
-    return buildBookingCore(input);
-  };
-
-  const submitRequestWithoutFee = async () => {
-    if (!bookingDraft || !service) return;
-
-    try {
-      const bookingCore = buildBookingCoreFromDraft();
-      if (!bookingCore) {
-        Alert.alert('Error', 'Failed to create booking.');
-        return;
-      }
-
-      createRequest(bookingCore);
-
-      Alert.alert(
-        'Request Submitted',
-        `We've received your request for ${service.title}. Our team will review and respond with options within 2-4 hours.`,
-        [{ text: 'View Requests', onPress: () => navigation.navigate('Requests') }]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit request. Please try again.');
-    }
-  };
+  if (isLoadingService) {
+    return (
+      <View style={[styles.container, styles.centeredState, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.errorText}>Loading live service details…</Text>
+      </View>
+    );
+  }
 
   // Error state
   if (!service) {
@@ -310,7 +243,7 @@ export default function ServiceDetailsScreen() {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.errorContainer}>
           <AppIcon name="info" size={64} color={colors.textTertiary} />
-          <Text style={styles.errorText}>Service not found</Text>
+          <Text style={styles.errorText}>{loadError || 'Service not found'}</Text>
           <TouchableOpacity style={styles.backLink} onPress={() => navigation.goBack()}>
             <Text style={styles.backLinkText}>Go back</Text>
           </TouchableOpacity>
@@ -320,19 +253,11 @@ export default function ServiceDetailsScreen() {
   }
 
   const icon = getServiceIcon(service.image);
-  const isOnRequestService = service.fulfillment.mode === 'on_request';
-  const availableSlots = service.booking.availableTimeSlots || serviceTimeSlots;
+  const availableSlots = service.booking.availableTimeSlots || preferredTimeOptions;
 
-  // Determine button label and action
-  let buttonLabel = 'Continue to checkout';
-  let buttonAction = handleCheckout;
-  let confirmationNote = "We'll confirm your booking within 10 minutes";
-
-  if (isOnRequestService) {
-    buttonLabel = 'Submit request';
-    buttonAction = handleSubmitRequest;
-    confirmationNote = 'Our team will review and respond within 2-4 hours';
-  }
+  const buttonLabel = 'Review booking';
+  const confirmationNote =
+    'Your preferred time is confirmed only after the care team accepts the booking';
 
   return (
     <View style={styles.container}>
@@ -379,14 +304,16 @@ export default function ServiceDetailsScreen() {
           <View style={styles.infoContainer}>
             {category && <Text style={styles.categoryLabel}>{category.title}</Text>}
             <Text style={styles.serviceTitle}>{service.title}</Text>
-            <View style={styles.ratingRow}>
-              <StarRating
-                rating={service.rating}
-                size={16}
-                showReviewCount
-                reviewCount={service.reviewCount}
-              />
-            </View>
+            {service.reviewCount > 0 && service.rating > 0 && (
+              <View style={styles.ratingRow}>
+                <StarRating
+                  rating={service.rating}
+                  size={16}
+                  showReviewCount
+                  reviewCount={service.reviewCount}
+                />
+              </View>
+            )}
             <Text style={styles.tagline}>{service.shortTagline}</Text>
           </View>
 
@@ -436,7 +363,9 @@ export default function ServiceDetailsScreen() {
           {service.booking.requiresTime && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Select time</Text>
-              <Text style={styles.sectionHint}>Available slots for your selected date</Text>
+              <Text style={styles.sectionHint}>
+                Choose a preferred time; availability is confirmed after submission
+              </Text>
               <TimePicker
                 availableSlots={availableSlots}
                 selectedTime={bookingDraft?.startTime || null}
@@ -498,10 +427,10 @@ export default function ServiceDetailsScreen() {
               <View style={styles.fixedPriceCard}>
                 <Text style={styles.fixedPriceLabel}>Service fee</Text>
                 <View style={styles.fixedPriceRow}>
-                  <Text style={styles.fixedPrice}>{formatPrice(service.pricing.price)}</Text>
+                  <Text style={styles.fixedPrice}>{formatInr(service.pricing.price)}</Text>
                   {service.pricing.originalPrice && (
                     <Text style={styles.fixedOriginalPrice}>
-                      {formatPrice(service.pricing.originalPrice)}
+                      {formatInr(service.pricing.originalPrice)}
                     </Text>
                   )}
                 </View>
@@ -546,10 +475,12 @@ export default function ServiceDetailsScreen() {
           </View>
 
           {/* Description */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About this service</Text>
-            <Text style={styles.description}>{service.description}</Text>
-          </View>
+          {service.benefits.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>About this service</Text>
+              <Text style={styles.description}>{service.description}</Text>
+            </View>
+          )}
 
           {/* Benefits */}
           <View style={styles.section}>
@@ -579,12 +510,9 @@ export default function ServiceDetailsScreen() {
         <StickyCheckoutBar
           price={pricing.total}
           originalPrice={pricing.discount > 0 ? pricing.subtotal : undefined}
-          buttonLabel={isProcessing ? 'Processing...' : buttonLabel}
-          onPress={buttonAction}
-          disabled={!isValid || isProcessing}
-          isOnRequest={
-            isOnRequestService && service.pricing.type === 'quote' && !service.pricing.bookingFee
-          }
+          buttonLabel={buttonLabel}
+          onPress={handleCheckout}
+          disabled={!isValid}
         />
       </KeyboardAvoidingView>
     </View>
@@ -595,6 +523,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  centeredState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
   },
   keyboardView: {
     flex: 1,

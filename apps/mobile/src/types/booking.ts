@@ -64,7 +64,7 @@ export type BookingCore = {
 // PAYMENT TYPES
 // ============================================
 
-export type PaymentProvider = 'mock' | 'stripe' | 'razorpay';
+export type PaymentProvider = 'stripe' | 'razorpay';
 
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -94,7 +94,13 @@ export type Order = BookingCore & {
 // SERVICE REQUEST TYPES (for on-request services)
 // ============================================
 
-export type RequestStatus = 'submitted' | 'in_review' | 'quoted' | 'scheduled' | 'closed' | 'cancelled';
+export type RequestStatus =
+  | 'submitted'
+  | 'in_review'
+  | 'quoted'
+  | 'scheduled'
+  | 'closed'
+  | 'cancelled';
 
 export type Quote = {
   quotedTotal?: Money;

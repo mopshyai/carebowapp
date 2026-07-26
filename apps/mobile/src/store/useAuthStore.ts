@@ -435,7 +435,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           // NOTE: /auth/resend-verification is not yet verified against the live
           // backend (signup itself auto-sends the first OTP). If the endpoint is
-          // missing server-side this surfaces as a clear error instead of a mock success.
+          // missing server-side this surfaces as a clear error instead of false success.
           await authApi.resendVerificationCode(email);
 
           set({

@@ -20,20 +20,27 @@ const resetStore = () => {
     healthRecords: [],
     notificationPreferences: {
       pushEnabled: true,
-      emailEnabled: true,
-      smsEnabled: false,
+      orderUpdates: true,
       appointmentReminders: true,
-      promotionalMessages: false,
-      healthTips: true,
+      promotions: false,
+      careAlerts: true,
+      emailEnabled: true,
+      emailOrderUpdates: true,
+      emailNewsletter: false,
+      smsEnabled: false,
+      smsAppointmentReminders: true,
+      smsUrgentAlerts: true,
     },
     privacySettings: {
+      biometricEnabled: false,
+      twoFactorEnabled: false,
       shareDataWithProviders: true,
-      shareDataForResearch: false,
       allowAnalytics: true,
     },
     appSettings: {
       theme: 'system',
       language: 'en',
+      currency: 'USD',
       measurementUnit: 'metric',
       hapticFeedback: true,
     },
@@ -172,9 +179,8 @@ describe('useProfileStore', () => {
     it('addMember creates a new member with generated ID', () => {
       const { result } = renderHook(() => useProfileStore());
 
-      let member: FamilyMember;
       act(() => {
-        member = result.current.addMember(mockMemberData);
+        result.current.addMember(mockMemberData);
       });
 
       expect(result.current.members).toHaveLength(1);
@@ -232,7 +238,11 @@ describe('useProfileStore', () => {
       let member2: FamilyMember;
       act(() => {
         member1 = result.current.addMember({ ...mockMemberData, isDefault: true });
-        member2 = result.current.addMember({ ...mockMemberData, firstName: 'Bob', isDefault: false });
+        member2 = result.current.addMember({
+          ...mockMemberData,
+          firstName: 'Bob',
+          isDefault: false,
+        });
       });
 
       act(() => {
@@ -246,10 +256,9 @@ describe('useProfileStore', () => {
     it('selectMember updates selected member', () => {
       const { result } = renderHook(() => useProfileStore());
 
-      let member1: FamilyMember;
       let member2: FamilyMember;
       act(() => {
-        member1 = result.current.addMember(mockMemberData);
+        result.current.addMember(mockMemberData);
         member2 = result.current.addMember({ ...mockMemberData, firstName: 'Bob' });
       });
 
@@ -397,10 +406,11 @@ describe('useProfileStore', () => {
       act(() => {
         result.current.addAddress({
           label: 'Home',
-          addressLine1: '123 Main St',
+          streetAddress: '123 Main St',
           city: 'Mumbai',
           state: 'Maharashtra',
-          pincode: '400001',
+          zipCode: '400001',
+          country: 'India',
           isDefault: false,
         });
       });
@@ -415,18 +425,20 @@ describe('useProfileStore', () => {
       act(() => {
         result.current.addAddress({
           label: 'Home',
-          addressLine1: '123 Main St',
+          streetAddress: '123 Main St',
           city: 'Mumbai',
           state: 'Maharashtra',
-          pincode: '400001',
+          zipCode: '400001',
+          country: 'India',
           isDefault: true,
         });
         result.current.addAddress({
           label: 'Office',
-          addressLine1: '456 Work St',
+          streetAddress: '456 Work St',
           city: 'Mumbai',
           state: 'Maharashtra',
-          pincode: '400002',
+          zipCode: '400002',
+          country: 'India',
           isDefault: false,
         });
       });
@@ -448,16 +460,18 @@ describe('useProfileStore', () => {
 
       act(() => {
         result.current.addInsurance({
-          provider: 'ICICI Lombard',
-          policyNumber: 'POL123456',
-          memberIds: [],
-          validTill: '2025-12-31',
+          providerName: 'ICICI Lombard',
+          memberId: 'user-123',
+          planType: 'ppo',
+          policyHolderName: 'John Doe',
+          policyHolderRelationship: 'self',
+          expirationDate: '2025-12-31',
           isActive: true,
         });
       });
 
       expect(result.current.insuranceInfo).toHaveLength(1);
-      expect(result.current.insuranceInfo[0].provider).toBe('ICICI Lombard');
+      expect(result.current.insuranceInfo[0].providerName).toBe('ICICI Lombard');
     });
 
     it('deleteInsurance removes insurance', () => {
@@ -465,10 +479,12 @@ describe('useProfileStore', () => {
 
       act(() => {
         result.current.addInsurance({
-          provider: 'ICICI Lombard',
-          policyNumber: 'POL123456',
-          memberIds: [],
-          validTill: '2025-12-31',
+          providerName: 'ICICI Lombard',
+          memberId: 'user-123',
+          planType: 'ppo',
+          policyHolderName: 'John Doe',
+          policyHolderRelationship: 'self',
+          expirationDate: '2025-12-31',
           isActive: true,
         });
       });
@@ -495,7 +511,7 @@ describe('useProfileStore', () => {
       act(() => {
         result.current.addHealthRecord({
           memberId: member!.id,
-          type: 'lab_report',
+          type: 'lab_result',
           title: 'Blood Test',
           date: '2024-01-15',
           fileUrl: 'https://example.com/report.pdf',
@@ -519,7 +535,7 @@ describe('useProfileStore', () => {
       act(() => {
         result.current.addHealthRecord({
           memberId: member1!.id,
-          type: 'lab_report',
+          type: 'lab_result',
           title: 'Jane Report',
           date: '2024-01-15',
         });
@@ -553,10 +569,10 @@ describe('useProfileStore', () => {
       const { result } = renderHook(() => useProfileStore());
 
       act(() => {
-        result.current.updatePrivacySettings({ shareDataForResearch: true });
+        result.current.updatePrivacySettings({ allowAnalytics: false });
       });
 
-      expect(result.current.privacySettings.shareDataForResearch).toBe(true);
+      expect(result.current.privacySettings.allowAnalytics).toBe(false);
     });
 
     it('updateAppSettings updates settings', () => {

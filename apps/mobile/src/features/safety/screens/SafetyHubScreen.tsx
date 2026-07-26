@@ -4,25 +4,11 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  colors,
-  space,
-  radius,
-  typography,
-  shadows,
-  layout,
-} from '@/theme/tokens';
+import { colors, space, radius, typography, shadows, layout } from '@/theme/tokens';
 import { useProfileStore } from '@/store/useProfileStore';
 
 import {
@@ -31,10 +17,16 @@ import {
   useSafetyContacts,
   useSafetyEvents,
   usePrimaryContact,
-  useHasCheckedInToday,
 } from '../store';
-import { getCheckInState, shouldPromptMissedCheckIn, alreadyRecordedMissedCheckIn } from '../services/checkInService';
-import { requestNotificationPermission, scheduleCheckInReminder } from '../services/notificationService';
+import {
+  getCheckInState,
+  shouldPromptMissedCheckIn,
+  alreadyRecordedMissedCheckIn,
+} from '../services/checkInService';
+import {
+  requestNotificationPermission,
+  scheduleCheckInReminder,
+} from '../services/notificationService';
 import { LocationData } from '../services/locationService';
 
 import {
@@ -62,7 +54,6 @@ export function SafetyHubScreen() {
   const allEvents = useSafetyEvents();
   const events = allEvents.slice(0, 10); // Get last 10 events
   const primaryContact = usePrimaryContact();
-  const hasCheckedInToday = useHasCheckedInToday();
   const user = useProfileStore((state) => state.user);
   const userName = user?.firstName || 'You';
 
@@ -149,8 +140,6 @@ export function SafetyHubScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Simulate refresh
-    await new Promise((resolve) => setTimeout(resolve, 500));
     setRefreshing(false);
   }, []);
 
@@ -173,14 +162,9 @@ export function SafetyHubScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + space.xl },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space.xl }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* SOS Section */}
         <View style={styles.sosSection}>
@@ -219,13 +203,8 @@ export function SafetyHubScreen() {
                 />
               ))}
               {contacts.length > 3 && (
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  onPress={handleManageContacts}
-                >
-                  <Text style={styles.viewAllText}>
-                    View all {contacts.length} contacts
-                  </Text>
+                <TouchableOpacity style={styles.viewAllButton} onPress={handleManageContacts}>
+                  <Text style={styles.viewAllText}>View all {contacts.length} contacts</Text>
                   <Icon name="chevron-forward" size={16} color={colors.primary.default} />
                 </TouchableOpacity>
               )}
@@ -243,9 +222,7 @@ export function SafetyHubScreen() {
 
           <View style={styles.activityCard}>
             {events.length > 0 ? (
-              events.map((event) => (
-                <SafetyEventItem key={event.id} event={event} />
-              ))
+              events.map((event) => <SafetyEventItem key={event.id} event={event} />)
             ) : (
               <EmptyEventsState />
             )}
