@@ -5,8 +5,8 @@
  */
 
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, spacing, typography } from '../../theme';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { colors, spacing } from '../../theme';
 
 // =============================================================================
 // TYPES
@@ -101,19 +101,21 @@ export const PriceText = memo(function PriceText({
   const config = sizeConfig[size];
 
   // Format amount - handle both numbers and strings
-  const formattedAmount = typeof amount === 'number'
-    ? amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-    : amount;
+  const formattedAmount =
+    typeof amount === 'number'
+      ? amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+      : amount;
 
   const formattedOriginal = originalAmount
     ? typeof originalAmount === 'number'
-      ? originalAmount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+      ? originalAmount.toLocaleString('en-US', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })
       : originalAmount
     : null;
 
-  const containerStyle: ViewStyle = inline
-    ? styles.inlineContainer
-    : styles.wrapContainer;
+  const containerStyle: ViewStyle = inline ? styles.inlineContainer : styles.wrapContainer;
 
   return (
     <View style={[containerStyle, style]}>
@@ -184,7 +186,8 @@ export const PriceText = memo(function PriceText({
             },
           ]}
         >
-          {currencySymbol}{formattedOriginal}
+          {currencySymbol}
+          {formattedOriginal}
         </Text>
       )}
     </View>

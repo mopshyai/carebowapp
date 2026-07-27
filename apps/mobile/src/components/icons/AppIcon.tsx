@@ -5,7 +5,6 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -20,25 +19,14 @@ interface AppIconProps {
   style?: object;
 }
 
-export function AppIcon({
-  name,
-  size = 20,
-  color,
-  fillOpacity = 0.15,
-  style,
-}: AppIconProps) {
+export function AppIcon({ name, size = 20, color, style }: AppIconProps) {
   // Get the vector icon mapping
   const vectorIcon = iconToVectorIcon[name];
 
   if (!vectorIcon) {
     // Fallback to a generic icon
     return (
-      <Ionicons
-        name="help-circle-outline"
-        size={size}
-        color={color || '#64748B'}
-        style={style}
-      />
+      <Ionicons name="help-circle-outline" size={size} color={color || '#64748B'} style={style} />
     );
   }
 
@@ -49,14 +37,7 @@ export function AppIcon({
   // Render based on the icon library
   switch (vectorIcon.library) {
     case 'ionicons':
-      return (
-        <Ionicons
-          name={vectorIcon.name}
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
+      return <Ionicons name={vectorIcon.name} size={size} color={iconColor} style={style} />;
     case 'material-community':
       return (
         <MaterialCommunityIcons
@@ -67,23 +48,9 @@ export function AppIcon({
         />
       );
     case 'feather':
-      return (
-        <Feather
-          name={vectorIcon.name}
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
+      return <Feather name={vectorIcon.name} size={size} color={iconColor} style={style} />;
     default:
-      return (
-        <Ionicons
-          name="help-circle-outline"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
+      return <Ionicons name="help-circle-outline" size={size} color={iconColor} style={style} />;
   }
 }
 
@@ -113,13 +80,7 @@ export function NavIcon({
   activeColor?: string;
   inactiveColor?: string;
 }) {
-  return (
-    <AppIcon
-      name={name}
-      size={size}
-      color={active ? activeColor : inactiveColor}
-    />
-  );
+  return <AppIcon name={name} size={size} color={active ? activeColor : inactiveColor} />;
 }
 
 export function StatusIcon({

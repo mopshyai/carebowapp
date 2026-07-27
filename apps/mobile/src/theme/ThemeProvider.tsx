@@ -5,7 +5,7 @@
  */
 
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
-import { useColorScheme, StatusBar, Platform } from 'react-native';
+import { useColorScheme, StatusBar } from 'react-native';
 import { useProfileStore } from '../store/useProfileStore';
 
 // =============================================================================
@@ -223,9 +223,7 @@ export function useTheme(): ThemeContextValue {
  *   container: { backgroundColor: colors.background }
  * }));
  */
-export function useThemedStyles<T>(
-  createStyles: (colors: ThemeColors, isDark: boolean) => T
-): T {
+export function useThemedStyles<T>(createStyles: (colors: ThemeColors, isDark: boolean) => T): T {
   const { colors, isDark } = useTheme();
   return useMemo(() => createStyles(colors, isDark), [colors, isDark, createStyles]);
 }

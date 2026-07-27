@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
   TextInput,
   Alert,
   Modal,
@@ -109,30 +108,26 @@ export default function HealthInfoScreen() {
   };
 
   const handleRemove = (id: string, name: string) => {
-    Alert.alert(
-      'Remove Item',
-      `Remove "${name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            switch (activeTab) {
-              case 'allergies':
-                removeAllergy(member.id, id);
-                break;
-              case 'conditions':
-                removeCondition(member.id, id);
-                break;
-              case 'medications':
-                removeMedication(member.id, id);
-                break;
-            }
-          },
+    Alert.alert('Remove Item', `Remove "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          switch (activeTab) {
+            case 'allergies':
+              removeAllergy(member.id, id);
+              break;
+            case 'conditions':
+              removeCondition(member.id, id);
+              break;
+            case 'medications':
+              removeMedication(member.id, id);
+              break;
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const tabConfig = {
@@ -266,7 +261,12 @@ export default function HealthInfoScreen() {
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowModal(false);
+                resetForm();
+              }}
+            >
               <Text style={styles.modalCancel}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add {config.title.slice(0, -1)}</Text>

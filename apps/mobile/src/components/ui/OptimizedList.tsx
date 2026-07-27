@@ -17,7 +17,7 @@ import {
   ViewStyle,
   ListRenderItem,
 } from 'react-native';
-import { colors, spacing, typography, radius } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 
 // ============================================
 // TYPES
@@ -52,7 +52,10 @@ export interface OptimizedFlatListProps<T> extends Omit<FlatListProps<T>, 'rende
   containerStyle?: ViewStyle;
 }
 
-export interface OptimizedSectionListProps<T, S> extends Omit<SectionListProps<T, S>, 'renderItem'> {
+export interface OptimizedSectionListProps<T, S> extends Omit<
+  SectionListProps<T, S>,
+  'renderItem'
+> {
   /** Render item function */
   renderItem: SectionListProps<T, S>['renderItem'];
   /** Loading state */
@@ -105,7 +108,6 @@ export function OptimizedFlatList<T>({
   onRefresh,
   EmptyComponent,
   emptyMessage = 'No items found',
-  emptyIcon,
   LoadingComponent,
   error,
   onRetry,
@@ -353,9 +355,7 @@ export function ListSeparator({ height = 1 }: { height?: number }) {
 }
 
 export function ListSeparatorWithPadding({ paddingLeft = 0 }: { paddingLeft?: number }) {
-  return (
-    <View style={[styles.separatorWithPadding, { marginLeft: paddingLeft }]} />
-  );
+  return <View style={[styles.separatorWithPadding, { marginLeft: paddingLeft }]} />;
 }
 
 export function ListItemGap({ size = spacing.sm }: { size?: number }) {

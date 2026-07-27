@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -33,7 +32,7 @@ import {
   SEVERITY_COLORS,
   SYMPTOM_DISCLAIMER,
 } from '@/types/symptomEntry';
-import { RELATIONSHIP_LABELS, type FamilyMember } from '@/types/profile';
+import { RELATIONSHIP_LABELS } from '@/types/profile';
 
 const MAX_DESCRIPTION_LENGTH = 2000;
 
@@ -141,9 +140,7 @@ export default function NewEntryScreen() {
                 selectedProfileId === member.id && styles.profileAvatarSelected,
               ]}
             >
-              <Text style={styles.profileInitial}>
-                {member.firstName.charAt(0).toUpperCase()}
-              </Text>
+              <Text style={styles.profileInitial}>{member.firstName.charAt(0).toUpperCase()}</Text>
             </View>
             <View style={styles.profileInfo}>
               <Text
@@ -296,9 +293,7 @@ export default function NewEntryScreen() {
             <Text style={styles.submitButtonText}>
               {isSubmitting ? 'Analyzing...' : 'Get Assessment'}
             </Text>
-            {!isSubmitting && (
-              <Icon name="arrow-forward" size={20} color={colors.textInverse} />
-            )}
+            {!isSubmitting && <Icon name="arrow-forward" size={20} color={colors.textInverse} />}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

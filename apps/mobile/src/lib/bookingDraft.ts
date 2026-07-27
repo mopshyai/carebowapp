@@ -8,7 +8,6 @@ import {
   BookingDraftInput,
   PricingBreakdown,
   Schedule,
-  Money,
   Currency,
   ValidationResult,
   money,
@@ -29,7 +28,9 @@ function calculateFixedPricing(
 ): PricingBreakdown {
   const subtotal = money(originalPrice || price, currency);
   const discount = originalPrice ? money(originalPrice - price, currency) : money(0, currency);
-  const discountPercent = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : undefined;
+  const discountPercent = originalPrice
+    ? Math.round(((originalPrice - price) / originalPrice) * 100)
+    : undefined;
 
   return {
     pricingModel: 'fixed',
@@ -162,7 +163,11 @@ export function buildBookingCore(input: BookingDraftInput): BookingCore {
       break;
 
     case 'packages':
-      if (!pricingSelections.packageId || !pricingSelections.packageLabel || pricingSelections.packagePrice === undefined) {
+      if (
+        !pricingSelections.packageId ||
+        !pricingSelections.packageLabel ||
+        pricingSelections.packagePrice === undefined
+      ) {
         throw new Error('Package details are required for packages pricing model');
       }
       pricing = calculatePackagePricing(
@@ -248,7 +253,12 @@ export function validateBookingInput(
   } = {}
 ): ValidationResult {
   const errors: string[] = [];
-  const { requireMember = true, requireDate = true, requireTime = true, requireNotes = false } = options;
+  const {
+    requireMember = true,
+    requireDate = true,
+    requireTime = true,
+    requireNotes = false,
+  } = options;
 
   if (!input.serviceId) {
     errors.push('Service ID is required');

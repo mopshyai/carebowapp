@@ -5,16 +5,7 @@
  */
 
 import React, { useCallback, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Linking,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -27,7 +18,6 @@ import {
   CARE_SUGGESTION_LABELS,
   CARE_SUGGESTION_DESCRIPTIONS,
   DURATION_LABELS,
-  SEVERITY_LABELS,
   SYMPTOM_DISCLAIMER,
   type RiskLevel,
   type CareSuggestion,
@@ -65,35 +55,27 @@ export default function AssessmentResultScreen() {
   // If entry not found, go back
   useEffect(() => {
     if (!entry) {
-      Alert.alert('Error', 'Entry not found', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert('Error', 'Entry not found', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     }
   }, [entry, navigation]);
 
-  if (!entry) {
-    return null;
-  }
-
-  const riskColors = RISK_LEVEL_COLORS[entry.riskLevel];
-  const isEmergency = entry.riskLevel === 'emergency';
+  // NOTE: every hook must run before the `if (!entry) return null` guard below.
+  // These three useCallbacks used to sit after it, so when entry was falsy the
+  // component rendered three fewer hooks — React throws "Rendered fewer hooks
+  // than expected" as soon as entry flips from falsy to truthy.
 
   // Handle emergency call
   const handleEmergencyCall = useCallback(() => {
-    Alert.alert(
-      'Call Emergency Services',
-      'This will dial 911. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call 911',
-          style: 'destructive',
-          onPress: () => {
-            Linking.openURL('tel:911');
-          },
+    Alert.alert('Call Emergency Services', 'This will dial 911. Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Call 911',
+        style: 'destructive',
+        onPress: () => {
+          Linking.openURL('tel:911');
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   // Handle done
@@ -105,6 +87,13 @@ export default function AssessmentResultScreen() {
   const handleViewHistory = useCallback(() => {
     navigation.navigate('MainTabs' as never, { screen: 'History' } as never);
   }, [navigation]);
+
+  if (!entry) {
+    return null;
+  }
+
+  const riskColors = RISK_LEVEL_COLORS[entry.riskLevel];
+  const isEmergency = entry.riskLevel === 'emergency';
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -161,11 +150,7 @@ export default function AssessmentResultScreen() {
           ]}
         >
           <View style={styles.riskIconWrap}>
-            <Icon
-              name={RISK_ICONS[entry.riskLevel]}
-              size={40}
-              color={riskColors.text}
-            />
+            <Icon name={RISK_ICONS[entry.riskLevel]} size={40} color={riskColors.text} />
           </View>
           <Text style={[styles.riskLevel, { color: riskColors.text }]}>
             {RISK_LEVEL_LABELS[entry.riskLevel]}
@@ -177,11 +162,7 @@ export default function AssessmentResultScreen() {
         <View style={styles.suggestionCard}>
           <View style={styles.suggestionHeader}>
             <View style={[styles.suggestionIcon, { backgroundColor: colors.accentSoft }]}>
-              <Icon
-                name={SUGGESTION_ICONS[entry.careSuggestion]}
-                size={24}
-                color={colors.accent}
-              />
+              <Icon name={SUGGESTION_ICONS[entry.careSuggestion]} size={24} color={colors.accent} />
             </View>
             <View style={styles.suggestionHeaderText}>
               <Text style={styles.suggestionLabel}>Recommended Action</Text>
@@ -195,9 +176,7 @@ export default function AssessmentResultScreen() {
           </Text>
           <View style={styles.urgencyRow}>
             <Icon name="time-outline" size={16} color={colors.textTertiary} />
-            <Text style={styles.urgencyText}>
-              {getUrgencyAdvice(entry.careSuggestion)}
-            </Text>
+            <Text style={styles.urgencyText}>{getUrgencyAdvice(entry.careSuggestion)}</Text>
           </View>
         </View>
 
@@ -269,11 +248,7 @@ export default function AssessmentResultScreen() {
             <Text style={styles.emergencyButtonText}>Call 911</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            style={styles.doneButton}
-            onPress={handleDone}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.doneButton} onPress={handleDone} activeOpacity={0.8}>
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
         )}

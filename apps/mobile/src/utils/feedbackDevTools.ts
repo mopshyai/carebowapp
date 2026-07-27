@@ -10,7 +10,7 @@
  */
 
 import { useFeedbackStore } from '../store/feedbackStore';
-import { NEGATIVE_FEEDBACK_REASONS, NegativeFeedbackReason } from '../types/feedback';
+import { NEGATIVE_FEEDBACK_REASONS } from '../types/feedback';
 
 /**
  * Dev tools object exposed globally for console access
@@ -105,7 +105,7 @@ export const CareBowFeedbackDevTools = {
  */
 export function initializeFeedbackDevTools() {
   if (__DEV__) {
-    // @ts-ignore - Intentionally adding to global for dev tools
+    // @ts-expect-error - Intentionally adding to global for dev tools
     global.CareBowFeedback = CareBowFeedbackDevTools;
     console.log('[Dev] CareBowFeedback tools available. Try: CareBowFeedback.summary()');
   }

@@ -4,15 +4,9 @@
  */
 
 import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  AccessibilityInfo,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing, radius, typography, shadows } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
 import { triggerLightHaptic } from '../services/sosService';
 
 // ============================================
@@ -56,20 +50,14 @@ export function SOSButton({ onPress, disabled = false, isLoading = false }: SOSB
       >
         <View style={styles.innerRing}>
           <View style={styles.iconContainer}>
-            <Icon
-              name="alert-circle"
-              size={40}
-              color={colors.white}
-            />
+            <Icon name="alert-circle" size={40} color={colors.white} />
           </View>
           <Text style={styles.buttonText}>SOS</Text>
           <Text style={styles.subText}>Emergency</Text>
         </View>
       </TouchableOpacity>
 
-      <Text style={styles.instructionText}>
-        Tap to send emergency alert
-      </Text>
+      <Text style={styles.instructionText}>Tap to send emergency alert</Text>
     </View>
   );
 }

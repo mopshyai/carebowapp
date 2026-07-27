@@ -9,7 +9,6 @@ import {
   ServiceRecommendation,
   UrgencyLevel,
   SuggestedAction,
-  ActionType,
   MemberProfile,
   COPY_RULES,
 } from '@/types/askCarebow';
@@ -69,7 +68,7 @@ const SYMPTOM_GUIDANCE_DATABASE: SymptomGuidance[] = [
     ],
     whenToSeekHelp: [
       'Blood in vomit or stool',
-      'Severe abdominal pain that doesn\'t improve',
+      "Severe abdominal pain that doesn't improve",
       'Signs of dehydration (dark urine, dizziness)',
       'Fever above 101.3F (38.5C)',
       'Symptoms lasting more than 3 days',
@@ -152,7 +151,7 @@ const SYMPTOM_GUIDANCE_DATABASE: SymptomGuidance[] = [
     possibleCauses: [
       'Viral infection (cold, flu)',
       'Bacterial infection',
-      'Body\'s immune response',
+      "Body's immune response",
       'Recent vaccination',
       'Heat exhaustion',
     ],
@@ -239,10 +238,9 @@ export function buildGuidanceResponse(
   recommendations: ServiceRecommendation[],
   memberProfile?: MemberProfile
 ): GuidanceResponse {
-  const symptomText = [
-    context.primarySymptom,
-    ...context.associatedSymptoms,
-  ].join(' ').toLowerCase();
+  const symptomText = [context.primarySymptom, ...context.associatedSymptoms]
+    .join(' ')
+    .toLowerCase();
 
   // Find matching guidance
   const matchingGuidance = findMatchingGuidance(symptomText);
@@ -252,7 +250,12 @@ export function buildGuidanceResponse(
 
   // Build response based on matches and assessment
   const possibleCauses = buildPossibleCauses(matchingGuidance, context, assessment);
-  const immediateActions = buildImmediateActions(matchingGuidance, context, assessment, memberProfile);
+  const immediateActions = buildImmediateActions(
+    matchingGuidance,
+    context,
+    assessment,
+    memberProfile
+  );
   const whenToSeekHelp = buildWhenToSeekHelp(matchingGuidance, assessment);
 
   // Build suggested actions with pre-filled data
@@ -281,7 +284,7 @@ export function buildGuidanceResponse(
  */
 function buildUnderstandingStatement(
   context: HealthContext,
-  assessment: SafetyAssessment
+  _assessment: SafetyAssessment
 ): string {
   const parts: string[] = [];
 
@@ -336,10 +339,7 @@ function determineRiskLevel(
 /**
  * Collect all detected symptoms from context and assessment
  */
-function collectDetectedSymptoms(
-  context: HealthContext,
-  assessment: SafetyAssessment
-): string[] {
+function collectDetectedSymptoms(context: HealthContext, assessment: SafetyAssessment): string[] {
   const symptoms: string[] = [];
 
   if (context.primarySymptom) {
@@ -498,8 +498,8 @@ function findMatchingGuidance(symptomText: string): SymptomGuidance[] {
 
 function buildPossibleCauses(
   matchingGuidance: SymptomGuidance[],
-  context: HealthContext,
-  assessment: SafetyAssessment
+  _context: HealthContext,
+  _assessment: SafetyAssessment
 ): string[] {
   const causes: string[] = [];
 
@@ -528,7 +528,7 @@ function buildImmediateActions(
   matchingGuidance: SymptomGuidance[],
   context: HealthContext,
   assessment: SafetyAssessment,
-  memberProfile?: MemberProfile
+  _memberProfile?: MemberProfile
 ): string[] {
   const actions: string[] = [];
 
@@ -544,10 +544,10 @@ function buildImmediateActions(
 
   // Add general self-care if appropriate
   if (assessment.urgency === 'self_care' || assessment.urgency === 'monitor') {
-    if (!actions.some(a => a.toLowerCase().includes('rest'))) {
+    if (!actions.some((a) => a.toLowerCase().includes('rest'))) {
       actions.push('Get adequate rest and sleep');
     }
-    if (!actions.some(a => a.toLowerCase().includes('hydrat'))) {
+    if (!actions.some((a) => a.toLowerCase().includes('hydrat'))) {
       actions.push('Stay hydrated');
     }
   }
@@ -582,7 +582,7 @@ function buildWhenToSeekHelp(
   }
 
   // Add general guidelines
-  whenToSeek.push('Symptoms significantly worsen or don\'t improve');
+  whenToSeek.push("Symptoms significantly worsen or don't improve");
   whenToSeek.push('You develop new concerning symptoms');
 
   // Remove duplicates and return
@@ -631,14 +631,24 @@ const DIFFERENTIAL_PATTERNS: DifferentialPattern[] = [
         name: 'Migraine',
         description: 'A neurological condition with moderate to severe headache',
         likelihood: 'high',
-        supportingFactors: ['Throbbing quality', 'Light/sound sensitivity', 'Nausea', 'History of similar'],
+        supportingFactors: [
+          'Throbbing quality',
+          'Light/sound sensitivity',
+          'Nausea',
+          'History of similar',
+        ],
         typicalPresentation: 'One-sided pulsating headache with nausea and light sensitivity',
       },
       {
         name: 'Tension-type headache',
         description: 'Most common type of headache caused by muscle tension',
         likelihood: 'moderate',
-        supportingFactors: ['Band-like pressure', 'Both sides affected', 'No nausea', 'Stress related'],
+        supportingFactors: [
+          'Band-like pressure',
+          'Both sides affected',
+          'No nausea',
+          'Stress related',
+        ],
         typicalPresentation: 'Mild to moderate pressing/tightening sensation on both sides',
       },
       {
@@ -756,7 +766,12 @@ const DIFFERENTIAL_PATTERNS: DifferentialPattern[] = [
         name: 'Acute bronchitis',
         description: 'Inflammation of the bronchial tubes',
         likelihood: 'moderate',
-        supportingFactors: ['Productive cough', 'Chest congestion', 'Following cold', 'Cough worsening'],
+        supportingFactors: [
+          'Productive cough',
+          'Chest congestion',
+          'Following cold',
+          'Cough worsening',
+        ],
         typicalPresentation: 'Persistent cough with mucus production after a cold',
       },
       {
@@ -785,7 +800,12 @@ const DIFFERENTIAL_PATTERNS: DifferentialPattern[] = [
         name: 'Postural back pain',
         description: 'Pain related to posture and positioning',
         likelihood: 'moderate',
-        supportingFactors: ['Desk work', 'Prolonged sitting', 'End of day worse', 'Improves with stretching'],
+        supportingFactors: [
+          'Desk work',
+          'Prolonged sitting',
+          'End of day worse',
+          'Improves with stretching',
+        ],
         typicalPresentation: 'Dull ache that develops through the day with sedentary work',
       },
       {
@@ -804,34 +824,36 @@ const DIFFERENTIAL_PATTERNS: DifferentialPattern[] = [
  */
 export function generateDifferentialPossibilities(
   context: HealthContext,
-  assessment: SafetyAssessment
+  _assessment: SafetyAssessment
 ): DifferentialPossibility[] {
   const allSymptomText = [
     context.primarySymptom,
     ...context.associatedSymptoms,
     context.additionalNotes,
-  ].join(' ').toLowerCase();
+  ]
+    .join(' ')
+    .toLowerCase();
 
   const possibilities: DifferentialPossibility[] = [];
 
   // Find matching patterns
   for (const pattern of DIFFERENTIAL_PATTERNS) {
     // Check if required symptoms are present
-    const hasRequired = pattern.requiredSymptoms.some(symptom =>
+    const hasRequired = pattern.requiredSymptoms.some((symptom) =>
       allSymptomText.includes(symptom)
     );
 
     if (!hasRequired) continue;
 
     // Check for excluding symptoms (skip if present)
-    const hasExcluding = pattern.excludingSymptoms.some(symptom =>
+    const hasExcluding = pattern.excludingSymptoms.some((symptom) =>
       allSymptomText.includes(symptom)
     );
 
     if (hasExcluding) continue;
 
     // Count optional symptom matches for likelihood adjustment
-    const optionalMatches = pattern.optionalSymptoms.filter(symptom =>
+    const optionalMatches = pattern.optionalSymptoms.filter((symptom) =>
       allSymptomText.includes(symptom)
     ).length;
 
@@ -913,7 +935,7 @@ export function buildDifferentialResponse(
   }
 
   const primary = possibilities[0];
-  const secondary = possibilities.slice(1).map(p => ({
+  const secondary = possibilities.slice(1).map((p) => ({
     name: p.name,
     description: p.description,
   }));
@@ -937,7 +959,8 @@ export function getUrgencyMessage(urgency: UrgencyLevel): {
   const messages: Record<UrgencyLevel, { title: string; message: string; actionLabel: string }> = {
     emergency: {
       title: 'Seek Emergency Care',
-      message: 'Your symptoms require immediate medical attention. Please call 911 or go to the nearest emergency room.',
+      message:
+        'Your symptoms require immediate medical attention. Please call 911 or go to the nearest emergency room.',
       actionLabel: 'Call Emergency Services',
     },
     urgent: {

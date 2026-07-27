@@ -20,12 +20,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing, radius, typography, shadows, components } from '@/theme';
+import { colors, spacing, radius, typography, components } from '@/theme';
 
 import { useSafetyStore, useSafetyContacts } from '../store';
 import { SafetyContact } from '../types';
 import { SafetyContactCard, EmptyContactsState } from '../components';
-import { isValidPhoneNumber, formatPhoneNumber } from '../services/sosService';
+import { isValidPhoneNumber } from '../services/sosService';
 
 // ============================================
 // COMPONENT
@@ -152,11 +152,9 @@ export function SafetyContactsScreen() {
     closeModal,
   ]);
 
-  const handleDelete = useCallback((contact: SafetyContact) => {
-    Alert.alert(
-      'Delete Contact',
-      `Are you sure you want to remove ${contact.name}?`,
-      [
+  const handleDelete = useCallback(
+    (contact: SafetyContact) => {
+      Alert.alert('Delete Contact', `Are you sure you want to remove ${contact.name}?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -168,13 +166,17 @@ export function SafetyContactsScreen() {
             }
           },
         },
-      ]
-    );
-  }, [deleteContact, showModal, closeModal]);
+      ]);
+    },
+    [deleteContact, showModal, closeModal]
+  );
 
-  const handleSetPrimary = useCallback((contact: SafetyContact) => {
-    setPrimaryContact(contact.id);
-  }, [setPrimaryContact]);
+  const handleSetPrimary = useCallback(
+    (contact: SafetyContact) => {
+      setPrimaryContact(contact.id);
+    },
+    [setPrimaryContact]
+  );
 
   return (
     <View style={styles.container}>
@@ -250,9 +252,7 @@ export function SafetyContactsScreen() {
             <TouchableOpacity onPress={closeModal}>
               <Text style={styles.modalCancel}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>
-              {editingContact ? 'Edit Contact' : 'Add Contact'}
-            </Text>
+            <Text style={styles.modalTitle}>{editingContact ? 'Edit Contact' : 'Add Contact'}</Text>
             <TouchableOpacity onPress={handleSave}>
               <Text style={styles.modalSave}>Save</Text>
             </TouchableOpacity>
@@ -297,9 +297,7 @@ export function SafetyContactsScreen() {
                   placeholderTextColor={colors.textTertiary}
                   keyboardType="phone-pad"
                 />
-                {errors.phoneNumber && (
-                  <Text style={styles.errorText}>{errors.phoneNumber}</Text>
-                )}
+                {errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
               </View>
 
               {/* Contact Methods */}

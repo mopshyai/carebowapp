@@ -7,12 +7,7 @@
 // PAYMENT METHODS
 // ============================================
 
-export type PaymentMethodType =
-  | 'card'
-  | 'upi'
-  | 'netbanking'
-  | 'wallet'
-  | 'cod'; // Cash on delivery for some services
+export type PaymentMethodType = 'card' | 'upi' | 'netbanking' | 'wallet' | 'cod'; // Cash on delivery for some services
 
 export interface SavedCard {
   id: string;
@@ -280,7 +275,7 @@ export function formatAmount(amount: number, currency: 'USD' | 'INR'): string {
 /**
  * Convert display amount to smallest unit
  */
-export function toSmallestUnit(amount: number, currency: 'USD' | 'INR'): number {
+export function toSmallestUnit(amount: number, _currency: 'USD' | 'INR'): number {
   return Math.round(amount * 100);
 }
 

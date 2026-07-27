@@ -16,7 +16,6 @@ import {
   ServiceRecommendation,
   FollowUpQuestionType,
   SessionFeedback,
-  SessionSummary,
   generateSessionId,
   createEmptyHealthContext,
   createMessage,
@@ -34,9 +33,9 @@ import {
 // ============================================
 
 type TrialState = {
-  trialStartDate: string | null;  // ISO date - set when user clicks "Start Trial"
-  trialEndDate: string | null;    // ISO date (startDate + 7 days)
-  hasUsedTrial: boolean;          // true once trial started (can't restart)
+  trialStartDate: string | null; // ISO date - set when user clicks "Start Trial"
+  trialEndDate: string | null; // ISO date (startDate + 7 days)
+  hasUsedTrial: boolean; // true once trial started (can't restart)
 };
 
 type AskCarebowState = {
@@ -111,7 +110,10 @@ type AskCarebowActions = {
   scheduleFollowUp: (scheduledFor: string, reminderId?: string) => void;
   cancelFollowUp: () => void;
   markDoctorNotesSent: (recipient: string) => void;
-  exportSession: (format: 'pdf' | 'text' | 'json', destination: 'email' | 'share' | 'download') => void;
+  exportSession: (
+    format: 'pdf' | 'text' | 'json',
+    destination: 'email' | 'share' | 'download'
+  ) => void;
   getSessionExportText: (sessionId?: string) => string | null;
   getSessionExportJson: (sessionId?: string) => object | null;
   setRiskLevel: (level: 'low' | 'moderate' | 'high' | 'critical') => void;
@@ -137,13 +139,7 @@ type AskCarebowActions = {
 const createInitialConversationState = (): ConversationState => ({
   phase: 'initial',
   questionsAsked: [],
-  questionsRemaining: [
-    'duration',
-    'severity',
-    'frequency',
-    'associated_symptoms',
-    'recent_events',
-  ],
+  questionsRemaining: ['duration', 'severity', 'frequency', 'associated_symptoms', 'recent_events'],
   healthContext: createEmptyHealthContext(),
   hasProvidedGuidance: false,
 });
@@ -225,9 +221,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: null,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -253,9 +247,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -278,9 +270,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -301,9 +291,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -326,9 +314,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -341,16 +327,14 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
             ...state.currentSession,
             conversationState: {
               ...state.currentSession.conversationState,
-              currentQuestion: questionType ? { type: questionType } as any : undefined,
+              currentQuestion: questionType ? ({ type: questionType } as any) : undefined,
             },
             updatedAt: new Date().toISOString(),
           };
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -371,9 +355,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -396,9 +378,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -421,9 +401,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -446,9 +424,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -470,9 +446,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -483,18 +457,13 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           const updatedSession = {
             ...state.currentSession,
-            recommendedServices: [
-              ...state.currentSession.recommendedServices,
-              recommendation,
-            ],
+            recommendedServices: [...state.currentSession.recommendedServices, recommendation],
             updatedAt: new Date().toISOString(),
           };
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -515,9 +484,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -536,9 +503,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -635,9 +600,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: null,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -661,9 +624,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -688,9 +649,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -715,9 +674,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -736,9 +693,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -757,9 +712,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -778,9 +731,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -797,18 +748,13 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           const updatedSession = {
             ...state.currentSession,
-            exportHistory: [
-              ...(state.currentSession.exportHistory || []),
-              exportEntry,
-            ],
+            exportHistory: [...(state.currentSession.exportHistory || []), exportEntry],
             updatedAt: new Date().toISOString(),
           };
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -845,9 +791,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -864,9 +808,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -886,9 +828,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 
           return {
             currentSession: updatedSession,
-            sessions: state.sessions.map((s) =>
-              s.id === updatedSession.id ? updatedSession : s
-            ),
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
           };
         });
       },
@@ -936,8 +876,7 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
 // SELECTOR HOOKS
 // ============================================
 
-export const useCurrentSession = () =>
-  useAskCarebowStore((state) => state.currentSession);
+export const useCurrentSession = () => useAskCarebowStore((state) => state.currentSession);
 
 export const useMessages = () =>
   useAskCarebowStore((state) => state.currentSession?.messages ?? []);
@@ -948,18 +887,14 @@ export const useHealthContext = () =>
 export const useConversationPhase = () =>
   useAskCarebowStore((state) => state.currentSession?.conversationState.phase ?? 'initial');
 
-export const useIsTyping = () =>
-  useAskCarebowStore((state) => state.isTyping);
+export const useIsTyping = () => useAskCarebowStore((state) => state.isTyping);
 
-export const useCanAskQuestion = () =>
-  useAskCarebowStore((state) => state.canAskQuestion());
+export const useCanAskQuestion = () => useAskCarebowStore((state) => state.canAskQuestion());
 
 // Trial selectors
-export const useTrialState = () =>
-  useAskCarebowStore((state) => state.trial);
+export const useTrialState = () => useAskCarebowStore((state) => state.trial);
 
-export const useIsTrialActive = () =>
-  useAskCarebowStore((state) => state.isTrialActive());
+export const useIsTrialActive = () => useAskCarebowStore((state) => state.isTrialActive());
 
 export const useTrialDaysRemaining = () =>
   useAskCarebowStore((state) => state.getTrialDaysRemaining());

@@ -10,13 +10,7 @@ import {
   UrgencyLevel,
   GuidanceResponse,
   ServiceRecommendation,
-  QuickOption,
   FollowUpQuestionType,
-  Duration,
-  Severity,
-  Frequency,
-  durationLabels,
-  frequencyLabels,
 } from '@/types/askCarebow';
 import {
   detectEmergency,
@@ -24,9 +18,12 @@ import {
   SafetyAssessment,
   detectCrisisType,
   formatCrisisResponse,
-  CrisisType,
 } from './safetyClassifier';
-import { getFollowUpQuestion, shouldAskMoreQuestions, parseUserResponse } from './followUpQuestions';
+import {
+  getFollowUpQuestion,
+  shouldAskMoreQuestions,
+  parseUserResponse,
+} from './followUpQuestions';
 import { getServiceRecommendations } from './serviceRouter';
 import { buildGuidanceResponse } from './guidanceBuilder';
 
@@ -108,7 +105,10 @@ function handleInitialInput(
     firstQuestionType = 'location';
   }
 
-  const firstQuestion = getFollowUpQuestion(firstQuestionType, { ...healthContext, ...healthContextUpdates });
+  const firstQuestion = getFollowUpQuestion(firstQuestionType, {
+    ...healthContext,
+    ...healthContextUpdates,
+  });
 
   // P1-1 FIX: Build single formatted first response
   const formattedResponse = buildFirstResponse(
@@ -218,7 +218,8 @@ function generateEmergencyResponse(
     emergencyText = `I hear you, and I want you to know that help is available right now.\n\n${crisisResources}`;
   } else {
     // Standard emergency response
-    emergencyText = 'Please take these steps immediately:\n\n1. If you or someone is in immediate danger, call emergency services (911 in the US)\n\n2. Do not drive yourself if you feel unwell - have someone else drive you or call an ambulance\n\n3. Stay calm and try to remain still until help arrives\n\n4. If possible, have someone stay with you';
+    emergencyText =
+      'Please take these steps immediately:\n\n1. If you or someone is in immediate danger, call emergency services (911 in the US)\n\n2. Do not drive yourself if you feel unwell - have someone else drive you or call an ambulance\n\n3. Stay calm and try to remain still until help arrives\n\n4. If possible, have someone stay with you';
   }
 
   return {
@@ -283,11 +284,12 @@ function generateAssessmentAndGuidance(
 
   // P1-2 FIX: Replace generic closer with specific next action
   // NO "Is there anything else..." or "Let me know..." - use specific action
-  const nextActionText = serviceRecommendations.length > 0
-    ? `Would you like me to help you book ${serviceRecommendations[0].serviceTitle}?`
-    : assessment.urgency === 'emergency' || assessment.urgency === 'urgent'
-      ? 'Please prioritize seeking medical care based on the guidance above.'
-      : 'Monitor your symptoms over the next 24 hours and let me know if anything changes.';
+  const nextActionText =
+    serviceRecommendations.length > 0
+      ? `Would you like me to help you book ${serviceRecommendations[0].serviceTitle}?`
+      : assessment.urgency === 'emergency' || assessment.urgency === 'urgent'
+        ? 'Please prioritize seeking medical care based on the guidance above.'
+        : 'Monitor your symptoms over the next 24 hours and let me know if anything changes.';
 
   messages.push({
     role: 'assistant',
@@ -372,13 +374,26 @@ function extractUnderstandingBullets(symptom: string, text: string): string[] {
   bullets.push(`You're experiencing ${symptom.toLowerCase()}`);
 
   // Add context if detected
-  if (lowerText.includes('worried') || lowerText.includes('anxious') || lowerText.includes('scared') || lowerText.includes('concerned')) {
+  if (
+    lowerText.includes('worried') ||
+    lowerText.includes('anxious') ||
+    lowerText.includes('scared') ||
+    lowerText.includes('concerned')
+  ) {
     bullets.push(`You're feeling worried about this`);
   } else if (lowerText.includes('pain') || lowerText.includes('hurt')) {
     bullets.push(`This is causing you discomfort`);
-  } else if (lowerText.includes('days') || lowerText.includes('week') || lowerText.includes('while')) {
+  } else if (
+    lowerText.includes('days') ||
+    lowerText.includes('week') ||
+    lowerText.includes('while')
+  ) {
     bullets.push(`This has been going on for some time`);
-  } else if (lowerText.includes('suddenly') || lowerText.includes('just started') || lowerText.includes('just now')) {
+  } else if (
+    lowerText.includes('suddenly') ||
+    lowerText.includes('just started') ||
+    lowerText.includes('just now')
+  ) {
     bullets.push(`This started recently`);
   }
 
@@ -405,7 +420,7 @@ function buildFirstResponse(
 
   // 2) 1-2 bullets reflecting what was understood
   const bullets = extractUnderstandingBullets(symptom, originalText);
-  const bulletSection = `From what you shared:\n${bullets.map(b => `• ${b}`).join('\n')}`;
+  const bulletSection = `From what you shared:\n${bullets.map((b) => `• ${b}`).join('\n')}`;
 
   // 3) EXACTLY ONE follow-up question
   const question = followUpQuestion;
@@ -421,14 +436,14 @@ function getNextQuestionType(
   // onset → location → severity → pattern → associated symptoms → risk factors
   // Max 2 questions per turn (handled by caller)
   const questionPriority: FollowUpQuestionType[] = [
-    'duration',           // onset
-    'location',           // location
-    'severity',           // severity
-    'frequency',          // pattern
+    'duration', // onset
+    'location', // location
+    'severity', // severity
+    'frequency', // pattern
     'associated_symptoms', // associated symptoms
-    'risk_factors',       // risk factors
+    'risk_factors', // risk factors
     'chronic_conditions', // chronic conditions (secondary)
-    'recent_events',      // recent events (secondary)
+    'recent_events', // recent events (secondary)
   ];
 
   // Find the next question that hasn't been asked
@@ -451,10 +466,7 @@ function getNextQuestionType(
   return null;
 }
 
-function formatGuidanceText(
-  guidance: GuidanceResponse,
-  assessment: SafetyAssessment
-): string {
+function formatGuidanceText(guidance: GuidanceResponse, _assessment: SafetyAssessment): string {
   let text = '';
 
   // What this could be related to
@@ -486,10 +498,7 @@ function formatGuidanceText(
   return text.trim();
 }
 
-function generateFollowUpResponse(
-  text: string,
-  healthContext: HealthContext
-): string {
+function generateFollowUpResponse(text: string, _healthContext: HealthContext): string {
   // Handle common follow-up questions
   // P1-2 FIX: All responses end with specific action or follow-up question
   if (text.includes('how long') || text.includes('when will')) {
@@ -501,7 +510,7 @@ function generateFollowUpResponse(
   }
 
   if (text.includes('serious') || text.includes('worried')) {
-    return 'I understand your concern. Based on what you\'ve shared, the situation doesn\'t appear to be immediately dangerous, but professional confirmation can give you peace of mind. Would you like to connect with a doctor?';
+    return "I understand your concern. Based on what you've shared, the situation doesn't appear to be immediately dangerous, but professional confirmation can give you peace of mind. Would you like to connect with a doctor?";
   }
 
   // P1-2 FIX: Replace generic default with specific follow-up question

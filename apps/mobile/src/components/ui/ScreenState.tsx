@@ -70,7 +70,6 @@ export function ScreenState({
   skeletonType = 'list',
   customSkeleton,
   loadingText,
-  errorMessage,
   emptyConfig,
   onRetry,
   style,
@@ -119,11 +118,7 @@ export function ScreenState({
   }
 
   // Content state
-  return (
-    <View style={[styles.container, contentStyle, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[styles.container, contentStyle, style]}>{children}</View>;
 }
 
 // ============================================
@@ -227,10 +222,7 @@ export function useScreenState({
 
   // Check if data is empty (array or null/undefined)
   const dataIsEmpty =
-    isEmpty ||
-    data === null ||
-    data === undefined ||
-    (Array.isArray(data) && data.length === 0);
+    isEmpty || data === null || data === undefined || (Array.isArray(data) && data.length === 0);
 
   if (dataIsEmpty) return 'empty';
 
@@ -253,65 +245,35 @@ interface ScreenStatePresetProps {
  * Home screen state wrapper
  */
 export function HomeScreenState(props: ScreenStatePresetProps) {
-  return (
-    <ScreenState
-      {...props}
-      loadingType="skeleton"
-      skeletonType="home"
-    />
-  );
+  return <ScreenState {...props} loadingType="skeleton" skeletonType="home" />;
 }
 
 /**
  * Profile screen state wrapper
  */
 export function ProfileScreenState(props: ScreenStatePresetProps) {
-  return (
-    <ScreenState
-      {...props}
-      loadingType="skeleton"
-      skeletonType="profile"
-    />
-  );
+  return <ScreenState {...props} loadingType="skeleton" skeletonType="profile" />;
 }
 
 /**
  * Detail screen state wrapper
  */
 export function DetailScreenState(props: ScreenStatePresetProps) {
-  return (
-    <ScreenState
-      {...props}
-      loadingType="skeleton"
-      skeletonType="detail"
-    />
-  );
+  return <ScreenState {...props} loadingType="skeleton" skeletonType="detail" />;
 }
 
 /**
  * List screen state wrapper
  */
 export function ListScreenState(props: ScreenStatePresetProps) {
-  return (
-    <ScreenState
-      {...props}
-      loadingType="skeleton"
-      skeletonType="list"
-    />
-  );
+  return <ScreenState {...props} loadingType="skeleton" skeletonType="list" />;
 }
 
 /**
  * Card-based screen state wrapper
  */
 export function CardScreenState(props: ScreenStatePresetProps) {
-  return (
-    <ScreenState
-      {...props}
-      loadingType="skeleton"
-      skeletonType="card"
-    />
-  );
+  return <ScreenState {...props} loadingType="skeleton" skeletonType="card" />;
 }
 
 export default ScreenState;

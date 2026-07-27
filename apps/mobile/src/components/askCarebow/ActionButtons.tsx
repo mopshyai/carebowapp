@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SuggestedAction, ActionType, urgencyConfig } from '../../types/askCarebow';
+import { SuggestedAction, ActionType } from '../../types/askCarebow';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 
 interface ActionButtonsProps {
@@ -129,11 +129,7 @@ export function ActionButtons({ actions, onActionPress }: ActionButtonsProps) {
               </Text>
             </View>
           </View>
-          <Icon
-            name="arrow-forward"
-            size={20}
-            color={actionColors[primaryAction.type].icon}
-          />
+          <Icon name="arrow-forward" size={20} color={actionColors[primaryAction.type].icon} />
         </TouchableOpacity>
       )}
 
@@ -157,10 +153,7 @@ export function ActionButtons({ actions, onActionPress }: ActionButtonsProps) {
                 color={actionColors[action.type].icon}
               />
               <Text
-                style={[
-                  styles.secondaryButtonLabel,
-                  { color: actionColors[action.type].text },
-                ]}
+                style={[styles.secondaryButtonLabel, { color: actionColors[action.type].text }]}
               >
                 {action.label}
               </Text>

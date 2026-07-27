@@ -11,7 +11,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, Platform, ViewStyle } from 'react-native';
 import { AppIcon, IconName } from '../icons';
-import { colors, spacing, radius } from '../../theme';
 
 // Badge type configuration
 export type BadgeType =

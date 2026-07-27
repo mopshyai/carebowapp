@@ -12,7 +12,6 @@ import {
   ScrollViewProps,
   View,
   Text,
-  Animated,
 } from 'react-native';
 import { colors, typography, spacing } from '../../theme';
 
@@ -116,9 +115,7 @@ export function RefreshableScrollView({
       {/* Last Updated Indicator */}
       {showLastUpdated && lastUpdated && (
         <View style={styles.lastUpdatedContainer}>
-          <Text style={styles.lastUpdatedText}>
-            Updated {formatLastUpdated(lastUpdated)}
-          </Text>
+          <Text style={styles.lastUpdatedText}>Updated {formatLastUpdated(lastUpdated)}</Text>
         </View>
       )}
 
@@ -141,9 +138,7 @@ export interface UseRefreshReturn {
 /**
  * Hook to manage refresh state
  */
-export function useRefresh(
-  fetchFunction: () => Promise<void>
-): UseRefreshReturn {
+export function useRefresh(fetchFunction: () => Promise<void>): UseRefreshReturn {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 

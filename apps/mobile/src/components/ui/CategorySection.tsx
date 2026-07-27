@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ServiceRowCard } from './ServiceRowCard';
 import { ServiceCategory } from '../../data/types';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 
 interface CategorySectionProps {
   category: ServiceCategory;

@@ -4,18 +4,10 @@
  */
 
 import React, { useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  StatusBar,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, typography, spacing, radius } from '@/theme';
+import { colors, typography, spacing } from '@/theme';
 import { useBiometrics } from '@/hooks/useBiometrics';
 import { Button } from '@/components/ui/Button';
 
@@ -51,13 +43,8 @@ export function BiometricLock({
   subtitle = 'Authenticate to continue',
 }: BiometricLockProps) {
   const insets = useSafeAreaInsets();
-  const {
-    isAvailable,
-    biometryType,
-    biometryLabel,
-    isAuthenticating,
-    authenticate,
-  } = useBiometrics();
+  const { isAvailable, biometryType, biometryLabel, isAuthenticating, authenticate } =
+    useBiometrics();
 
   /**
    * Handle biometric authentication
@@ -116,10 +103,7 @@ export function BiometricLock({
         {isAvailable ? (
           <>
             <TouchableOpacity
-              style={[
-                styles.biometricButton,
-                isAuthenticating && styles.biometricButtonActive,
-              ]}
+              style={[styles.biometricButton, isAuthenticating && styles.biometricButtonActive]}
               onPress={handleAuthenticate}
               disabled={isAuthenticating}
               activeOpacity={0.8}
@@ -156,10 +140,7 @@ export function BiometricLock({
       {/* Passcode Option */}
       {showPasscodeOption && onUsePasscode && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <TouchableOpacity
-            style={styles.passcodeButton}
-            onPress={onUsePasscode}
-          >
+          <TouchableOpacity style={styles.passcodeButton} onPress={onUsePasscode}>
             <Icon name="keypad-outline" size={20} color={colors.white} />
             <Text style={styles.passcodeText}>Use Passcode Instead</Text>
           </TouchableOpacity>

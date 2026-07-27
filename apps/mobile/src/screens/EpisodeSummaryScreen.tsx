@@ -14,14 +14,14 @@ import {
   Alert,
   Modal,
   Pressable,
-  Platform,
+  Linking,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../theme';
-import { useEpisodeStore, useEpisodeMessages } from '../store/episodeStore';
+import { useEpisodeStore } from '../store/episodeStore';
 import {
   buildEpisodeSummary,
   getTriageLevelDisplay,
@@ -88,7 +88,6 @@ export default function EpisodeSummaryScreen() {
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
 
     try {
-      const { Linking } = require('react-native');
       const canOpen = await Linking.canOpenURL(mailtoUrl);
       if (canOpen) {
         await Linking.openURL(mailtoUrl);
@@ -165,12 +164,7 @@ export default function EpisodeSummaryScreen() {
               <Text style={styles.metaText}>{summary.forWhom}</Text>
             </View>
             {summary.triageLevel && (
-              <View
-                style={[
-                  styles.triageBadge,
-                  { backgroundColor: triageDisplay.bgColor },
-                ]}
-              >
+              <View style={[styles.triageBadge, { backgroundColor: triageDisplay.bgColor }]}>
                 <Text style={[styles.triageBadgeText, { color: triageDisplay.color }]}>
                   {triageDisplay.label}
                 </Text>
@@ -247,8 +241,8 @@ export default function EpisodeSummaryScreen() {
         <View style={styles.disclaimer}>
           <Icon name="information-circle-outline" size={14} color={colors.textTertiary} />
           <Text style={styles.disclaimerText}>
-            This summary is for informational purposes only and does not constitute
-            medical advice. Please consult a healthcare provider for diagnosis and treatment.
+            This summary is for informational purposes only and does not constitute medical advice.
+            Please consult a healthcare provider for diagnosis and treatment.
           </Text>
         </View>
       </ScrollView>

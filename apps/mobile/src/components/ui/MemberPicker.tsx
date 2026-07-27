@@ -4,17 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Member } from '../../data/types';
-import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { colors, spacing, radius, typography } from '../../theme';
 
 interface MemberPickerProps {
   members: Member[];
@@ -22,11 +15,7 @@ interface MemberPickerProps {
   onSelectMember: (member: Member) => void;
 }
 
-export function MemberPicker({
-  members,
-  selectedMemberId,
-  onSelectMember,
-}: MemberPickerProps) {
+export function MemberPicker({ members, selectedMemberId, onSelectMember }: MemberPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedMember = members.find((m) => m.id === selectedMemberId);
@@ -85,10 +74,7 @@ export function MemberPicker({
                   >
                     <View style={styles.memberInfo}>
                       <View
-                        style={[
-                          styles.memberAvatar,
-                          isSelected && styles.memberAvatarSelected,
-                        ]}
+                        style={[styles.memberAvatar, isSelected && styles.memberAvatarSelected]}
                       >
                         <Icon
                           name="person"
@@ -97,12 +83,7 @@ export function MemberPicker({
                         />
                       </View>
                       <View>
-                        <Text
-                          style={[
-                            styles.memberName,
-                            isSelected && styles.memberNameSelected,
-                          ]}
-                        >
+                        <Text style={[styles.memberName, isSelected && styles.memberNameSelected]}>
                           {member.name}
                         </Text>
                         <Text style={styles.memberRelationship}>
@@ -111,9 +92,7 @@ export function MemberPicker({
                         </Text>
                       </View>
                     </View>
-                    {isSelected && (
-                      <Icon name="checkmark-circle" size={24} color={colors.accent} />
-                    )}
+                    {isSelected && <Icon name="checkmark-circle" size={24} color={colors.accent} />}
                   </TouchableOpacity>
                 );
               })}

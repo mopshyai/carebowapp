@@ -15,7 +15,7 @@ import {
   UIManager,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { colors, spacing, radius, typography } from '../../theme';
 import {
   MemoryCandidate,
   memoryTypeLabels,
@@ -102,17 +102,11 @@ export function MemoryCandidateCard({
             return (
               <View key={candidate.id} style={styles.candidateItem}>
                 <View style={[styles.candidateIcon, { backgroundColor: colorConfig.bg }]}>
-                  <Icon
-                    name={memoryTypeIcons[candidate.type]}
-                    size={14}
-                    color={colorConfig.text}
-                  />
+                  <Icon name={memoryTypeIcons[candidate.type]} size={14} color={colorConfig.text} />
                 </View>
 
                 <View style={styles.candidateContent}>
-                  <Text style={styles.candidateType}>
-                    {memoryTypeLabels[candidate.type]}
-                  </Text>
+                  <Text style={styles.candidateType}>{memoryTypeLabels[candidate.type]}</Text>
 
                   {isEditing ? (
                     <View style={styles.editContainer}>
@@ -129,10 +123,7 @@ export function MemoryCandidateCard({
                         >
                           <Icon name="checkmark" size={16} color={colors.success} />
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.editButton}
-                          onPress={handleCancelEdit}
-                        >
+                        <TouchableOpacity style={styles.editButton} onPress={handleCancelEdit}>
                           <Icon name="close" size={16} color={colors.textTertiary} />
                         </TouchableOpacity>
                       </View>
@@ -163,9 +154,11 @@ export function MemoryCandidateCard({
                           candidate.confidence === 'low' && styles.confidenceTextLow,
                         ]}
                       >
-                        {candidate.confidence === 'high' ? 'High confidence' :
-                         candidate.confidence === 'medium' ? 'Medium confidence' :
-                         'Low confidence'}
+                        {candidate.confidence === 'high'
+                          ? 'High confidence'
+                          : candidate.confidence === 'medium'
+                            ? 'Medium confidence'
+                            : 'Low confidence'}
                       </Text>
                     </View>
                   </View>

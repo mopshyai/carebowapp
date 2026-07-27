@@ -32,7 +32,8 @@ const CODE_LENGTH = 6;
 export default function VerifyEmailScreen() {
   const navigation = useNavigation<VerifyEmailScreenNavigationProp>();
   const route = useRoute<VerifyEmailScreenRouteProp>();
-  const { verifyEmail, completeVerifiedLogin, sendVerificationCode, isLoading, error, clearError } = useAuthStore();
+  const { verifyEmail, completeVerifiedLogin, sendVerificationCode, isLoading, error, clearError } =
+    useAuthStore();
 
   const email = route.params?.email || useAuthStore.getState().pendingVerificationEmail || '';
   const deepLinkToken = route.params?.token;
@@ -63,7 +64,7 @@ export default function VerifyEmailScreen() {
   useEffect(() => {
     setResendCooldown(60);
     const interval = setInterval(() => {
-      setResendCooldown(prev => {
+      setResendCooldown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
           return 0;
@@ -127,7 +128,7 @@ export default function VerifyEmailScreen() {
     if (success) {
       setResendCooldown(60);
       const interval = setInterval(() => {
-        setResendCooldown(prev => {
+        setResendCooldown((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
             return 0;
@@ -138,6 +139,11 @@ export default function VerifyEmailScreen() {
     }
   };
 
+  // UNWIRED. Handles pasting a full verification code into the OTP boxes, but
+  // nothing calls it — no input passes its onChangeText here. Worth connecting
+  // (pasting a code from an email is the common path) or deleting; left in
+  // place rather than guessing at the wiring.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handlePaste = (text: string) => {
     const digits = text.replace(/[^0-9]/g, '').slice(0, CODE_LENGTH);
     if (digits.length > 0) {
@@ -167,10 +173,7 @@ export default function VerifyEmailScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <Pressable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
 
@@ -211,14 +214,14 @@ export default function VerifyEmailScreen() {
             {code.map((digit, index) => (
               <TextInput
                 key={index}
-                ref={ref => (inputRefs.current[index] = ref)}
+                ref={(ref) => (inputRefs.current[index] = ref)}
                 style={[
                   styles.codeInput,
                   digit && styles.codeInputFilled,
                   error && styles.codeInputError,
                 ]}
                 value={digit}
-                onChangeText={text => handleCodeChange(text, index)}
+                onChangeText={(text) => handleCodeChange(text, index)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
                 keyboardType="number-pad"
                 maxLength={1}
@@ -257,9 +260,7 @@ export default function VerifyEmailScreen() {
           <View style={styles.resendContainer}>
             <Text style={styles.resendText}>Didn't receive the code? </Text>
             {resendCooldown > 0 ? (
-              <Text style={styles.resendCooldown}>
-                Resend in {resendCooldown}s
-              </Text>
+              <Text style={styles.resendCooldown}>Resend in {resendCooldown}s</Text>
             ) : (
               <Pressable onPress={handleResend} disabled={isLoading}>
                 <Text style={styles.resendLink}>Resend</Text>

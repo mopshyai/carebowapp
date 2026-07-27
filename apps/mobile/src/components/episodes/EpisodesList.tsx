@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { colors, spacing, radius, typography } from '../../theme';
+import { colors, spacing, typography } from '../../theme';
 import { Episode } from '../../types/episode';
 import { EpisodeCard } from './EpisodeCard';
 

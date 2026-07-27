@@ -58,7 +58,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'cold_milk',
         name: 'Cold Milk',
         hindiName: 'Thanda Doodh',
-        description: 'Milk contains calcium which helps neutralize stomach acid and provides instant relief.',
+        description:
+          'Milk contains calcium which helps neutralize stomach acid and provides instant relief.',
         howTo: 'Drink a glass of cold milk (without sugar). Sip slowly for best results.',
         timing: 'When you feel acidity starting or after a heavy meal',
         effectiveness: 'high',
@@ -70,8 +71,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'jeera_water',
         name: 'Jeera (Cumin) Water',
         hindiName: 'Jeera Paani',
-        description: 'Cumin helps stimulate digestive enzymes and neutralizes acids in the stomach.',
-        howTo: 'Boil 1 tsp cumin seeds in 1 glass water for 5 minutes. Strain and drink warm or at room temperature. Can add a pinch of rock salt.',
+        description:
+          'Cumin helps stimulate digestive enzymes and neutralizes acids in the stomach.',
+        howTo:
+          'Boil 1 tsp cumin seeds in 1 glass water for 5 minutes. Strain and drink warm or at room temperature. Can add a pinch of rock salt.',
         timing: 'After meals or when symptoms occur',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -82,8 +85,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'fennel_seeds',
         name: 'Fennel Seeds (Saunf)',
         hindiName: 'Saunf',
-        description: 'Fennel has natural antacid properties and helps with digestion and gas relief.',
-        howTo: 'Chew 1/2 teaspoon of fennel seeds slowly after meals, or make fennel tea by boiling seeds in water.',
+        description:
+          'Fennel has natural antacid properties and helps with digestion and gas relief.',
+        howTo:
+          'Chew 1/2 teaspoon of fennel seeds slowly after meals, or make fennel tea by boiling seeds in water.',
         timing: 'After meals or when symptoms occur',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -94,7 +99,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'banana',
         name: 'Banana',
         hindiName: 'Kela',
-        description: 'Bananas are natural antacids. They coat the stomach lining and reduce irritation.',
+        description:
+          'Bananas are natural antacids. They coat the stomach lining and reduce irritation.',
         howTo: 'Eat a ripe banana when experiencing acidity. Overripe bananas work best.',
         timing: 'During symptoms or as prevention after spicy food',
         effectiveness: 'moderate',
@@ -107,7 +113,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Ajwain (Carom Seeds)',
         hindiName: 'Ajwain',
         description: 'Ajwain has anti-acidic properties and helps with gas, bloating, and acidity.',
-        howTo: 'Chew 1/2 tsp ajwain with a pinch of black salt, or boil in water and drink the strained liquid.',
+        howTo:
+          'Chew 1/2 tsp ajwain with a pinch of black salt, or boil in water and drink the strained liquid.',
         timing: 'After meals or during symptoms',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -118,7 +125,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'coconut_water',
         name: 'Coconut Water',
         hindiName: 'Nariyal Paani',
-        description: 'Coconut water is alkaline and helps neutralize acid while keeping you hydrated.',
+        description:
+          'Coconut water is alkaline and helps neutralize acid while keeping you hydrated.',
         howTo: 'Drink fresh coconut water. Best consumed at room temperature.',
         timing: 'Anytime, especially in morning or when symptoms occur',
         effectiveness: 'moderate',
@@ -129,7 +137,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
     ],
     lifestyleAdvice: [
       'Eat smaller, more frequent meals instead of large meals',
-      'Don\'t lie down immediately after eating (wait 2-3 hours)',
+      "Don't lie down immediately after eating (wait 2-3 hours)",
       'Avoid spicy, fried, and oily foods',
       'Reduce tea, coffee, and carbonated drinks',
       'Sleep with head slightly elevated',
@@ -142,7 +150,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
       'Unintentional weight loss',
       'Vomiting blood or dark material',
       'Black, tarry stools',
-      'Severe pain that doesn\'t improve with antacids',
+      "Severe pain that doesn't improve with antacids",
     ],
   },
 
@@ -155,8 +163,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'ajwain_water',
         name: 'Ajwain Water',
         hindiName: 'Ajwain Paani',
-        description: 'Ajwain is excellent for gas relief and improves digestion by stimulating digestive enzymes.',
-        howTo: 'Boil 1 tsp ajwain in 2 cups water until reduced to half. Add a pinch of black salt. Drink warm.',
+        description:
+          'Ajwain is excellent for gas relief and improves digestion by stimulating digestive enzymes.',
+        howTo:
+          'Boil 1 tsp ajwain in 2 cups water until reduced to half. Add a pinch of black salt. Drink warm.',
         timing: 'After meals or during discomfort',
         effectiveness: 'high',
         evidenceLevel: 'traditional',
@@ -167,8 +177,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'ginger_tea',
         name: 'Ginger Tea (Adrak Chai)',
         hindiName: 'Adrak Ki Chai',
-        description: 'Ginger helps relax intestinal muscles, reduces inflammation, and promotes gas expulsion.',
-        howTo: 'Grate 1 inch fresh ginger, boil in water for 5-7 minutes. Strain and add honey if desired.',
+        description:
+          'Ginger helps relax intestinal muscles, reduces inflammation, and promotes gas expulsion.',
+        howTo:
+          'Grate 1 inch fresh ginger, boil in water for 5-7 minutes. Strain and add honey if desired.',
         timing: 'After meals or when bloated',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -180,7 +192,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Hing (Asafoetida) Water',
         hindiName: 'Hing Ka Paani',
         description: 'Hing is a powerful digestive aid that reduces gas and bloating quickly.',
-        howTo: 'Dissolve a small pinch (less than 1/4 tsp) of hing in warm water. Mix well and drink slowly.',
+        howTo:
+          'Dissolve a small pinch (less than 1/4 tsp) of hing in warm water. Mix well and drink slowly.',
         timing: 'During acute bloating or after heavy meals',
         effectiveness: 'high',
         evidenceLevel: 'traditional',
@@ -220,7 +233,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
       'Avoid carbonated drinks and chewing gum',
       'Identify gas-producing foods (beans, cabbage, onions) and limit them',
       'Stay hydrated throughout the day',
-      'Don\'t skip meals - irregular eating causes gas',
+      "Don't skip meals - irregular eating causes gas",
     ],
     warningSignsToWatch: [
       'Severe abdominal pain',
@@ -240,7 +253,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'triphala',
         name: 'Triphala',
         hindiName: 'Triphala',
-        description: 'A time-tested Ayurvedic blend of three fruits that gently cleanses the digestive system.',
+        description:
+          'A time-tested Ayurvedic blend of three fruits that gently cleanses the digestive system.',
         howTo: 'Mix 1/2 tsp triphala powder in warm water. Drink before bed.',
         timing: 'Bedtime, at least 2 hours after dinner',
         effectiveness: 'high',
@@ -253,7 +267,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Isabgol (Psyllium Husk)',
         hindiName: 'Isabgol',
         description: 'Natural fiber that adds bulk to stool and promotes healthy bowel movement.',
-        howTo: 'Mix 1-2 tsp isabgol in a glass of warm water or milk. Drink immediately before it thickens. Follow with another glass of water.',
+        howTo:
+          'Mix 1-2 tsp isabgol in a glass of warm water or milk. Drink immediately before it thickens. Follow with another glass of water.',
         timing: 'Bedtime, with plenty of water',
         effectiveness: 'high',
         evidenceLevel: 'well-researched',
@@ -314,7 +329,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
     lifestyleAdvice: [
       'Drink 8-10 glasses of water daily',
       'Include fiber-rich foods (fruits, vegetables, whole grains)',
-      'Don\'t ignore the urge to go - respond promptly',
+      "Don't ignore the urge to go - respond promptly",
       'Exercise regularly - even a 20-minute walk helps',
       'Establish a regular bathroom routine',
       'Limit processed foods and refined flour (maida)',
@@ -343,7 +358,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Kadha (Traditional Decoction)',
         hindiName: 'Kadha',
         description: 'Traditional immunity-boosting drink with multiple healing herbs.',
-        howTo: 'Boil together: 1 cup water, 1/2 inch ginger (grated), 4-5 tulsi leaves, 2-3 peppercorns, 1/4 tsp turmeric, 1 small cinnamon stick. Simmer for 10 minutes. Strain and add honey when lukewarm.',
+        howTo:
+          'Boil together: 1 cup water, 1/2 inch ginger (grated), 4-5 tulsi leaves, 2-3 peppercorns, 1/4 tsp turmeric, 1 small cinnamon stick. Simmer for 10 minutes. Strain and add honey when lukewarm.',
         timing: '2-3 times daily when unwell',
         effectiveness: 'high',
         evidenceLevel: 'traditional',
@@ -354,8 +370,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'haldi_doodh',
         name: 'Golden Milk (Haldi Doodh)',
         hindiName: 'Haldi Doodh',
-        description: 'Turmeric milk is anti-inflammatory and helps with cold symptoms and immunity.',
-        howTo: 'Warm 1 cup milk with 1/2 tsp turmeric and a pinch of black pepper. Add honey if desired. Drink warm.',
+        description:
+          'Turmeric milk is anti-inflammatory and helps with cold symptoms and immunity.',
+        howTo:
+          'Warm 1 cup milk with 1/2 tsp turmeric and a pinch of black pepper. Add honey if desired. Drink warm.',
         timing: 'Bedtime, once daily',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -367,20 +385,23 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Steam Inhalation',
         hindiName: 'Bhaap lena',
         description: 'Helps clear nasal congestion and soothes irritated airways.',
-        howTo: 'Boil water in a large bowl. Add 2-3 drops eucalyptus oil or Vicks. Cover head with towel and inhale steam for 5-10 minutes. Keep eyes closed.',
+        howTo:
+          'Boil water in a large bowl. Add 2-3 drops eucalyptus oil or Vicks. Cover head with towel and inhale steam for 5-10 minutes. Keep eyes closed.',
         timing: '2-3 times daily, especially before bed',
         effectiveness: 'high',
         evidenceLevel: 'well-researched',
         contraindications: ['asthma_caution', 'children_need_supervision'],
         suitableFor: ['adults', 'elderly_with_care'],
-        safetyNote: 'Keep face at safe distance to avoid burns. Not recommended for young children without supervision.',
+        safetyNote:
+          'Keep face at safe distance to avoid burns. Not recommended for young children without supervision.',
       },
       {
         id: 'honey_ginger',
         name: 'Honey Ginger',
         hindiName: 'Shahad Adrak',
         description: 'Soothes throat irritation and helps with cough and cold symptoms.',
-        howTo: 'Mix 1 tsp honey with 1/2 tsp fresh ginger juice. Take directly or add to warm water.',
+        howTo:
+          'Mix 1 tsp honey with 1/2 tsp fresh ginger juice. Take directly or add to warm water.',
         timing: '2-3 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -392,11 +413,16 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Tulsi Tea',
         hindiName: 'Tulsi Ki Chai',
         description: 'Holy basil has antimicrobial and immune-boosting properties.',
-        howTo: 'Boil 5-6 fresh tulsi leaves in water for 5 minutes. Strain and drink. Can add honey.',
+        howTo:
+          'Boil 5-6 fresh tulsi leaves in water for 5 minutes. Strain and drink. Can add honey.',
         timing: '2-3 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'Ayurvedic',
-        contraindications: ['pregnancy_high_amounts', 'blood_thinners', 'surgery_stop_2_weeks_before'],
+        contraindications: [
+          'pregnancy_high_amounts',
+          'blood_thinners',
+          'surgery_stop_2_weeks_before',
+        ],
         suitableFor: ['all_ages', 'elderly_friendly', 'diabetic_friendly'],
       },
       {
@@ -413,7 +439,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
       },
     ],
     lifestyleAdvice: [
-      'Rest is essential - don\'t push through illness',
+      "Rest is essential - don't push through illness",
       'Stay hydrated with warm fluids (soup, water, herbal tea)',
       'Gargle with warm salt water for sore throat',
       'Keep the room ventilated but avoid direct cold drafts',
@@ -440,8 +466,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'honey_black_pepper',
         name: 'Honey with Black Pepper',
         hindiName: 'Shahad aur Kali Mirch',
-        description: 'Honey soothes throat, black pepper has expectorant properties that help clear mucus.',
-        howTo: 'Mix 1 tbsp honey with a pinch of crushed black pepper. Take directly and let it coat your throat slowly.',
+        description:
+          'Honey soothes throat, black pepper has expectorant properties that help clear mucus.',
+        howTo:
+          'Mix 1 tbsp honey with a pinch of crushed black pepper. Take directly and let it coat your throat slowly.',
         timing: '3-4 times daily, especially before bed',
         effectiveness: 'high',
         evidenceLevel: 'well-researched',
@@ -466,7 +494,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Ginger-Tulsi-Honey Mix',
         hindiName: 'Adrak-Tulsi-Shahad',
         description: 'Combines multiple cough-relieving ingredients for comprehensive relief.',
-        howTo: 'Crush ginger and tulsi, extract juice (about 1/2 tsp each). Mix with 1 tsp honey. Take directly.',
+        howTo:
+          'Crush ginger and tulsi, extract juice (about 1/2 tsp each). Mix with 1 tsp honey. Take directly.',
         timing: '3-4 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -477,8 +506,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'salt_water_gargle',
         name: 'Warm Salt Water Gargle',
         hindiName: 'Namak ke paani se garare',
-        description: 'Reduces throat irritation, clears mucus, and helps with post-nasal drip cough.',
-        howTo: 'Dissolve 1/2 tsp salt in 1 cup warm water. Gargle thoroughly for 30 seconds, then spit out. Do not swallow.',
+        description:
+          'Reduces throat irritation, clears mucus, and helps with post-nasal drip cough.',
+        howTo:
+          'Dissolve 1/2 tsp salt in 1 cup warm water. Gargle thoroughly for 30 seconds, then spit out. Do not swallow.',
         timing: '3-4 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -529,8 +560,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'peppermint_oil',
         name: 'Peppermint Oil',
         hindiName: 'Pudina Tel',
-        description: 'Has cooling and muscle-relaxing properties that help relieve tension headaches.',
-        howTo: 'Dilute 1-2 drops peppermint oil in 1 tsp carrier oil (coconut/almond). Apply to temples and forehead gently. Avoid eye area.',
+        description:
+          'Has cooling and muscle-relaxing properties that help relieve tension headaches.',
+        howTo:
+          'Dilute 1-2 drops peppermint oil in 1 tsp carrier oil (coconut/almond). Apply to temples and forehead gently. Avoid eye area.',
         timing: 'When headache occurs, can reapply after 30 minutes',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -553,7 +586,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'cold_compress',
         name: 'Cold Compress',
         hindiName: 'Thandi Patti',
-        description: 'Constricts blood vessels and reduces pain, especially effective for migraines.',
+        description:
+          'Constricts blood vessels and reduces pain, especially effective for migraines.',
         howTo: 'Apply ice pack wrapped in cloth or cold damp towel to forehead for 15-20 minutes.',
         timing: 'During headache, can repeat after 30-minute break',
         effectiveness: 'high',
@@ -577,7 +611,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'hydration',
         name: 'Stay Hydrated',
         hindiName: 'Paani Piyein',
-        description: 'Dehydration is a very common headache trigger. Often headaches resolve with hydration.',
+        description:
+          'Dehydration is a very common headache trigger. Often headaches resolve with hydration.',
         howTo: 'Drink water, coconut water, or oral rehydration solution. Aim for 2-3 glasses.',
         timing: 'Immediately when headache starts',
         effectiveness: 'moderate',
@@ -627,8 +662,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'warm_oil_massage',
         name: 'Warm Oil Massage',
         hindiName: 'Garam Tel Malish',
-        description: 'Improves blood circulation, relaxes muscles, and provides warmth to affected areas.',
-        howTo: 'Warm mustard oil or sesame oil. Gently massage affected areas in circular motions for 10-15 minutes. Can leave oil on or wipe off after 30 minutes.',
+        description:
+          'Improves blood circulation, relaxes muscles, and provides warmth to affected areas.',
+        howTo:
+          'Warm mustard oil or sesame oil. Gently massage affected areas in circular motions for 10-15 minutes. Can leave oil on or wipe off after 30 minutes.',
         timing: 'Evening or before bed for best results',
         effectiveness: 'high',
         evidenceLevel: 'traditional',
@@ -652,7 +689,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Turmeric Paste',
         hindiName: 'Haldi Ka Lep',
         description: 'Turmeric has powerful anti-inflammatory properties that help with pain.',
-        howTo: 'Mix turmeric powder with warm water or mustard oil to make paste. Apply to affected area. Leave for 30 minutes, then wash off.',
+        howTo:
+          'Mix turmeric powder with warm water or mustard oil to make paste. Apply to affected area. Leave for 30 minutes, then wash off.',
         timing: 'Once daily',
         effectiveness: 'moderate',
         evidenceLevel: 'Ayurvedic',
@@ -665,7 +703,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Hot Water Bag',
         hindiName: 'Garam Paani Ki Botal',
         description: 'Heat therapy increases blood flow and relaxes tight muscles.',
-        howTo: 'Fill hot water bag with warm (not boiling) water. Wrap in cloth and apply to painful area for 15-20 minutes.',
+        howTo:
+          'Fill hot water bag with warm (not boiling) water. Wrap in cloth and apply to painful area for 15-20 minutes.',
         timing: 'As needed, multiple times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -677,7 +716,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'rest_hydration',
         name: 'Rest and Hydration',
         hindiName: 'Aaram aur paani',
-        description: 'Body needs rest to recover, and hydration helps flush out toxins and metabolic waste.',
+        description:
+          'Body needs rest to recover, and hydration helps flush out toxins and metabolic waste.',
         howTo: 'Rest adequately, drink warm fluids including herbal teas and soups.',
         timing: 'Ongoing until symptoms improve',
         effectiveness: 'moderate',
@@ -716,8 +756,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'tulsi_ginger_kadha',
         name: 'Tulsi-Ginger Kadha',
         hindiName: 'Tulsi-Adrak Kadha',
-        description: 'Traditional fever-reducing and immunity-boosting drink combining multiple healing herbs.',
-        howTo: 'Boil 5-6 tulsi leaves, 1/2 inch grated ginger, and a pinch of black pepper in 2 cups water until reduced to 1 cup. Strain and add honey when lukewarm.',
+        description:
+          'Traditional fever-reducing and immunity-boosting drink combining multiple healing herbs.',
+        howTo:
+          'Boil 5-6 tulsi leaves, 1/2 inch grated ginger, and a pinch of black pepper in 2 cups water until reduced to 1 cup. Strain and add honey when lukewarm.',
         timing: '2-3 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'Ayurvedic',
@@ -729,20 +771,23 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Cool Sponging',
         hindiName: 'Thande paani se ponchna',
         description: 'Helps bring down body temperature naturally and safely.',
-        howTo: 'Dip cloth in room temperature water (not ice cold). Wring out excess and sponge forehead, armpits, groin, and back of neck.',
+        howTo:
+          'Dip cloth in room temperature water (not ice cold). Wring out excess and sponge forehead, armpits, groin, and back of neck.',
         timing: 'Every 30 minutes if fever is high',
         effectiveness: 'high',
         evidenceLevel: 'well-researched',
         contraindications: ['shivering_stop_if_occurs'],
         suitableFor: ['all_ages'],
-        safetyNote: 'Do NOT use ice cold water as it can cause shivering which raises body temperature.',
+        safetyNote:
+          'Do NOT use ice cold water as it can cause shivering which raises body temperature.',
       },
       {
         id: 'coriander_tea',
         name: 'Coriander Tea',
         hindiName: 'Dhaniya Ki Chai',
         description: 'Helps reduce fever and flush out toxins from the body.',
-        howTo: 'Boil 1 tbsp coriander seeds in 2 cups water until reduced to half. Strain and drink warm.',
+        howTo:
+          'Boil 1 tbsp coriander seeds in 2 cups water until reduced to half. Strain and drink warm.',
         timing: '2-3 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'Ayurvedic',
@@ -753,8 +798,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'hydration_fever',
         name: 'Stay Hydrated',
         hindiName: 'Khoob paani piyein',
-        description: 'Fever increases fluid loss. Hydration is critical to prevent dehydration and support recovery.',
-        howTo: 'Drink water, ORS (Electral), coconut water, clear soups, and herbal teas frequently.',
+        description:
+          'Fever increases fluid loss. Hydration is critical to prevent dehydration and support recovery.',
+        howTo:
+          'Drink water, ORS (Electral), coconut water, clear soups, and herbal teas frequently.',
         timing: 'Ongoing, every 30-60 minutes. Small sips if nauseous.',
         effectiveness: 'high',
         evidenceLevel: 'well-researched',
@@ -766,7 +813,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Basil Seeds Water',
         hindiName: 'Sabja Paani',
         description: 'Basil seeds are cooling and help reduce body heat.',
-        howTo: 'Soak 1 tsp basil seeds (sabja) in water for 15 minutes. Add to water or lemonade and drink.',
+        howTo:
+          'Soak 1 tsp basil seeds (sabja) in water for 15 minutes. Add to water or lemonade and drink.',
         timing: '2-3 times daily',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -818,8 +866,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'aloe_vera',
         name: 'Aloe Vera Gel',
         hindiName: 'Aloe Vera',
-        description: 'Soothing, cooling, and helps heal skin irritation. Has anti-inflammatory properties.',
-        howTo: 'Extract fresh aloe vera gel from leaf or use pure store-bought gel. Apply directly to affected area.',
+        description:
+          'Soothing, cooling, and helps heal skin irritation. Has anti-inflammatory properties.',
+        howTo:
+          'Extract fresh aloe vera gel from leaf or use pure store-bought gel. Apply directly to affected area.',
         timing: '2-3 times daily, can leave on',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -844,7 +894,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Oatmeal Bath',
         hindiName: 'Oatmeal Ka Snan',
         description: 'Colloidal oatmeal soothes itchy, irritated skin and reduces inflammation.',
-        howTo: 'Grind 1 cup oatmeal to fine powder. Add to lukewarm bath water and soak for 15-20 minutes.',
+        howTo:
+          'Grind 1 cup oatmeal to fine powder. Add to lukewarm bath water and soak for 15-20 minutes.',
         timing: 'Once daily or as needed',
         effectiveness: 'moderate',
         evidenceLevel: 'well-researched',
@@ -894,8 +945,10 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         id: 'warm_milk_nutmeg',
         name: 'Warm Milk with Nutmeg',
         hindiName: 'Jaiphal wala Doodh',
-        description: 'Nutmeg has natural sedative properties. Combined with warm milk, it promotes relaxation.',
-        howTo: 'Add a tiny pinch of nutmeg powder (less than 1/8 tsp) to warm milk. Drink 30 minutes before bed.',
+        description:
+          'Nutmeg has natural sedative properties. Combined with warm milk, it promotes relaxation.',
+        howTo:
+          'Add a tiny pinch of nutmeg powder (less than 1/8 tsp) to warm milk. Drink 30 minutes before bed.',
         timing: '30 minutes before bed',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -933,7 +986,8 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
         name: 'Warm Foot Soak',
         hindiName: 'Pairo ko garam paani mein rakhna',
         description: 'Promotes relaxation and helps prepare body for sleep.',
-        howTo: 'Soak feet in warm water with a pinch of salt or few drops of lavender oil for 15 minutes before bed.',
+        howTo:
+          'Soak feet in warm water with a pinch of salt or few drops of lavender oil for 15 minutes before bed.',
         timing: 'Before bed',
         effectiveness: 'moderate',
         evidenceLevel: 'traditional',
@@ -958,7 +1012,7 @@ export const HOME_REMEDIES_DB: Record<string, ConditionRemedies> = {
       'Avoid screens (phone, TV, computer) 1 hour before bed',
       'Keep bedroom cool, dark, and quiet',
       'Avoid caffeine (tea, coffee) after 2 PM',
-      'Don\'t nap during the day if having trouble sleeping at night',
+      "Don't nap during the day if having trouble sleeping at night",
       'Eat light dinner at least 2-3 hours before bed',
       'Practice gentle stretching, deep breathing, or meditation before bed',
       'Avoid alcohol before bed - it disrupts sleep quality',
@@ -993,25 +1047,25 @@ export function searchRemediesBySymptom(symptom: string): ConditionRemedies[] {
 
   // Symptom to condition mapping
   const symptomMapping: Record<string, string[]> = {
-    'acidity': ['acidity'],
-    'heartburn': ['acidity'],
+    acidity: ['acidity'],
+    heartburn: ['acidity'],
     'acid reflux': ['acidity'],
-    'indigestion': ['acidity', 'gas_bloating'],
-    'gas': ['gas_bloating'],
-    'bloating': ['gas_bloating'],
-    'constipation': ['constipation'],
-    'kabz': ['constipation'],
-    'cold': ['common_cold'],
-    'cough': ['cough', 'common_cold'],
+    indigestion: ['acidity', 'gas_bloating'],
+    gas: ['gas_bloating'],
+    bloating: ['gas_bloating'],
+    constipation: ['constipation'],
+    kabz: ['constipation'],
+    cold: ['common_cold'],
+    cough: ['cough', 'common_cold'],
     'sore throat': ['common_cold', 'cough'],
-    'fever': ['fever'],
-    'headache': ['headache'],
+    fever: ['fever'],
+    headache: ['headache'],
     'body ache': ['body_ache'],
     'muscle pain': ['body_ache'],
-    'rash': ['skin_rash'],
-    'itching': ['skin_rash'],
-    'sleep': ['sleep_difficulty'],
-    'insomnia': ['sleep_difficulty'],
+    rash: ['skin_rash'],
+    itching: ['skin_rash'],
+    sleep: ['sleep_difficulty'],
+    insomnia: ['sleep_difficulty'],
   };
 
   // Find matching conditions
@@ -1019,7 +1073,7 @@ export function searchRemediesBySymptom(symptom: string): ConditionRemedies[] {
     if (normalizedSymptom.includes(keyword)) {
       for (const conditionKey of conditions) {
         const condition = HOME_REMEDIES_DB[conditionKey];
-        if (condition && !matches.find(m => m.id === condition.id)) {
+        if (condition && !matches.find((m) => m.id === condition.id)) {
           matches.push(condition);
         }
       }
@@ -1028,7 +1082,7 @@ export function searchRemediesBySymptom(symptom: string): ConditionRemedies[] {
 
   // Direct lookup if no keyword matches
   if (matches.length === 0) {
-    for (const [key, condition] of Object.entries(HOME_REMEDIES_DB)) {
+    for (const [, condition] of Object.entries(HOME_REMEDIES_DB)) {
       if (
         condition.name.toLowerCase().includes(normalizedSymptom) ||
         condition.hindiName.toLowerCase().includes(normalizedSymptom)
@@ -1054,7 +1108,7 @@ export function filterRemediesForProfile(
     allergies?: string[];
   }
 ): HomeRemedy[] {
-  return remedies.filter(remedy => {
+  return remedies.filter((remedy) => {
     // Check contraindications
     for (const contraindication of remedy.contraindications) {
       if (contraindication.includes('pregnancy') && profile.isPregnant) {
@@ -1080,9 +1134,9 @@ export function filterRemediesForProfile(
 
     // Check suitability
     if (profile.age) {
-      if (profile.age >= 60 && !remedy.suitableFor.some(s => s.includes('elderly'))) {
+      if (profile.age >= 60 && !remedy.suitableFor.some((s) => s.includes('elderly'))) {
         // Still allow if suitable for all_ages or adults
-        if (!remedy.suitableFor.some(s => s === 'all_ages' || s === 'adults')) {
+        if (!remedy.suitableFor.some((s) => s === 'all_ages' || s === 'adults')) {
           return false;
         }
       }

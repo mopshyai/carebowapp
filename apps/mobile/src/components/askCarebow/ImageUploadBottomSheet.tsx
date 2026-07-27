@@ -25,6 +25,10 @@ let launchCamera: any;
 let launchImageLibrary: any;
 
 try {
+  // require, not import: this guards against the native module not being
+  // linked. A static import is hoisted and would throw before the catch could
+  // run, defeating the fallback below.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const ImagePicker = require('react-native-image-picker');
   launchCamera = ImagePicker.launchCamera;
   launchImageLibrary = ImagePicker.launchImageLibrary;
@@ -169,12 +173,7 @@ export function ImageUploadBottomSheet({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {/* Handle */}

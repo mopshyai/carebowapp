@@ -14,12 +14,8 @@ import {
   Alert,
   ActivityIndicator,
   ViewStyle,
-  Platform,
 } from 'react-native';
-import DocumentPicker, {
-  DocumentPickerResponse,
-  types,
-} from 'react-native-document-picker';
+import DocumentPicker, { DocumentPickerResponse, types } from 'react-native-document-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { createLogger } from '@/utils/logger';
@@ -70,12 +66,7 @@ export interface FileUploadProps {
   compact?: boolean;
 }
 
-export type AcceptedFileType =
-  | 'pdf'
-  | 'image'
-  | 'document'
-  | 'spreadsheet'
-  | 'all';
+export type AcceptedFileType = 'pdf' | 'image' | 'document' | 'spreadsheet' | 'all';
 
 // ============================================
 // CONSTANTS
@@ -165,7 +156,7 @@ export function FileUpload({
   containerStyle,
   compact = false,
 }: FileUploadProps) {
-  const [isDragActive, setIsDragActive] = useState(false);
+  const [isDragActive] = useState(false);
 
   const getAcceptedExtensions = useCallback((): string[] => {
     const extensions: string[] = [];
@@ -262,11 +253,7 @@ export function FileUpload({
 
       // Show validation errors if any
       if (errors.length > 0) {
-        Alert.alert(
-          'Some files could not be added',
-          errors.join('\n'),
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Some files could not be added', errors.join('\n'), [{ text: 'OK' }]);
       }
 
       // Add valid files
@@ -286,7 +273,16 @@ export function FileUpload({
       logger.error('Error picking document', err);
       Alert.alert('Error', 'Failed to select file. Please try again.');
     }
-  }, [disabled, isUploading, multiple, files, maxFiles, onFilesSelected, validateFile, getDocumentPickerTypes]);
+  }, [
+    disabled,
+    isUploading,
+    multiple,
+    files,
+    maxFiles,
+    onFilesSelected,
+    validateFile,
+    getDocumentPickerTypes,
+  ]);
 
   const handleRemoveFile = useCallback(
     (file: SelectedFile) => {
@@ -449,12 +445,7 @@ function FilePreviewCard({
       {isUploading ? (
         <ActivityIndicator size="small" color={colors.accent} style={styles.removeButton} />
       ) : (
-        <Pressable
-          style={styles.removeButton}
-          onPress={onRemove}
-          disabled={disabled}
-          hitSlop={8}
-        >
+        <Pressable style={styles.removeButton} onPress={onRemove} disabled={disabled} hitSlop={8}>
           <Icon
             name="close-circle"
             size={24}

@@ -3,7 +3,7 @@
  * Handles image caching, preloading, and optimization using FastImage
  */
 
-import FastImage, { Source, Priority, ResizeMode } from 'react-native-fast-image';
+import FastImage, { Source, Priority } from 'react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================
@@ -71,10 +71,7 @@ class ImageCacheServiceClass {
   /**
    * Get FastImage source with caching configuration
    */
-  getSource(
-    uri: string,
-    options: ImageCacheConfig = {}
-  ): Source {
+  getSource(uri: string, options: ImageCacheConfig = {}): Source {
     const { priority = FastImage.priority.normal } = options;
 
     return {
@@ -192,8 +189,9 @@ class ImageCacheServiceClass {
 
     // Enforce max cache size (LRU eviction)
     if (this.cacheIndex.size > MAX_CACHE_SIZE) {
-      const entries = Array.from(this.cacheIndex.entries())
-        .sort((a, b) => a[1].cachedAt - b[1].cachedAt);
+      const entries = Array.from(this.cacheIndex.entries()).sort(
+        (a, b) => a[1].cachedAt - b[1].cachedAt
+      );
 
       const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
       toRemove.forEach(([key]) => {

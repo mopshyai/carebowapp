@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography } from '../../theme';
 import { FOLLOW_UP_OPTIONS } from '../../types/followUp';
@@ -30,9 +30,7 @@ export function FollowUpCheckIn({
     return (
       <View style={styles.scheduledContainer}>
         <Icon name="checkmark-circle" size={16} color={colors.success} />
-        <Text style={styles.scheduledText}>
-          Check-in scheduled: {scheduledLabel}
-        </Text>
+        <Text style={styles.scheduledText}>Check-in scheduled: {scheduledLabel}</Text>
       </View>
     );
   }
@@ -60,11 +58,7 @@ export function FollowUpCheckIn({
             <Text style={styles.optionText}>{option.label}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity
-          style={styles.dismissButton}
-          onPress={handleDismiss}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.dismissButton} onPress={handleDismiss} activeOpacity={0.7}>
           <Text style={styles.dismissText}>No</Text>
         </TouchableOpacity>
       </View>

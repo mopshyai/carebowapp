@@ -4,19 +4,12 @@
  */
 
 import React, { memo, useState, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  ViewStyle,
-  ImageStyle,
-  ActivityIndicator,
-} from 'react-native';
+import { View, StyleSheet, ViewStyle, ImageStyle, ActivityIndicator } from 'react-native';
 import FastImage, {
   FastImageProps,
   ResizeMode,
   Priority,
   OnLoadEvent,
-  OnProgressEvent,
 } from 'react-native-fast-image';
 import { colors, radius } from '@/theme';
 
@@ -103,10 +96,13 @@ export const CachedImage = memo(function CachedImage({
     setHasError(false);
   }, []);
 
-  const handleLoad = useCallback((event: OnLoadEvent) => {
-    setIsLoading(false);
-    onLoad?.(event);
-  }, [onLoad]);
+  const handleLoad = useCallback(
+    (event: OnLoadEvent) => {
+      setIsLoading(false);
+      onLoad?.(event);
+    },
+    [onLoad]
+  );
 
   const handleError = useCallback(() => {
     setIsLoading(false);
@@ -133,7 +129,10 @@ export const CachedImage = memo(function CachedImage({
   // Show error state without custom placeholder
   if (hasError) {
     return (
-      <View style={[containerStyle, styles.container, styles.errorContainer, style]} testID={testID}>
+      <View
+        style={[containerStyle, styles.container, styles.errorContainer, style]}
+        testID={testID}
+      >
         <View style={styles.errorIcon} />
       </View>
     );
@@ -159,9 +158,7 @@ export const CachedImage = memo(function CachedImage({
       {/* Loading indicator */}
       {isLoading && showLoader && (
         <View style={styles.loaderContainer}>
-          {placeholder || (
-            <ActivityIndicator size="small" color={colors.accent} />
-          )}
+          {placeholder || <ActivityIndicator size="small" color={colors.accent} />}
         </View>
       )}
     </View>
@@ -172,23 +169,16 @@ export const CachedImage = memo(function CachedImage({
 // AVATAR VARIANT
 // ============================================
 
-export interface CachedAvatarProps extends Omit<CachedImageProps, 'width' | 'height' | 'borderRadius'> {
+export interface CachedAvatarProps extends Omit<
+  CachedImageProps,
+  'width' | 'height' | 'borderRadius'
+> {
   /** Avatar size */
   size?: number;
 }
 
-export const CachedAvatar = memo(function CachedAvatar({
-  size = 48,
-  ...props
-}: CachedAvatarProps) {
-  return (
-    <CachedImage
-      {...props}
-      width={size}
-      height={size}
-      borderRadius={size / 2}
-    />
-  );
+export const CachedAvatar = memo(function CachedAvatar({ size = 48, ...props }: CachedAvatarProps) {
+  return <CachedImage {...props} width={size} height={size} borderRadius={size / 2} />;
 });
 
 // ============================================
@@ -204,13 +194,7 @@ export const CachedThumbnail = memo(function CachedThumbnail({
   rounded = true,
   ...props
 }: CachedThumbnailProps) {
-  return (
-    <CachedImage
-      {...props}
-      borderRadius={rounded ? radius.sm : 0}
-      priority="low"
-    />
-  );
+  return <CachedImage {...props} borderRadius={rounded ? radius.sm : 0} priority="low" />;
 });
 
 // ============================================

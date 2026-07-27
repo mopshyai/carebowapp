@@ -198,7 +198,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
   },
   {
     id: 'neuro_neck_stiffness_fever',
-    pattern: /(stiff\s*neck|neck\s*stiff).*(fever|headache)|(fever|headache).*(stiff\s*neck|neck\s*stiff)/i,
+    pattern:
+      /(stiff\s*neck|neck\s*stiff).*(fever|headache)|(fever|headache).*(stiff\s*neck|neck\s*stiff)/i,
     category: 'neurological',
     urgencyBoost: 50,
     immediateAction: 'Call emergency services - possible meningitis',
@@ -246,10 +247,12 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
   // ============================================
   {
     id: 'mental_suicidal',
-    pattern: /(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i,
+    pattern:
+      /(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i,
     category: 'mental_health',
     urgencyBoost: 50,
-    immediateAction: 'Please call or text 988 (Suicide & Crisis Lifeline) now, or go to your nearest emergency room. You are not alone, and help is available 24/7.',
+    immediateAction:
+      'Please call or text 988 (Suicide & Crisis Lifeline) now, or go to your nearest emergency room. You are not alone, and help is available 24/7.',
     description: 'Suicidal ideation',
   },
   {
@@ -257,7 +260,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     pattern: /self[- ]harm|cutting\s*(myself|self)|hurt(ing)?\s*myself/i,
     category: 'mental_health',
     urgencyBoost: 45,
-    immediateAction: 'Please call or text 988 (Suicide & Crisis Lifeline) now. You deserve support, and trained counselors are available 24/7 to help.',
+    immediateAction:
+      'Please call or text 988 (Suicide & Crisis Lifeline) now. You deserve support, and trained counselors are available 24/7 to help.',
     description: 'Self-harm',
   },
   {
@@ -265,7 +269,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     pattern: /overdos(e|ed|ing)|took\s*too\s*many\s*(pills|medication)/i,
     category: 'mental_health',
     urgencyBoost: 50,
-    immediateAction: 'Call 911 or Poison Control (1-800-222-1222) immediately. If this was intentional, also call or text 988 (Suicide & Crisis Lifeline). Do not wait — help is available now.',
+    immediateAction:
+      'Call 911 or Poison Control (1-800-222-1222) immediately. If this was intentional, also call or text 988 (Suicide & Crisis Lifeline). Do not wait — help is available now.',
     description: 'Overdose',
   },
 
@@ -367,7 +372,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
   },
   {
     id: 'peds_inconsolable',
-    pattern: /inconsolable|won'?t\s*stop\s*crying|constant\s*crying|screaming|high[- ]pitch(ed)?\s*cry/i,
+    pattern:
+      /inconsolable|won'?t\s*stop\s*crying|constant\s*crying|screaming|high[- ]pitch(ed)?\s*cry/i,
     category: 'pediatric',
     urgencyBoost: 40,
     requiresContext: ['infant', 'child'],
@@ -443,7 +449,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
   },
   {
     id: 'preg_preeclampsia',
-    pattern: /(severe\s*)?headache.*(vision|swelling|pregnant)|vision\s*change.*(pregnant|headache)|preeclampsia/i,
+    pattern:
+      /(severe\s*)?headache.*(vision|swelling|pregnant)|vision\s*change.*(pregnant|headache)|preeclampsia/i,
     category: 'pregnancy',
     urgencyBoost: 50,
     requiresContext: ['pregnancy'],
@@ -479,7 +486,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
   },
   {
     id: 'preg_abdominal_pain',
-    pattern: /severe\s*(abdominal|stomach|belly)\s*pain.*pregnan|pregnan.*severe\s*(abdominal|stomach|belly)\s*pain/i,
+    pattern:
+      /severe\s*(abdominal|stomach|belly)\s*pain.*pregnan|pregnan.*severe\s*(abdominal|stomach|belly)\s*pain/i,
     category: 'pregnancy',
     urgencyBoost: 50,
     requiresContext: ['pregnancy'],
@@ -514,7 +522,8 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     category: 'neurological',
     urgencyBoost: 45,
     requiresContext: ['senior'],
-    immediateAction: 'Sudden confusion in elderly may indicate stroke, infection, or other emergency',
+    immediateAction:
+      'Sudden confusion in elderly may indicate stroke, infection, or other emergency',
     description: 'Sudden confusion in elderly',
   },
 
@@ -538,12 +547,6 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
     description: 'High fever (over 103°F)',
   },
 ];
-
-// Legacy pattern array for backwards compatibility
-const RED_FLAG_PATTERNS = RED_FLAG_RULES.filter(r => !r.requiresContext).map(r => ({
-  pattern: r.pattern,
-  category: r.category,
-}));
 
 // ============================================
 // HIGH RISK CONDITIONS
@@ -583,9 +586,9 @@ type PatientContext = {
  * Extracts patient context from health context for rule matching
  */
 export function extractPatientContext(context: HealthContext): PatientContext {
-  const isPregnant = context.chronicConditions.some(c =>
-    /pregnan/i.test(c)
-  ) || context.riskFactors.some(r => /pregnan/i.test(r));
+  const isPregnant =
+    context.chronicConditions.some((c) => /pregnan/i.test(c)) ||
+    context.riskFactors.some((r) => /pregnan/i.test(r));
 
   const ageGroup = context.ageGroup;
 
@@ -607,7 +610,7 @@ function shouldApplyRule(rule: RedFlagRule, patientContext: PatientContext): boo
   }
 
   // Rule requires specific context - check if ANY required context matches
-  return rule.requiresContext.some(ctx => {
+  return rule.requiresContext.some((ctx) => {
     switch (ctx) {
       case 'pregnancy':
         return patientContext.isPregnant;
@@ -675,7 +678,7 @@ export function detectEmergencyWithContext(
         if (!detectedSymptoms.includes(symptomDesc)) {
           detectedSymptoms.push(symptomDesc);
         }
-        if (!matchedRules.find(r => r.id === rule.id)) {
+        if (!matchedRules.find((r) => r.id === rule.id)) {
           matchedRules.push(rule);
         }
       }
@@ -686,9 +689,9 @@ export function detectEmergencyWithContext(
   let confidence = 0;
   if (matchedRules.length > 0) {
     // Weight by urgency boost of matched rules
-    const maxUrgency = Math.max(...matchedRules.map(r => r.urgencyBoost));
+    const maxUrgency = Math.max(...matchedRules.map((r) => r.urgencyBoost));
     const urgencyWeight = maxUrgency / 50; // Normalize to 0-1
-    confidence = Math.min(0.5 + (matchedRules.length * 0.15) + (urgencyWeight * 0.3), 1.0);
+    confidence = Math.min(0.5 + matchedRules.length * 0.15 + urgencyWeight * 0.3, 1.0);
   } else if (detectedSymptoms.length > 0) {
     confidence = Math.min(detectedSymptoms.length * 0.3 + 0.5, 1.0);
   }
@@ -724,26 +727,17 @@ export function assessUrgency(context: HealthContext): SafetyAssessment {
   // Extract patient context for context-aware detection
   const patientContext = extractPatientContext(context);
 
-  // Combine all symptom text for comprehensive checking
-  const allSymptomText = [
-    context.primarySymptom,
-    ...context.associatedSymptoms,
-    context.additionalNotes,
-  ].join(' ');
-
   // Check primary symptom for red flags (with context awareness)
-  const emergencyCheck = detectEmergencyWithContext(
-    context.primarySymptom,
-    patientContext
-  );
+  const emergencyCheck = detectEmergencyWithContext(context.primarySymptom, patientContext);
   if (emergencyCheck.isEmergency) {
     redFlagsDetected.push(...emergencyCheck.detectedSymptoms);
     matchedRedFlagRules.push(...emergencyCheck.matchedRules);
 
     // Use the highest urgency boost from matched rules
-    const maxBoost = emergencyCheck.matchedRules.length > 0
-      ? Math.max(...emergencyCheck.matchedRules.map(r => r.urgencyBoost))
-      : 50;
+    const maxBoost =
+      emergencyCheck.matchedRules.length > 0
+        ? Math.max(...emergencyCheck.matchedRules.map((r) => r.urgencyBoost))
+        : 50;
     urgencyScore += maxBoost;
     reasoning.push('Primary symptom contains concerning indicators');
   }
@@ -760,7 +754,7 @@ export function assessUrgency(context: HealthContext): SafetyAssessment {
       }
       // Add only new rules
       for (const r of check.matchedRules) {
-        if (!matchedRedFlagRules.find(mr => mr.id === r.id)) {
+        if (!matchedRedFlagRules.find((mr) => mr.id === r.id)) {
           matchedRedFlagRules.push(r);
         }
       }
@@ -779,7 +773,7 @@ export function assessUrgency(context: HealthContext): SafetyAssessment {
         }
       }
       for (const r of notesCheck.matchedRules) {
-        if (!matchedRedFlagRules.find(mr => mr.id === r.id)) {
+        if (!matchedRedFlagRules.find((mr) => mr.id === r.id)) {
           matchedRedFlagRules.push(r);
         }
       }
@@ -955,7 +949,11 @@ export function detectCrisisType(text: string): CrisisType {
   const normalizedText = text.toLowerCase();
 
   // Check for suicide ideation
-  if (/(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i.test(normalizedText)) {
+  if (
+    /(want|going|plan(ning)?)\s*to\s*(kill|hurt|end)\s*(myself|my\s*life|self)|suicid(e|al)/i.test(
+      normalizedText
+    )
+  ) {
     return 'suicide';
   }
 
@@ -976,7 +974,10 @@ export function detectCrisisType(text: string): CrisisType {
  * Formats crisis resources for inclusion in assistant response.
  * This is the TEXT that should appear in the assistant's message.
  */
-export function formatCrisisResponse(crisisType: CrisisType, includeImmediateDanger: boolean = false): string {
+export function formatCrisisResponse(
+  crisisType: CrisisType,
+  includeImmediateDanger: boolean = false
+): string {
   if (crisisType === 'none') return '';
 
   let response = '';
@@ -1047,8 +1048,15 @@ export function analyzeSymptomContext(
 
   // Detect severity indicators
   const severityWords = [
-    'severe', 'intense', 'unbearable', 'worst', 'extreme',
-    'terrible', 'excruciating', 'sharp', 'stabbing'
+    'severe',
+    'intense',
+    'unbearable',
+    'worst',
+    'extreme',
+    'terrible',
+    'excruciating',
+    'sharp',
+    'stabbing',
   ];
 
   for (const word of severityWords) {

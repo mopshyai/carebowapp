@@ -3,9 +3,9 @@
  * React hook for analytics tracking in components
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
-import { AnalyticsService, AnalyticsEvents, EventCategory } from '../services/analytics';
+import { AnalyticsService, EventCategory } from '../services/analytics';
 
 // ============================================
 // HOOK
@@ -21,11 +21,7 @@ export interface UseAnalyticsReturn {
   /** Track screen view (auto-tracked on focus) */
   trackScreen: (screenName: string, properties?: Record<string, unknown>) => void;
   /** Track user action */
-  trackAction: (
-    action: string,
-    target?: string,
-    properties?: Record<string, unknown>
-  ) => void;
+  trackAction: (action: string, target?: string, properties?: Record<string, unknown>) => void;
   /** Track button click */
   trackClick: (buttonName: string, properties?: Record<string, unknown>) => void;
   /** Track conversion */
@@ -84,12 +80,9 @@ export function useAnalytics(screenName?: string): UseAnalyticsReturn {
     [currentScreen]
   );
 
-  const trackScreen = useCallback(
-    (name: string, properties?: Record<string, unknown>) => {
-      AnalyticsService.trackScreen(name, properties);
-    },
-    []
-  );
+  const trackScreen = useCallback((name: string, properties?: Record<string, unknown>) => {
+    AnalyticsService.trackScreen(name, properties);
+  }, []);
 
   const trackAction = useCallback(
     (action: string, target?: string, properties?: Record<string, unknown>) => {
@@ -112,11 +105,7 @@ export function useAnalytics(screenName?: string): UseAnalyticsReturn {
   );
 
   const trackConversion = useCallback(
-    (
-      conversionType: string,
-      value?: number,
-      properties?: Record<string, unknown>
-    ) => {
+    (conversionType: string, value?: number, properties?: Record<string, unknown>) => {
       AnalyticsService.trackConversion(conversionType, value, {
         screen: currentScreen,
         ...properties,
@@ -126,12 +115,7 @@ export function useAnalytics(screenName?: string): UseAnalyticsReturn {
   );
 
   const trackTiming = useCallback(
-    (
-      category: string,
-      variable: string,
-      timeMs: number,
-      properties?: Record<string, unknown>
-    ) => {
+    (category: string, variable: string, timeMs: number, properties?: Record<string, unknown>) => {
       AnalyticsService.trackTiming(category, variable, timeMs, {
         screen: currentScreen,
         ...properties,
@@ -141,11 +125,7 @@ export function useAnalytics(screenName?: string): UseAnalyticsReturn {
   );
 
   const trackError = useCallback(
-    (
-      errorName: string,
-      errorMessage: string,
-      properties?: Record<string, unknown>
-    ) => {
+    (errorName: string, errorMessage: string, properties?: Record<string, unknown>) => {
       AnalyticsService.trackError(errorName, errorMessage, {
         screen: currentScreen,
         ...properties,

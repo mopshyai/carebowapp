@@ -41,8 +41,7 @@
  */
 
 import { processUserInput } from '../conversationEngine';
-import { sendAskCareBowMessage, EXTERNAL_TRIAGE_LEVELS } from '../apiClient';
-import { detectCrisisType, CRISIS_RESOURCES } from '../safetyClassifier';
+import { sendAskCareBowMessage } from '../apiClient';
 import { createEmptyHealthContext, HealthContext } from '@/types/askCarebow';
 
 // ============================================
@@ -185,25 +184,33 @@ function checkFirstResponseFormat(output: string): AuditCheckResult {
   // 2) 1-2 bullets reflecting what was understood
   // 3) EXACTLY ONE follow-up question
 
-  const hasAcknowledgment = output.includes('hear you') || output.includes('glad you reached out') || output.includes('understand');
+  const hasAcknowledgment =
+    output.includes('hear you') ||
+    output.includes('glad you reached out') ||
+    output.includes('understand');
   const hasBullets = output.includes('•') || output.includes('-');
   const hasQuestion = output.includes('?');
   const bulletCount = (output.match(/•/g) || []).length;
   const questionCount = (output.match(/\?/g) || []).length;
 
-  const passed = hasAcknowledgment && hasBullets && hasQuestion && bulletCount >= 1 && bulletCount <= 2;
+  const passed =
+    hasAcknowledgment && hasBullets && hasQuestion && bulletCount >= 1 && bulletCount <= 2;
 
   return {
     name: 'First response format',
     passed,
-    evidence: passed ? undefined : `Ack: ${hasAcknowledgment}, Bullets: ${bulletCount}, Questions: ${questionCount}`,
-    violatedRule: passed ? undefined : 'First response must have: 1 ack sentence, 1-2 bullets, 1 question',
+    evidence: passed
+      ? undefined
+      : `Ack: ${hasAcknowledgment}, Bullets: ${bulletCount}, Questions: ${questionCount}`,
+    violatedRule: passed
+      ? undefined
+      : 'First response must have: 1 ack sentence, 1-2 bullets, 1 question',
   };
 }
 
 function checkNoDiagnosisLanguage(output: string): AuditCheckResult {
   const lowerOutput = output.toLowerCase();
-  const foundForbidden = FORBIDDEN_DIAGNOSIS_PHRASES.find(phrase => lowerOutput.includes(phrase));
+  const foundForbidden = FORBIDDEN_DIAGNOSIS_PHRASES.find((phrase) => lowerOutput.includes(phrase));
 
   return {
     name: 'No diagnosis language',
@@ -215,7 +222,7 @@ function checkNoDiagnosisLanguage(output: string): AuditCheckResult {
 
 function checkNoGenericClosers(output: string): AuditCheckResult {
   const lowerOutput = output.toLowerCase();
-  const foundForbidden = FORBIDDEN_GENERIC_CLOSERS.find(phrase => lowerOutput.includes(phrase));
+  const foundForbidden = FORBIDDEN_GENERIC_CLOSERS.find((phrase) => lowerOutput.includes(phrase));
 
   return {
     name: 'No forbidden generic closers',
@@ -239,13 +246,16 @@ function checkValidTriageLevel(triageLevel: string): AuditCheckResult {
 function checkCrisisResourcesPresent(output: string): AuditCheckResult {
   const has988 = output.includes('988');
   const has911 = output.includes('911');
-  const hasCrisisLanguage = has988 || output.includes('Crisis Lifeline') || output.includes('help is available');
+  const hasCrisisLanguage =
+    has988 || output.includes('Crisis Lifeline') || output.includes('help is available');
 
   return {
     name: 'Crisis resources present',
     passed: hasCrisisLanguage,
     evidence: `988: ${has988}, 911: ${has911}`,
-    violatedRule: hasCrisisLanguage ? undefined : 'Crisis situations must include hotline resources',
+    violatedRule: hasCrisisLanguage
+      ? undefined
+      : 'Crisis situations must include hotline resources',
   };
 }
 
@@ -317,7 +327,7 @@ function checkElevatedUrgency(triageLevel: string): AuditCheckResult {
 
 function checkSupportiveTone(output: string): AuditCheckResult {
   const supportiveWords = ['understand', 'hear you', 'normal', 'common', 'support', 'help'];
-  const hasSupportive = supportiveWords.some(word => output.toLowerCase().includes(word));
+  const hasSupportive = supportiveWords.some((word) => output.toLowerCase().includes(word));
 
   return {
     name: 'Supportive tone',
@@ -328,18 +338,22 @@ function checkSupportiveTone(output: string): AuditCheckResult {
 }
 
 function checkValidMemoryTypes(memoryCandidates: any[]): AuditCheckResult {
-  const invalidTypes = memoryCandidates.filter(m => DISALLOWED_MEMORY_TYPES.includes(m.type));
+  const invalidTypes = memoryCandidates.filter((m) => DISALLOWED_MEMORY_TYPES.includes(m.type));
 
   return {
     name: 'Valid memory types only',
     passed: invalidTypes.length === 0,
-    evidence: invalidTypes.length > 0 ? `Invalid: ${invalidTypes.map(m => m.type).join(', ')}` : 'All valid',
-    violatedRule: invalidTypes.length > 0 ? 'Memory candidates must not include disallowed types' : undefined,
+    evidence:
+      invalidTypes.length > 0
+        ? `Invalid: ${invalidTypes.map((m) => m.type).join(', ')}`
+        : 'All valid',
+    violatedRule:
+      invalidTypes.length > 0 ? 'Memory candidates must not include disallowed types' : undefined,
   };
 }
 
 function checkNoPastEpisode(memoryCandidates: any[]): AuditCheckResult {
-  const hasPastEpisode = memoryCandidates.some(m => m.type === 'past_episode');
+  const hasPastEpisode = memoryCandidates.some((m) => m.type === 'past_episode');
 
   return {
     name: 'No past_episode memory type',
@@ -364,15 +378,10 @@ async function runTestCase(testCase: TestCase): Promise<AuditTestResult> {
       ...testCase.context,
     };
 
-    const response = await processUserInput(
-      testCase.input,
-      'initial',
-      healthContext,
-      []
-    );
+    const response = await processUserInput(testCase.input, 'initial', healthContext, []);
 
     // Get raw output text
-    const rawOutput = response.messages.map(m => m.text).join('\n\n');
+    const rawOutput = response.messages.map((m) => m.text).join('\n\n');
     const triageLevel = response.urgencyLevel || 'self_care';
 
     // Also run through API client for memory candidates
@@ -456,7 +465,7 @@ async function runTestCase(testCase: TestCase): Promise<AuditTestResult> {
       }
     }
 
-    const allPassed = checks.every(c => c.passed);
+    const allPassed = checks.every((c) => c.passed);
 
     return {
       testId: testCase.id,
@@ -471,11 +480,13 @@ async function runTestCase(testCase: TestCase): Promise<AuditTestResult> {
       testId: testCase.id,
       testName: testCase.name,
       passed: false,
-      checks: [{
-        name: 'Test execution',
-        passed: false,
-        violatedRule: `Test threw error: ${error}`,
-      }],
+      checks: [
+        {
+          name: 'Test execution',
+          passed: false,
+          violatedRule: `Test threw error: ${error}`,
+        },
+      ],
       duration: Date.now() - startTime,
     };
   }
@@ -521,8 +532,8 @@ export async function runAskCareBowAudit(): Promise<AuditReport> {
     console.log('');
   }
 
-  const passedCount = results.filter(r => r.passed).length;
-  const failedCount = results.filter(r => !r.passed).length;
+  const passedCount = results.filter((r) => r.passed).length;
+  const failedCount = results.filter((r) => !r.passed).length;
 
   console.log('================================================================================');
   console.log(`SUMMARY: ${passedCount}/${results.length} PASSED, ${failedCount} FAILED`);
@@ -541,7 +552,7 @@ export async function runAskCareBowAudit(): Promise<AuditReport> {
  * Run a single test case by ID (for debugging)
  */
 export async function runSingleAuditTest(testId: string): Promise<AuditTestResult | null> {
-  const testCase = TEST_CASES.find(t => t.id === testId);
+  const testCase = TEST_CASES.find((t) => t.id === testId);
   if (!testCase) {
     console.error(`Test case ${testId} not found`);
     return null;
@@ -553,7 +564,7 @@ export async function runSingleAuditTest(testId: string): Promise<AuditTestResul
  * Get list of available test cases
  */
 export function getAuditTestCases(): { id: string; name: string }[] {
-  return TEST_CASES.map(t => ({ id: t.id, name: t.name }));
+  return TEST_CASES.map((t) => ({ id: t.id, name: t.name }));
 }
 
 // Export for dev tools

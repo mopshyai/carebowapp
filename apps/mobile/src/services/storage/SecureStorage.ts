@@ -15,7 +15,7 @@
  */
 
 import * as Keychain from 'react-native-keychain';
-import { Platform, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Fallback storage prefix for AsyncStorage (development only)
@@ -83,8 +83,8 @@ class SecureStorageService {
     if (!this.hasLoggedFallbackWarning && __DEV__) {
       console.warn(
         '[SecureStorage] WARNING: Keychain native module is not available. ' +
-        'Falling back to AsyncStorage which is NOT secure. ' +
-        'This is acceptable for development/simulator but NOT for production builds.'
+          'Falling back to AsyncStorage which is NOT secure. ' +
+          'This is acceptable for development/simulator but NOT for production builds.'
       );
       this.hasLoggedFallbackWarning = true;
     }
@@ -238,7 +238,10 @@ class SecureStorageService {
         } catch (retryError) {
           // Fall through to AsyncStorage fallback below.
           if (__DEV__) {
-            console.log(`[SecureStorage] Software-backed store also failed for ${key}:`, retryError);
+            console.log(
+              `[SecureStorage] Software-backed store also failed for ${key}:`,
+              retryError
+            );
           }
         }
       }
@@ -262,10 +265,7 @@ class SecureStorageService {
   /**
    * Retrieve a value from secure storage
    */
-  async getItem(
-    key: SecureStorageKey,
-    options?: SecureStorageOptions
-  ): Promise<string | null> {
+  async getItem(key: SecureStorageKey, options?: SecureStorageOptions): Promise<string | null> {
     // Check if Keychain is working
     const keychainWorks = await this.isKeychainWorking();
 
@@ -335,10 +335,7 @@ class SecureStorageService {
   /**
    * Remove a value from secure storage
    */
-  async removeItem(
-    key: SecureStorageKey,
-    options?: SecureStorageOptions
-  ): Promise<boolean> {
+  async removeItem(key: SecureStorageKey, options?: SecureStorageOptions): Promise<boolean> {
     // Check if Keychain is working
     const keychainWorks = await this.isKeychainWorking();
 
@@ -388,10 +385,7 @@ class SecureStorageService {
   /**
    * Check if a key exists in secure storage
    */
-  async hasItem(
-    key: SecureStorageKey,
-    options?: SecureStorageOptions
-  ): Promise<boolean> {
+  async hasItem(key: SecureStorageKey, options?: SecureStorageOptions): Promise<boolean> {
     // Check if Keychain is working
     const keychainWorks = await this.isKeychainWorking();
 
@@ -439,7 +433,7 @@ class SecureStorageService {
     ];
 
     try {
-      await Promise.all(keys.map(key => this.removeItem(key)));
+      await Promise.all(keys.map((key) => this.removeItem(key)));
 
       if (__DEV__) {
         console.log('[SecureStorage] Cleared all items');
@@ -459,19 +453,14 @@ class SecureStorageService {
   /**
    * Store a value that requires biometric authentication to retrieve
    */
-  async setItemWithBiometrics(
-    key: SecureStorageKey,
-    value: string
-  ): Promise<boolean> {
+  async setItemWithBiometrics(key: SecureStorageKey, value: string): Promise<boolean> {
     return this.setItem(key, value, getBiometricOptions());
   }
 
   /**
    * Retrieve a value that requires biometric authentication
    */
-  async getItemWithBiometrics(
-    key: SecureStorageKey
-  ): Promise<string | null> {
+  async getItemWithBiometrics(key: SecureStorageKey): Promise<string | null> {
     return this.getItem(key, getBiometricOptions());
   }
 
@@ -482,10 +471,7 @@ class SecureStorageService {
   /**
    * Store authentication tokens securely
    */
-  async setAuthTokens(
-    accessToken: string,
-    refreshToken: string
-  ): Promise<boolean> {
+  async setAuthTokens(accessToken: string, refreshToken: string): Promise<boolean> {
     try {
       const [accessResult, refreshResult] = await Promise.all([
         this.setItem('auth_access_token', accessToken),
@@ -559,10 +545,7 @@ class SecureStorageService {
    */
   async disableBiometrics(): Promise<boolean> {
     try {
-      await Promise.all([
-        this.removeItem('biometric_enabled'),
-        this.removeItem('user_pin'),
-      ]);
+      await Promise.all([this.removeItem('biometric_enabled'), this.removeItem('user_pin')]);
 
       return true;
     } catch (error) {
@@ -601,7 +584,7 @@ class SecureStorageService {
    * Authenticate with biometrics
    */
   async authenticateWithBiometrics(
-    promptMessage: string = 'Authenticate to continue'
+    _promptMessage: string = 'Authenticate to continue'
   ): Promise<boolean> {
     const keychainWorks = await this.isKeychainWorking();
 
@@ -614,7 +597,7 @@ class SecureStorageService {
     try {
       // Try to access a biometric-protected item
       // This will trigger the biometric prompt
-      const storedPin = await this.getItemWithBiometrics('user_pin');
+      await this.getItemWithBiometrics('user_pin');
 
       // If we can retrieve it (or there was no pin stored), authentication succeeded
       return true;

@@ -17,9 +17,6 @@ import {
   Duration,
   Severity,
   Frequency,
-  AgeGroup,
-  durationLabels,
-  frequencyLabels,
 } from '@/types/askCarebow';
 
 // ============================================
@@ -27,15 +24,15 @@ import {
 // ============================================
 
 export type SymptomCategory =
-  | 'pain'           // Any pain complaint
-  | 'gi'             // Gastrointestinal
-  | 'headache'       // Headache-specific
-  | 'fever'          // Fever/infection
-  | 'respiratory'    // Breathing/cough
-  | 'skin'           // Rash, itching
+  | 'pain' // Any pain complaint
+  | 'gi' // Gastrointestinal
+  | 'headache' // Headache-specific
+  | 'fever' // Fever/infection
+  | 'respiratory' // Breathing/cough
+  | 'skin' // Rash, itching
   | 'musculoskeletal' // Joint/muscle
-  | 'neurological'   // Dizziness, numbness
-  | 'general';       // Default
+  | 'neurological' // Dizziness, numbness
+  | 'general'; // Default
 
 /**
  * Detects the symptom category from primary symptom text
@@ -49,7 +46,11 @@ export function detectSymptomCategory(primarySymptom: string): SymptomCategory {
   }
 
   // GI symptoms
-  if (/stomach|abdominal|abdomen|belly|nausea|vomit|diarrhea|constipat|indigestion|heartburn|bloat/.test(symptom)) {
+  if (
+    /stomach|abdominal|abdomen|belly|nausea|vomit|diarrhea|constipat|indigestion|heartburn|bloat/.test(
+      symptom
+    )
+  ) {
     return 'gi';
   }
 
@@ -109,11 +110,14 @@ export type OPQRSTQuestion =
   | 'severity'
   | 'timing';
 
-export const OPQRST_QUESTIONS: Record<OPQRSTQuestion, {
-  question: string;
-  explanation: string;
-  quickOptions?: QuickOption[];
-}> = {
+export const OPQRST_QUESTIONS: Record<
+  OPQRSTQuestion,
+  {
+    question: string;
+    explanation: string;
+    quickOptions?: QuickOption[];
+  }
+> = {
   onset: {
     question: 'When did this pain start? Was it sudden or did it come on gradually?',
     explanation: 'Understanding the onset helps identify the cause',
@@ -169,7 +173,8 @@ export const OPQRST_QUESTIONS: Record<OPQRSTQuestion, {
     ],
   },
   severity: {
-    question: 'On a scale of 0-10, how severe is the pain right now? (0 = no pain, 10 = worst imaginable)',
+    question:
+      'On a scale of 0-10, how severe is the pain right now? (0 = no pain, 10 = worst imaginable)',
     explanation: 'This helps assess urgency',
     quickOptions: [
       { id: 'mild', label: '1-3 (Mild)', value: '3' },
@@ -261,7 +266,7 @@ export const GI_QUESTIONS: SymptomSpecificQuestion[] = [
     quickOptions: [
       { id: 'yes', label: 'Yes, drinking okay', value: 'keeping fluids down' },
       { id: 'some', label: 'Some fluids', value: 'keeping some fluids down' },
-      { id: 'no', label: 'No, can\'t keep anything down', value: 'cannot keep fluids down' },
+      { id: 'no', label: "No, can't keep anything down", value: 'cannot keep fluids down' },
     ],
     contextKey: 'additionalNotes',
     isRequired: true,
@@ -278,7 +283,11 @@ export const HEADACHE_QUESTIONS: SymptomSpecificQuestion[] = [
     explanation: 'A "thunderclap" headache requires immediate attention',
     quickOptions: [
       { id: 'no', label: 'No', value: 'not worst headache' },
-      { id: 'severe_but_not_worst', label: 'Severe, but not the worst', value: 'severe but not worst headache' },
+      {
+        id: 'severe_but_not_worst',
+        label: 'Severe, but not the worst',
+        value: 'severe but not worst headache',
+      },
       { id: 'yes', label: 'Yes, worst ever', value: 'worst headache of life' },
     ],
     contextKey: 'additionalNotes',
@@ -353,7 +362,7 @@ export const FEVER_QUESTIONS: SymptomSpecificQuestion[] = [
     id: 'fever_temp',
     question: 'Do you know your temperature? If so, what is it?',
     quickOptions: [
-      { id: 'unknown', label: 'Haven\'t checked', value: 'temperature not measured' },
+      { id: 'unknown', label: "Haven't checked", value: 'temperature not measured' },
       { id: 'low', label: 'Under 100.4°F (38°C)', value: 'low-grade fever under 100.4' },
       { id: 'moderate', label: '100.4-102°F (38-39°C)', value: 'fever 100.4-102' },
       { id: 'high', label: 'Over 102°F (39°C)', value: 'high fever over 102' },
@@ -448,7 +457,7 @@ export const PEDIATRIC_QUESTIONS: SymptomSpecificQuestion[] = [
   },
   {
     id: 'peds_activity',
-    question: 'How is the child\'s activity level?',
+    question: "How is the child's activity level?",
     quickOptions: [
       { id: 'normal', label: 'Normal/playful', value: 'normal activity level' },
       { id: 'less', label: 'Less active than usual', value: 'less active than usual' },
@@ -459,11 +468,11 @@ export const PEDIATRIC_QUESTIONS: SymptomSpecificQuestion[] = [
   },
   {
     id: 'peds_crying',
-    question: 'Is the child\'s crying different than usual?',
+    question: "Is the child's crying different than usual?",
     quickOptions: [
       { id: 'normal', label: 'Normal crying', value: 'normal crying' },
       { id: 'more', label: 'Crying more than usual', value: 'crying more than usual' },
-      { id: 'inconsolable', label: 'Won\'t stop crying', value: 'inconsolable crying' },
+      { id: 'inconsolable', label: "Won't stop crying", value: 'inconsolable crying' },
       { id: 'high_pitched', label: 'High-pitched cry', value: 'high-pitched cry' },
     ],
     contextKey: 'additionalNotes',
@@ -493,9 +502,7 @@ export function getSymptomSpecificQuestions(
   // Start with pediatric questions if applicable
   let questions: SymptomSpecificQuestion[] = [];
   if (isPediatric) {
-    questions = PEDIATRIC_QUESTIONS.filter(q =>
-      !q.condition || q.condition(context)
-    );
+    questions = PEDIATRIC_QUESTIONS.filter((q) => !q.condition || q.condition(context));
   }
 
   // Add symptom-specific questions
@@ -521,9 +528,7 @@ export function getSymptomSpecificQuestions(
 /**
  * Get OPQRST questions for pain assessment
  */
-export function getOPQRSTQuestions(
-  questionsAsked: OPQRSTQuestion[]
-): OPQRSTQuestion[] {
+export function getOPQRSTQuestions(questionsAsked: OPQRSTQuestion[]): OPQRSTQuestion[] {
   const allQuestions: OPQRSTQuestion[] = [
     'onset',
     'quality',
@@ -538,7 +543,7 @@ export function getOPQRSTQuestions(
   const required: OPQRSTQuestion[] = ['onset', 'quality', 'severity'];
 
   // Filter out already asked questions
-  const remaining = allQuestions.filter(q => !questionsAsked.includes(q));
+  const remaining = allQuestions.filter((q) => !questionsAsked.includes(q));
 
   // Prioritize required questions
   const sortedRemaining = remaining.sort((a, b) => {
@@ -556,11 +561,14 @@ export function getOPQRSTQuestions(
 // QUESTION TEMPLATES
 // ============================================
 
-const questionTemplates: Record<FollowUpQuestionType, {
-  getQuestion: (context: HealthContext) => string;
-  quickOptions?: QuickOption[];
-  contextKey: keyof HealthContext;
-}> = {
+const questionTemplates: Record<
+  FollowUpQuestionType,
+  {
+    getQuestion: (context: HealthContext) => string;
+    quickOptions?: QuickOption[];
+    contextKey: keyof HealthContext;
+  }
+> = {
   duration: {
     getQuestion: (context) =>
       `How long have you been experiencing ${context.primarySymptom.toLowerCase() || 'this'}?`,
@@ -576,7 +584,7 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   severity: {
-    getQuestion: (context) =>
+    getQuestion: (_context) =>
       `On a scale of 1 to 10, how would you rate the severity? (1 being very mild, 10 being the worst you can imagine)`,
     quickOptions: [
       { id: 'mild', label: '1-3 (Mild)', value: '3' },
@@ -617,8 +625,7 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   risk_factors: {
-    getQuestion: () =>
-      'Do you have any known health conditions or take any regular medications?',
+    getQuestion: () => 'Do you have any known health conditions or take any regular medications?',
     quickOptions: [
       { id: 'none', label: 'None', value: 'none' },
       { id: 'diabetes', label: 'Diabetes', value: 'diabetes' },
@@ -640,8 +647,7 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   chronic_conditions: {
-    getQuestion: () =>
-      'Do you have any chronic health conditions I should be aware of?',
+    getQuestion: () => 'Do you have any chronic health conditions I should be aware of?',
     quickOptions: [
       { id: 'none', label: 'None', value: 'none' },
       { id: 'diabetes', label: 'Diabetes', value: 'diabetes' },
@@ -652,7 +658,7 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   recent_events: {
-    getQuestion: (context) =>
+    getQuestion: (_context) =>
       `Has anything happened recently that might be related? Such as an injury, travel, new food, or unusual activity?`,
     quickOptions: [
       { id: 'nothing', label: 'Nothing specific', value: 'nothing' },
@@ -664,8 +670,7 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   medications: {
-    getQuestion: () =>
-      'Are you currently taking any medications?',
+    getQuestion: () => 'Are you currently taking any medications?',
     quickOptions: [
       { id: 'none', label: 'None', value: 'none' },
       { id: 'otc', label: 'Over-the-counter only', value: 'otc' },
@@ -693,10 +698,9 @@ const questionTemplates: Record<FollowUpQuestionType, {
   },
 
   relief_attempts: {
-    getQuestion: () =>
-      'Have you tried anything to relieve the symptoms? If so, did it help?',
+    getQuestion: () => 'Have you tried anything to relieve the symptoms? If so, did it help?',
     quickOptions: [
-      { id: 'none', label: 'Haven\'t tried anything', value: 'none' },
+      { id: 'none', label: "Haven't tried anything", value: 'none' },
       { id: 'rest', label: 'Rest', value: 'rest' },
       { id: 'medication', label: 'Over-the-counter meds', value: 'medication' },
       { id: 'other', label: 'Other remedies', value: 'other' },
@@ -781,33 +785,37 @@ export function parseUserResponse(
       result.frequency = parseFrequency(normalizedText);
       break;
 
-    case 'associated_symptoms':
+    case 'associated_symptoms': {
       const symptoms = parseAssociatedSymptoms(normalizedText);
       if (symptoms.length > 0) {
         result.associatedSymptoms = symptoms;
       }
       break;
+    }
 
-    case 'recent_events':
+    case 'recent_events': {
       const events = parseRecentEvents(normalizedText);
       if (events.length > 0) {
         result.recentEvents = events;
       }
       break;
+    }
 
-    case 'chronic_conditions':
+    case 'chronic_conditions': {
       const conditions = parseChronicConditions(normalizedText);
       if (conditions.length > 0) {
         result.chronicConditions = conditions;
       }
       break;
+    }
 
-    case 'risk_factors':
+    case 'risk_factors': {
       const factors = parseRiskFactors(normalizedText);
       if (factors.length > 0) {
         result.riskFactors = factors;
       }
       break;
+    }
 
     case 'age':
       result.ageGroup = parseAgeGroup(normalizedText);
@@ -836,16 +844,34 @@ function parseDuration(text: string): Duration {
   if (text.includes('today') || text.includes('this morning') || text.includes('tonight')) {
     return 'today';
   }
-  if (text.includes('yesterday') || text.includes('1 day') || text.includes('2 day') || text.includes('1-2')) {
+  if (
+    text.includes('yesterday') ||
+    text.includes('1 day') ||
+    text.includes('2 day') ||
+    text.includes('1-2')
+  ) {
     return '1_2_days';
   }
-  if (text.includes('3') || text.includes('4') || text.includes('5') || text.includes('6') || text.includes('7') || text.includes('week') || text.includes('3-7')) {
+  if (
+    text.includes('3') ||
+    text.includes('4') ||
+    text.includes('5') ||
+    text.includes('6') ||
+    text.includes('7') ||
+    text.includes('week') ||
+    text.includes('3-7')
+  ) {
     return '3_7_days';
   }
   if (text.includes('1-2 week') || text.includes('couple week')) {
     return '1_2_weeks';
   }
-  if (text.includes('month') || text.includes('long time') || text.includes('longer') || text.includes('more than')) {
+  if (
+    text.includes('month') ||
+    text.includes('long time') ||
+    text.includes('longer') ||
+    text.includes('more than')
+  ) {
     return 'more_than_2_weeks';
   }
   if (text.includes('chronic') || text.includes('always') || text.includes('ongoing')) {
@@ -853,8 +879,14 @@ function parseDuration(text: string): Duration {
   }
 
   // Default based on quick options
-  if (text === 'just_now' || text === 'today' || text === '1_2_days' ||
-      text === '3_7_days' || text === '1_2_weeks' || text === 'more_than_2_weeks') {
+  if (
+    text === 'just_now' ||
+    text === 'today' ||
+    text === '1_2_days' ||
+    text === '3_7_days' ||
+    text === '1_2_weeks' ||
+    text === 'more_than_2_weeks'
+  ) {
     return text as Duration;
   }
 
@@ -881,7 +913,12 @@ function parseSeverity(text: string): Severity {
   if (text.includes('severe') || text.includes('bad') || text.includes('7-8')) {
     return 8;
   }
-  if (text.includes('very severe') || text.includes('worst') || text.includes('9-10') || text.includes('unbearable')) {
+  if (
+    text.includes('very severe') ||
+    text.includes('worst') ||
+    text.includes('9-10') ||
+    text.includes('unbearable')
+  ) {
     return 10;
   }
 
@@ -892,10 +929,19 @@ function parseFrequency(text: string): Frequency {
   if (text.includes('constant') || text.includes('all the time') || text.includes('continuous')) {
     return 'constant';
   }
-  if (text.includes('come') || text.includes('go') || text.includes('intermittent') || text.includes('on and off')) {
+  if (
+    text.includes('come') ||
+    text.includes('go') ||
+    text.includes('intermittent') ||
+    text.includes('on and off')
+  ) {
     return 'intermittent';
   }
-  if (text.includes('occasional') || text.includes('sometimes') || text.includes('once in a while')) {
+  if (
+    text.includes('occasional') ||
+    text.includes('sometimes') ||
+    text.includes('once in a while')
+  ) {
     return 'occasional';
   }
   if (text.includes('first') || text.includes('never before') || text.includes('new')) {
@@ -909,10 +955,26 @@ function parseAssociatedSymptoms(text: string): string[] {
   const symptoms: string[] = [];
 
   const symptomKeywords = [
-    'fever', 'headache', 'nausea', 'vomiting', 'dizziness', 'fatigue',
-    'weakness', 'pain', 'swelling', 'rash', 'cough', 'sore throat',
-    'congestion', 'runny nose', 'chills', 'sweating', 'loss of appetite',
-    'diarrhea', 'constipation', 'bloating',
+    'fever',
+    'headache',
+    'nausea',
+    'vomiting',
+    'dizziness',
+    'fatigue',
+    'weakness',
+    'pain',
+    'swelling',
+    'rash',
+    'cough',
+    'sore throat',
+    'congestion',
+    'runny nose',
+    'chills',
+    'sweating',
+    'loss of appetite',
+    'diarrhea',
+    'constipation',
+    'bloating',
   ];
 
   for (const symptom of symptomKeywords) {
@@ -994,7 +1056,12 @@ function parseAgeGroup(text: string): HealthContext['ageGroup'] {
   if (text.includes('teen') || text.includes('13') || text.includes('17')) {
     return 'teen';
   }
-  if (text.includes('senior') || text.includes('elderly') || text.includes('65') || text.includes('old')) {
+  if (
+    text.includes('senior') ||
+    text.includes('elderly') ||
+    text.includes('65') ||
+    text.includes('old')
+  ) {
     return 'senior';
   }
 
@@ -1084,17 +1151,14 @@ export function getNextQuestion(
   }
 
   // Next, check for symptom-specific questions
-  const symptomQuestions = getSymptomSpecificQuestions(
-    flowState.symptomCategory,
-    context
-  );
+  const symptomQuestions = getSymptomSpecificQuestions(flowState.symptomCategory, context);
 
   const unansweredSymptomQs = symptomQuestions.filter(
-    q => !flowState.symptomQuestionsAsked.includes(q.id)
+    (q) => !flowState.symptomQuestionsAsked.includes(q.id)
   );
 
   // Prioritize required questions
-  const requiredUnanswered = unansweredSymptomQs.filter(q => q.isRequired);
+  const requiredUnanswered = unansweredSymptomQs.filter((q) => q.isRequired);
   if (requiredUnanswered.length > 0) {
     const nextQ = requiredUnanswered[0];
     return {
@@ -1108,7 +1172,7 @@ export function getNextQuestion(
 
   // Then optional symptom questions (limit to 2 more)
   const optionalAsked = flowState.symptomQuestionsAsked.filter(
-    id => !symptomQuestions.find(q => q.id === id && q.isRequired)
+    (id) => !symptomQuestions.find((q) => q.id === id && q.isRequired)
   ).length;
 
   if (optionalAsked < 2 && unansweredSymptomQs.length > 0) {
@@ -1132,12 +1196,16 @@ export function getNextQuestion(
   ];
 
   // Only ask general questions that haven't been covered
-  const neededGeneral = generalQuestionOrder.filter(type => {
+  const neededGeneral = generalQuestionOrder.filter((type) => {
     // Skip if already asked
     if (flowState.generalQuestionsAsked.includes(type)) return false;
 
     // Skip severity if OPQRST was used (it includes severity)
-    if (type === 'severity' && flowState.useOPQRST && flowState.opqrstQuestionsAsked.includes('severity')) {
+    if (
+      type === 'severity' &&
+      flowState.useOPQRST &&
+      flowState.opqrstQuestionsAsked.includes('severity')
+    ) {
       return false;
     }
 
@@ -1174,17 +1242,19 @@ export function updateFlowState(
   const newState = { ...flowState };
 
   switch (flowType) {
-    case 'opqrst':
+    case 'opqrst': {
       const opqrstType = questionId.replace('opqrst_', '') as OPQRSTQuestion;
       newState.opqrstQuestionsAsked = [...flowState.opqrstQuestionsAsked, opqrstType];
       break;
+    }
     case 'symptom':
       newState.symptomQuestionsAsked = [...flowState.symptomQuestionsAsked, questionId];
       break;
-    case 'general':
+    case 'general': {
       const generalType = questionId.replace('general_', '') as FollowUpQuestionType;
       newState.generalQuestionsAsked = [...flowState.generalQuestionsAsked, generalType];
       break;
+    }
   }
 
   return newState;
@@ -1198,7 +1268,6 @@ export function hasEnoughInformation(
   flowState: QuestionFlowState
 ): boolean {
   // Minimum requirements
-  const hasBasicInfo = context.duration || context.severity;
   const totalQuestionsAsked =
     flowState.opqrstQuestionsAsked.length +
     flowState.symptomQuestionsAsked.length +
@@ -1218,13 +1287,10 @@ export function hasEnoughInformation(
 
   // For other symptoms, we need at least 3 questions answered
   // and any required symptom questions answered
-  const symptomQuestions = getSymptomSpecificQuestions(
-    flowState.symptomCategory,
-    context
-  );
-  const requiredQuestions = symptomQuestions.filter(q => q.isRequired);
-  const allRequiredAnswered = requiredQuestions.every(
-    q => flowState.symptomQuestionsAsked.includes(q.id)
+  const symptomQuestions = getSymptomSpecificQuestions(flowState.symptomCategory, context);
+  const requiredQuestions = symptomQuestions.filter((q) => q.isRequired);
+  const allRequiredAnswered = requiredQuestions.every((q) =>
+    flowState.symptomQuestionsAsked.includes(q.id)
   );
 
   if (allRequiredAnswered && totalQuestionsAsked >= 3) {

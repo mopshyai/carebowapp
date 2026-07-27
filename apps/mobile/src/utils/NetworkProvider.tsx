@@ -11,17 +11,10 @@ import React, {
   useCallback,
   ReactNode,
 } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import NetInfo, { NetInfoState, NetInfoSubscription } from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, typography } from '../theme';
-import { api } from '../services/api';
 import { createLogger } from './logger';
 
 const logger = createLogger('Network');
@@ -95,7 +88,7 @@ const syncHandlers: Record<string, SyncHandler> = {
   },
 
   // User profile sync
-  userProfile: async (type, data) => {
+  userProfile: async (type, _data) => {
     switch (type) {
       case 'update':
         // await api.users.updateProfile(data);
@@ -191,7 +184,9 @@ interface NetworkContextType {
   /** Whether the app is in offline mode */
   isOffline: boolean;
   /** Add an operation to the sync queue */
-  addToSyncQueue: (operation: Omit<PendingOperation, 'id' | 'timestamp' | 'retryCount'>) => Promise<void>;
+  addToSyncQueue: (
+    operation: Omit<PendingOperation, 'id' | 'timestamp' | 'retryCount'>
+  ) => Promise<void>;
   /** Get pending operations count */
   pendingOperationsCount: number;
   /** Manually trigger sync */
@@ -364,7 +359,11 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
 
         if (handler) {
           await handler(operation.type, operation.data);
-          logger.debug('Synced operation', { id: operation.id, entity: operation.entity, type: operation.type });
+          logger.debug('Synced operation', {
+            id: operation.id,
+            entity: operation.entity,
+            type: operation.type,
+          });
         } else {
           // Unknown entity type - log warning and skip
           logger.warn('Unknown entity type', operation.entity);
@@ -433,9 +432,7 @@ export function NetworkProvider({ children, showBanner = true }: NetworkProvider
             </Text>
           </View>
           {pendingOperations.length > 0 && (
-            <Text style={styles.pendingText}>
-              {pendingOperations.length} pending
-            </Text>
+            <Text style={styles.pendingText}>{pendingOperations.length} pending</Text>
           )}
         </Animated.View>
       )}
@@ -470,7 +467,7 @@ export function useOnlineCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   offlineCallback?: () => void
 ): T {
-  const { isOnline, addToSyncQueue } = useNetwork();
+  const { isOnline } = useNetwork();
 
   return ((...args: Parameters<T>) => {
     if (isOnline) {

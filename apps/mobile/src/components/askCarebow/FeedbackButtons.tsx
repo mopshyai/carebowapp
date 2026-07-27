@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography } from '../../theme';
 import {
@@ -20,11 +20,7 @@ interface FeedbackButtonsProps {
   messageSnippet?: string;
 }
 
-export function FeedbackButtons({
-  episodeId,
-  messageId,
-  messageSnippet,
-}: FeedbackButtonsProps) {
+export function FeedbackButtons({ episodeId, messageId, messageSnippet }: FeedbackButtonsProps) {
   const [showReasons, setShowReasons] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [selectedRating, setSelectedRating] = useState<FeedbackRating | null>(null);
@@ -100,19 +96,15 @@ export function FeedbackButtons({
       <View style={styles.reasonsContainer}>
         <Text style={styles.reasonsTitle}>What could be better?</Text>
         <View style={styles.reasonsGrid}>
-          {(Object.keys(NEGATIVE_FEEDBACK_REASONS) as NegativeFeedbackReason[]).map(
-            (reason) => (
-              <TouchableOpacity
-                key={reason}
-                style={styles.reasonChip}
-                onPress={() => handleReasonSelect(reason)}
-              >
-                <Text style={styles.reasonChipText}>
-                  {NEGATIVE_FEEDBACK_REASONS[reason]}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+          {(Object.keys(NEGATIVE_FEEDBACK_REASONS) as NegativeFeedbackReason[]).map((reason) => (
+            <TouchableOpacity
+              key={reason}
+              style={styles.reasonChip}
+              onPress={() => handleReasonSelect(reason)}
+            >
+              <Text style={styles.reasonChipText}>{NEGATIVE_FEEDBACK_REASONS[reason]}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
         <TouchableOpacity style={styles.skipButton} onPress={handleSkipReason}>
           <Text style={styles.skipButtonText}>Skip</Text>

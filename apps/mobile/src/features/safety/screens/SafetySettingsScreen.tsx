@@ -26,8 +26,8 @@ import {
   scheduleCheckInReminder,
   cancelCheckInNotifications,
 } from '../services/notificationService';
-import { requestLocationPermission, getLocationPermissionStatus } from '../services/locationService';
-import { parseTimeToToday, formatScheduledTime, isValidGracePeriod } from '../services/checkInService';
+import { requestLocationPermission } from '../services/locationService';
+import { parseTimeToToday, formatScheduledTime } from '../services/checkInService';
 
 // ============================================
 // GRACE PERIOD OPTIONS
@@ -60,32 +60,35 @@ export function SafetySettingsScreen() {
   const [showGracePeriodPicker, setShowGracePeriodPicker] = useState(false);
 
   // Handlers
-  const handleToggleCheckIn = useCallback(async (enabled: boolean) => {
-    if (enabled) {
-      // Request notification permission
-      const permission = await requestNotificationPermission();
-      updatePermissions({ notifications: permission });
+  const handleToggleCheckIn = useCallback(
+    async (enabled: boolean) => {
+      if (enabled) {
+        // Request notification permission
+        const permission = await requestNotificationPermission();
+        updatePermissions({ notifications: permission });
 
-      if (permission !== 'granted') {
-        Alert.alert(
-          'Notifications Disabled',
-          'Daily check-in reminders require notification permission. You can still check in manually.',
-          [{ text: 'OK' }]
-        );
+        if (permission !== 'granted') {
+          Alert.alert(
+            'Notifications Disabled',
+            'Daily check-in reminders require notification permission. You can still check in manually.',
+            [{ text: 'OK' }]
+          );
+        }
+
+        // Enable and schedule
+        updateSettings({ dailyCheckInEnabled: true });
+        await scheduleCheckInReminder({
+          checkInTime: settings.dailyCheckInTime,
+          gracePeriodMinutes: settings.gracePeriodMinutes,
+        });
+      } else {
+        // Disable and cancel notifications
+        updateSettings({ dailyCheckInEnabled: false });
+        await cancelCheckInNotifications();
       }
-
-      // Enable and schedule
-      updateSettings({ dailyCheckInEnabled: true });
-      await scheduleCheckInReminder({
-        checkInTime: settings.dailyCheckInTime,
-        gracePeriodMinutes: settings.gracePeriodMinutes,
-      });
-    } else {
-      // Disable and cancel notifications
-      updateSettings({ dailyCheckInEnabled: false });
-      await cancelCheckInNotifications();
-    }
-  }, [updateSettings, updatePermissions, settings.dailyCheckInTime, settings.gracePeriodMinutes]);
+    },
+    [updateSettings, updatePermissions, settings.dailyCheckInTime, settings.gracePeriodMinutes]
+  );
 
   const handleTimeChange = useCallback(
     async (event: any, selectedDate?: Date) => {
@@ -128,45 +131,54 @@ export function SafetySettingsScreen() {
     [updateSettings, settings.dailyCheckInEnabled, settings.dailyCheckInTime]
   );
 
-  const handleToggleShareLocationSOS = useCallback(async (enabled: boolean) => {
-    if (enabled) {
-      const permission = await requestLocationPermission();
-      updatePermissions({ location: permission });
+  const handleToggleShareLocationSOS = useCallback(
+    async (enabled: boolean) => {
+      if (enabled) {
+        const permission = await requestLocationPermission();
+        updatePermissions({ location: permission });
 
-      if (permission !== 'granted') {
-        Alert.alert(
-          'Location Permission Required',
-          'To share your location during SOS, please grant location permission.',
-          [{ text: 'OK' }]
-        );
-        return;
+        if (permission !== 'granted') {
+          Alert.alert(
+            'Location Permission Required',
+            'To share your location during SOS, please grant location permission.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
       }
-    }
 
-    updateSettings({ shareLocationOnSOS: enabled });
-  }, [updateSettings, updatePermissions]);
+      updateSettings({ shareLocationOnSOS: enabled });
+    },
+    [updateSettings, updatePermissions]
+  );
 
-  const handleToggleShareLocationMissed = useCallback(async (enabled: boolean) => {
-    if (enabled) {
-      const permission = await requestLocationPermission();
-      updatePermissions({ location: permission });
+  const handleToggleShareLocationMissed = useCallback(
+    async (enabled: boolean) => {
+      if (enabled) {
+        const permission = await requestLocationPermission();
+        updatePermissions({ location: permission });
 
-      if (permission !== 'granted') {
-        Alert.alert(
-          'Location Permission Required',
-          'To share your location during missed check-ins, please grant location permission.',
-          [{ text: 'OK' }]
-        );
-        return;
+        if (permission !== 'granted') {
+          Alert.alert(
+            'Location Permission Required',
+            'To share your location during missed check-ins, please grant location permission.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
       }
-    }
 
-    updateSettings({ shareLocationOnMissedCheckIn: enabled });
-  }, [updateSettings, updatePermissions]);
+      updateSettings({ shareLocationOnMissedCheckIn: enabled });
+    },
+    [updateSettings, updatePermissions]
+  );
 
-  const handleToggleEscalation = useCallback((enabled: boolean) => {
-    updateSettings({ escalationEnabled: enabled });
-  }, [updateSettings]);
+  const handleToggleEscalation = useCallback(
+    (enabled: boolean) => {
+      updateSettings({ escalationEnabled: enabled });
+    },
+    [updateSettings]
+  );
 
   const handleClearHistory = useCallback(() => {
     Alert.alert(
@@ -230,10 +242,7 @@ export function SafetySettingsScreen() {
             {settings.dailyCheckInEnabled && (
               <>
                 {/* Check-in Time */}
-                <TouchableOpacity
-                  style={styles.settingRow}
-                  onPress={() => setShowTimePicker(true)}
-                >
+                <TouchableOpacity style={styles.settingRow} onPress={() => setShowTimePicker(true)}>
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingLabel}>Check-in time</Text>
                     <Text style={styles.settingDescription}>
@@ -308,7 +317,8 @@ export function SafetySettingsScreen() {
           <View style={styles.infoCard}>
             <Icon name="information-circle" size={18} color={colors.info} />
             <Text style={styles.infoText}>
-              We only request location during SOS or when sharing is enabled. Your location is never tracked continuously.
+              We only request location during SOS or when sharing is enabled. Your location is never
+              tracked continuously.
             </Text>
           </View>
         </View>
@@ -345,9 +355,7 @@ export function SafetySettingsScreen() {
                 <Text style={[styles.settingLabel, { color: colors.error }]}>
                   Clear safety history
                 </Text>
-                <Text style={styles.settingDescription}>
-                  Remove all recorded safety events
-                </Text>
+                <Text style={styles.settingDescription}>Remove all recorded safety events</Text>
               </View>
               <Icon name="trash-outline" size={20} color={colors.error} />
             </TouchableOpacity>
@@ -364,7 +372,9 @@ export function SafetySettingsScreen() {
                 <Icon
                   name="notifications"
                   size={20}
-                  color={permissions.notifications === 'granted' ? colors.success : colors.textTertiary}
+                  color={
+                    permissions.notifications === 'granted' ? colors.success : colors.textTertiary
+                  }
                 />
               </View>
               <Text style={styles.permissionLabel}>Notifications</Text>
@@ -409,9 +419,7 @@ export function SafetySettingsScreen() {
                   styles.permissionBadge,
                   {
                     backgroundColor:
-                      permissions.location === 'granted'
-                        ? colors.successSoft
-                        : colors.surface2,
+                      permissions.location === 'granted' ? colors.successSoft : colors.surface2,
                   },
                 ]}
               >
@@ -420,9 +428,7 @@ export function SafetySettingsScreen() {
                     styles.permissionBadgeText,
                     {
                       color:
-                        permissions.location === 'granted'
-                          ? colors.success
-                          : colors.textTertiary,
+                        permissions.location === 'granted' ? colors.success : colors.textTertiary,
                     },
                   ]}
                 >

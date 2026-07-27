@@ -12,18 +12,10 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import {
-  HealthContext,
   UrgencyLevel,
   urgencyConfig,
   SuggestedAction,
@@ -150,12 +142,7 @@ function CollapsibleSection({
 // MAIN COMPONENT
 // ============================================
 
-export function TriageResultCard({
-  result,
-  onActionPress,
-  onServicePress,
-  onDismiss,
-}: TriageResultCardProps) {
+export function TriageResultCard({ result, onServicePress, onDismiss }: TriageResultCardProps) {
   const urgency = urgencyConfig[result.safetyCheck.urgencyLevel];
   const isEmergency = result.safetyCheck.urgencyLevel === 'emergency';
   const isUrgent = result.safetyCheck.urgencyLevel === 'urgent';

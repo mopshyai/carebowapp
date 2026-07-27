@@ -3,14 +3,13 @@
  * View and edit individual family member's information and health data
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
   TextInput,
   Alert,
   Modal,
@@ -21,15 +20,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import {
-  FamilyMember,
-  Relationship,
   RELATIONSHIP_LABELS,
   MOBILITY_LABELS,
   MobilityStatus,
-  Gender,
-  Allergy,
-  Condition,
-  Medication,
   WHY_WE_ASK,
 } from '../../types/profile';
 
@@ -124,14 +117,22 @@ export default function MemberDetailsScreen() {
   const handleRemoveCondition = (conditionId: string, name: string) => {
     Alert.alert('Remove Condition', `Remove "${name}" from conditions?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeCondition(member.id, conditionId) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => removeCondition(member.id, conditionId),
+      },
     ]);
   };
 
   const handleRemoveMedication = (medicationId: string, name: string) => {
     Alert.alert('Remove Medication', `Remove "${name}" from medications?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeMedication(member.id, medicationId) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => removeMedication(member.id, medicationId),
+      },
     ]);
   };
 
@@ -178,10 +179,7 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Allergies</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.allergies}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setActiveModal('allergy')}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('allergy')}>
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
@@ -197,9 +195,7 @@ export default function MemberDetailsScreen() {
                     <Text style={styles.itemName}>{allergy.name}</Text>
                     <Text style={styles.itemMeta}>Severity: {allergy.severity}</Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveAllergy(allergy.id, allergy.name)}
-                  >
+                  <TouchableOpacity onPress={() => handleRemoveAllergy(allergy.id, allergy.name)}>
                     <Icon name="close-circle" size={24} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
@@ -219,10 +215,7 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Health Conditions</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.conditions}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setActiveModal('condition')}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('condition')}>
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
@@ -260,10 +253,7 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Medications</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.medications}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setActiveModal('medication')}
-            >
+            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('medication')}>
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
@@ -323,7 +313,8 @@ export default function MemberDetailsScreen() {
                 <Text
                   style={[
                     styles.mobilityOptionText,
-                    member.healthInfo.mobilityStatus === status && styles.mobilityOptionTextSelected,
+                    member.healthInfo.mobilityStatus === status &&
+                      styles.mobilityOptionTextSelected,
                   ]}
                 >
                   {MOBILITY_LABELS[status]}
@@ -372,8 +363,8 @@ export default function MemberDetailsScreen() {
                   activeModal === 'allergy'
                     ? 'e.g., Penicillin, Peanuts'
                     : activeModal === 'condition'
-                    ? 'e.g., Diabetes, Hypertension'
-                    : 'e.g., Lisinopril, Metformin'
+                      ? 'e.g., Diabetes, Hypertension'
+                      : 'e.g., Lisinopril, Metformin'
                 }
                 placeholderTextColor={colors.textTertiary}
                 autoFocus

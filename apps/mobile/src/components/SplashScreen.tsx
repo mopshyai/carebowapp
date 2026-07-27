@@ -5,14 +5,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Dimensions,
-  StatusBar,
-} from 'react-native';
+import { View, StyleSheet, Animated, StatusBar } from 'react-native';
 import SplashScreenNative from 'react-native-splash-screen';
 import { colors, typography, spacing } from '../theme';
 import { CareBowLogoAccurate } from './icons/CareBowLogo';
@@ -33,8 +26,6 @@ interface SplashScreenProps {
 // ============================================
 // CONSTANTS
 // ============================================
-
-const { width, height } = Dimensions.get('window');
 const ANIMATION_DURATION = 800;
 const FADE_DURATION = 400;
 const DEFAULT_MIN_DISPLAY_TIME = 1500;
@@ -120,18 +111,21 @@ export function SplashScreen({
     const elapsed = Date.now() - startTime;
     const remainingTime = Math.max(0, minDisplayTime - elapsed);
 
-    const exitTimeout = setTimeout(() => {
-      pulseAnimation.stop();
-      setIsFadingOut(true); // Disable touch interception during fade out
+    const exitTimeout = setTimeout(
+      () => {
+        pulseAnimation.stop();
+        setIsFadingOut(true); // Disable touch interception during fade out
 
-      Animated.timing(containerOpacity, {
-        toValue: 0,
-        duration: FADE_DURATION,
-        useNativeDriver: true,
-      }).start(() => {
-        onAnimationComplete?.();
-      });
-    }, remainingTime + ANIMATION_DURATION + FADE_DURATION * 2);
+        Animated.timing(containerOpacity, {
+          toValue: 0,
+          duration: FADE_DURATION,
+          useNativeDriver: true,
+        }).start(() => {
+          onAnimationComplete?.();
+        });
+      },
+      remainingTime + ANIMATION_DURATION + FADE_DURATION * 2
+    );
 
     return () => {
       clearTimeout(exitTimeout);
@@ -159,9 +153,7 @@ export function SplashScreen({
           styles.logoContainer,
           {
             opacity: logoOpacity,
-            transform: [
-              { scale: Animated.multiply(logoScale, pulseAnim) },
-            ],
+            transform: [{ scale: Animated.multiply(logoScale, pulseAnim) }],
           },
         ]}
       >
@@ -171,32 +163,15 @@ export function SplashScreen({
       </Animated.View>
 
       {/* Brand Name */}
-      <Animated.Text
-        style={[
-          styles.brandName,
-          { opacity: textOpacity },
-        ]}
-      >
-        CareBow
-      </Animated.Text>
+      <Animated.Text style={[styles.brandName, { opacity: textOpacity }]}>CareBow</Animated.Text>
 
       {/* Tagline */}
-      <Animated.Text
-        style={[
-          styles.tagline,
-          { opacity: taglineOpacity },
-        ]}
-      >
+      <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
         Healthcare at your fingertips
       </Animated.Text>
 
       {/* Loading indicator */}
-      <Animated.View
-        style={[
-          styles.loadingContainer,
-          { opacity: taglineOpacity },
-        ]}
-      >
+      <Animated.View style={[styles.loadingContainer, { opacity: taglineOpacity }]}>
         <View style={styles.loadingDot} />
         <View style={[styles.loadingDot, styles.loadingDotMiddle]} />
         <View style={styles.loadingDot} />

@@ -284,11 +284,7 @@ export function percentageLabel(value: number, context?: string): string {
 /**
  * Generate accessibility hint for a list item
  */
-export function listItemHint(
-  index: number,
-  total: number,
-  action?: string
-): string {
+export function listItemHint(index: number, total: number, action?: string): string {
   let hint = `Item ${index + 1} of ${total}`;
   if (action) {
     hint += `. ${action}`;
@@ -366,7 +362,7 @@ export function buildSwitchA11yProps(
 /**
  * Build accessibility props for a header
  */
-export function buildHeaderA11yProps(level: 1 | 2 | 3 | 4 | 5 | 6 = 1): AccessibilityProps {
+export function buildHeaderA11yProps(_level: 1 | 2 | 3 | 4 | 5 | 6 = 1): AccessibilityProps {
   return {
     accessible: true,
     accessibilityRole: 'header',

@@ -5,12 +5,7 @@
  * @deprecated Import from '@/services/notifications' instead
  */
 
-import {
-  NotificationService,
-  initializeNotifications,
-  type ScheduledNotification,
-  type NotificationPermissionStatus,
-} from '../services/notifications';
+import { NotificationService, initializeNotifications } from '../services/notifications';
 
 export interface LocalNotification {
   id: string;

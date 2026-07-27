@@ -4,13 +4,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, {
   useAnimatedStyle,
@@ -21,11 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { CheckInState, CheckInStatus } from '../types';
-import {
-  getCheckInStatusMessage,
-  formatDisplayTime,
-  formatScheduledTime,
-} from '../services/checkInService';
+import { getCheckInStatusMessage, formatDisplayTime } from '../services/checkInService';
 import { triggerSuccessHaptic } from '../services/sosService';
 import { createLogger } from '../../../utils/logger';
 
@@ -90,12 +80,7 @@ function getStatusIcon(status: CheckInStatus): {
 // COMPONENT
 // ============================================
 
-export function CheckInModule({
-  state,
-  enabled,
-  onCheckIn,
-  onEnableCheckIn,
-}: CheckInModuleProps) {
+export function CheckInModule({ state, enabled, onCheckIn, onEnableCheckIn }: CheckInModuleProps) {
   const [isLoading, setIsLoading] = useState(false);
   const scale = useSharedValue(1);
   const checkmarkScale = useSharedValue(0);
@@ -115,20 +100,14 @@ export function CheckInModule({
     setIsLoading(true);
 
     // Animate button press
-    scale.value = withSequence(
-      withTiming(0.95, { duration: 100 }),
-      withSpring(1)
-    );
+    scale.value = withSequence(withTiming(0.95, { duration: 100 }), withSpring(1));
 
     try {
       await onCheckIn();
       await triggerSuccessHaptic();
 
       // Show success animation
-      checkmarkScale.value = withSequence(
-        withSpring(1.2),
-        withSpring(1)
-      );
+      checkmarkScale.value = withSequence(withSpring(1.2), withSpring(1));
 
       // Reset after animation
       setTimeout(() => {
@@ -142,9 +121,6 @@ export function CheckInModule({
   }, [onCheckIn, isLoading, scale, checkmarkScale]);
 
   const statusIcon = getStatusIcon(state.status);
-  const canCheckIn =
-    enabled &&
-    (state.status === 'DUE' || state.status === 'MISSED' || state.status === 'NOT_DUE');
   const showCheckInButton =
     enabled && state.status !== 'CHECKED_IN' && state.status !== 'CHECKED_IN_LATE';
 
@@ -175,11 +151,7 @@ export function CheckInModule({
       {/* Status Header */}
       <View style={styles.header}>
         <View style={[styles.iconContainer, { backgroundColor: statusIcon.bgColor }]}>
-          <Icon
-            name={statusIcon.name as any}
-            size={24}
-            color={statusIcon.color}
-          />
+          <Icon name={statusIcon.name as any} size={24} color={statusIcon.color} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>Daily Check-in</Text>
@@ -206,11 +178,7 @@ export function CheckInModule({
               <ActivityIndicator color={colors.white} size="small" />
             ) : (
               <>
-                <Icon
-                  name="hand-right"
-                  size={22}
-                  color={colors.white}
-                />
+                <Icon name="hand-right" size={22} color={colors.white} />
                 <Text style={styles.checkInButtonText}>I'm OK</Text>
               </>
             )}

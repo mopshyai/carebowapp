@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BookingDraft, CartItem, Service, PackageOption } from '@/data/types';
+import { BookingDraft, CartItem, Service } from '@/data/types';
 import { calculatePrice } from '@/data/services';
 
 type CartStore = {
@@ -88,121 +88,121 @@ export const useCartStore = create<CartStore>()(
       items: [],
       bookingDraft: null,
 
-  // Initialize booking draft from a service
-  initBookingDraft: (service) => {
-    set({ bookingDraft: createInitialDraft(service) });
-  },
+      // Initialize booking draft from a service
+      initBookingDraft: (service) => {
+        set({ bookingDraft: createInitialDraft(service) });
+      },
 
-  // Update booking draft with partial updates
-  updateBookingDraft: (updates) => {
-    set((state) => {
-      if (!state.bookingDraft) return state;
-      return {
-        bookingDraft: {
-          ...state.bookingDraft,
-          ...updates,
-        },
-      };
-    });
-    // Recalculate pricing after update
-    get().calculateDraftPricing();
-  },
+      // Update booking draft with partial updates
+      updateBookingDraft: (updates) => {
+        set((state) => {
+          if (!state.bookingDraft) return state;
+          return {
+            bookingDraft: {
+              ...state.bookingDraft,
+              ...updates,
+            },
+          };
+        });
+        // Recalculate pricing after update
+        get().calculateDraftPricing();
+      },
 
-  // Clear booking draft
-  clearBookingDraft: () => {
-    set({ bookingDraft: null });
-  },
+      // Clear booking draft
+      clearBookingDraft: () => {
+        set({ bookingDraft: null });
+      },
 
-  // Recalculate pricing for current draft
-  calculateDraftPricing: () => {
-    set((state) => {
-      const draft = state.bookingDraft;
-      if (!draft) return state;
+      // Recalculate pricing for current draft
+      calculateDraftPricing: () => {
+        set((state) => {
+          const draft = state.bookingDraft;
+          if (!draft) return state;
 
-      // We need to get the service to calculate pricing
-      // This is a bit of a workaround since we don't have the service in the store
-      // The actual calculation happens in the component using calculatePrice()
-      return state;
-    });
-  },
+          // We need to get the service to calculate pricing
+          // This is a bit of a workaround since we don't have the service in the store
+          // The actual calculation happens in the component using calculatePrice()
+          return state;
+        });
+      },
 
-  // Add current draft to cart
-  addItemFromDraft: () => {
-    const draft = get().bookingDraft;
-    if (!draft) return null;
-    if (!draft.memberId || !draft.date || !draft.startTime) return null;
+      // Add current draft to cart
+      addItemFromDraft: () => {
+        const draft = get().bookingDraft;
+        if (!draft) return null;
+        if (!draft.memberId || !draft.date || !draft.startTime) return null;
 
-    const cartItem: CartItem = {
-      id: generateId(),
-      serviceId: draft.serviceId,
-      serviceTitle: draft.serviceTitle,
-      memberId: draft.memberId,
-      memberName: draft.memberName || '',
-      date: draft.date,
-      startTime: draft.startTime,
-      endTime: draft.endTime || undefined,
-      durationMinutes: draft.durationMinutes || undefined,
-      packageId: draft.selectedPackageId || undefined,
-      packageLabel: draft.selectedPackageLabel || undefined,
-      hours: draft.hours || undefined,
-      days: draft.days || undefined,
-      requestNotes: draft.requestNotes,
-      subtotal: draft.subtotal,
-      discount: draft.discount,
-      total: draft.total,
-      pricingLabel: draft.pricingLabel,
-    };
+        const cartItem: CartItem = {
+          id: generateId(),
+          serviceId: draft.serviceId,
+          serviceTitle: draft.serviceTitle,
+          memberId: draft.memberId,
+          memberName: draft.memberName || '',
+          date: draft.date,
+          startTime: draft.startTime,
+          endTime: draft.endTime || undefined,
+          durationMinutes: draft.durationMinutes || undefined,
+          packageId: draft.selectedPackageId || undefined,
+          packageLabel: draft.selectedPackageLabel || undefined,
+          hours: draft.hours || undefined,
+          days: draft.days || undefined,
+          requestNotes: draft.requestNotes,
+          subtotal: draft.subtotal,
+          discount: draft.discount,
+          total: draft.total,
+          pricingLabel: draft.pricingLabel,
+        };
 
-    set((state) => ({
-      items: [...state.items, cartItem],
-      bookingDraft: null,
-    }));
+        set((state) => ({
+          items: [...state.items, cartItem],
+          bookingDraft: null,
+        }));
 
-    return cartItem;
-  },
+        return cartItem;
+      },
 
-  // Add item directly
-  addItem: (item) => {
-    const newItem: CartItem = {
-      ...item,
-      id: generateId(),
-    };
+      // Add item directly
+      addItem: (item) => {
+        const newItem: CartItem = {
+          ...item,
+          id: generateId(),
+        };
 
-    set((state) => ({
-      items: [...state.items, newItem],
-    }));
-  },
+        set((state) => ({
+          items: [...state.items, newItem],
+        }));
+      },
 
-  // Remove item
-  removeItem: (itemId) => {
-    set((state) => ({
-      items: state.items.filter((item) => item.id !== itemId),
-    }));
-  },
+      // Remove item
+      removeItem: (itemId) => {
+        set((state) => ({
+          items: state.items.filter((item) => item.id !== itemId),
+        }));
+      },
 
-  // Update quantity (for future multi-quantity support)
-  updateQuantity: (itemId, qty) => {
-    if (qty <= 0) {
-      get().removeItem(itemId);
-      return;
-    }
-    // Currently services are qty=1, but keeping this for future
-  },
+      // Update quantity (for future multi-quantity support)
+      updateQuantity: (itemId, qty) => {
+        if (qty <= 0) {
+          get().removeItem(itemId);
+          return;
+        }
+        // Currently services are qty=1, but keeping this for future
+      },
 
-  // Clear cart
-  clearCart: () => {
-    set({ items: [], bookingDraft: null });
-  },
+      // Clear cart
+      clearCart: () => {
+        set({ items: [], bookingDraft: null });
+      },
 
-  // Get total items count
-  getTotalItems: () => {
-    return get().items.length;
-  },
+      // Get total items count
+      getTotalItems: () => {
+        return get().items.length;
+      },
 
-  // Get total price
-  getTotalPrice: () => {
-    return get().items.reduce((total, item) => total + item.total, 0);
-  },
+      // Get total price
+      getTotalPrice: () => {
+        return get().items.reduce((total, item) => total + item.total, 0);
+      },
     }),
     {
       name: '@carebow/cart',

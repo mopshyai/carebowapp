@@ -12,25 +12,9 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-  Platform,
-} from 'react-native';
+import { View, Text, Pressable, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  colors,
-  space,
-  radius,
-  typography,
-  shadows,
-  componentStyles,
-  layout,
-} from '@/theme/tokens';
+import { colors, space, radius, typography, shadows, layout } from '@/theme/tokens';
 
 // =============================================================================
 // APP HEADER
@@ -74,9 +58,7 @@ export function AppHeader({
         </Text>
       </View>
 
-      <View style={styles.headerRight}>
-        {rightAction}
-      </View>
+      <View style={styles.headerRight}>{rightAction}</View>
     </View>
   );
 }
@@ -93,11 +75,7 @@ interface ScreenContainerProps {
   scrollable?: boolean;
 }
 
-export function ScreenContainer({
-  children,
-  edges = ['top'],
-  style,
-}: ScreenContainerProps) {
+export function ScreenContainer({ children, edges = ['top'], style }: ScreenContainerProps) {
   return (
     <SafeAreaView style={[styles.screenContainer, style]} edges={edges}>
       {children}
@@ -118,20 +96,12 @@ interface SectionTitleProps {
   style?: ViewStyle;
 }
 
-export function SectionTitle({
-  title,
-  subtitle,
-  action,
-  onActionPress,
-  style,
-}: SectionTitleProps) {
+export function SectionTitle({ title, subtitle, action, onActionPress, style }: SectionTitleProps) {
   return (
     <View style={[styles.sectionTitleContainer, style]}>
       <View style={styles.sectionTitleLeft}>
         <Text style={styles.sectionTitleText}>{title}</Text>
-        {subtitle && (
-          <Text style={styles.sectionSubtitleText}>{subtitle}</Text>
-        )}
+        {subtitle && <Text style={styles.sectionSubtitleText}>{subtitle}</Text>}
       </View>
       {action && onActionPress && (
         <Pressable
@@ -255,9 +225,7 @@ export function ListRow({
   const content = (
     <View style={[styles.listRow, disabled && styles.disabled, style]}>
       {icon && (
-        <View style={[styles.listRowIcon, { backgroundColor: iconBackground }]}>
-          {icon}
-        </View>
+        <View style={[styles.listRowIcon, { backgroundColor: iconBackground }]}>{icon}</View>
       )}
 
       <View style={styles.listRowContent}>
@@ -271,13 +239,9 @@ export function ListRow({
         )}
       </View>
 
-      {value && (
-        <Text style={styles.listRowValue}>{value}</Text>
-      )}
+      {value && <Text style={styles.listRowValue}>{value}</Text>}
 
-      {showChevron && onPress && (
-        <Text style={styles.listRowChevron}>›</Text>
-      )}
+      {showChevron && onPress && <Text style={styles.listRowChevron}>›</Text>}
     </View>
   );
 
@@ -390,12 +354,7 @@ export function SecondaryButton({
       ]}
       accessibilityRole="button"
     >
-      <Text
-        style={[
-          styles.secondaryButtonText,
-          size === 'small' && styles.buttonTextSmall,
-        ]}
-      >
+      <Text style={[styles.secondaryButtonText, size === 'small' && styles.buttonTextSmall]}>
         {title}
       </Text>
     </Pressable>
@@ -425,37 +384,20 @@ interface ComparisonRowProps {
   style?: ViewStyle;
 }
 
-export function ComparisonRow({
-  label,
-  values,
-  isHeader = false,
-  style,
-}: ComparisonRowProps) {
+export function ComparisonRow({ label, values, isHeader = false, style }: ComparisonRowProps) {
   return (
     <View style={[styles.comparisonRow, isHeader && styles.comparisonHeaderRow, style]}>
       <View style={styles.comparisonLabel}>
-        <Text
-          style={[
-            styles.comparisonLabelText,
-            isHeader && styles.comparisonHeaderText,
-          ]}
-        >
+        <Text style={[styles.comparisonLabelText, isHeader && styles.comparisonHeaderText]}>
           {label}
         </Text>
       </View>
       {values.map((value, index) => (
         <View key={index} style={styles.comparisonValue}>
           {typeof value === 'boolean' ? (
-            <Text style={value ? styles.checkIcon : styles.xIcon}>
-              {value ? '✓' : '✕'}
-            </Text>
+            <Text style={value ? styles.checkIcon : styles.xIcon}>{value ? '✓' : '✕'}</Text>
           ) : (
-            <Text
-              style={[
-                styles.comparisonValueText,
-                isHeader && styles.comparisonHeaderText,
-              ]}
-            >
+            <Text style={[styles.comparisonValueText, isHeader && styles.comparisonHeaderText]}>
               {value}
             </Text>
           )}
@@ -494,9 +436,7 @@ export function PriceDisplay({
       {prefix && <Text style={styles.pricePrefix}>{prefix}</Text>}
       <View style={styles.priceRow}>
         <Text style={[styles.priceText, priceStyle]}>{price}</Text>
-        {originalPrice && (
-          <Text style={styles.originalPrice}>{originalPrice}</Text>
-        )}
+        {originalPrice && <Text style={styles.originalPrice}>{originalPrice}</Text>}
       </View>
       {suffix && <Text style={styles.priceSuffix}>{suffix}</Text>}
     </View>
@@ -538,12 +478,8 @@ export function StatusIndicator({
 
   return (
     <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }, style]}>
-      {showDot && (
-        <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
-      )}
-      <Text style={[styles.statusText, { color: statusColors.text }]}>
-        {label}
-      </Text>
+      {showDot && <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />}
+      <Text style={[styles.statusText, { color: statusColors.text }]}>{label}</Text>
     </View>
   );
 }
@@ -551,15 +487,27 @@ export function StatusIndicator({
 function getStatusColors(status: StatusType) {
   switch (status) {
     case 'success':
-      return { bg: colors.success.muted, dot: colors.success.default, text: colors.success.default };
+      return {
+        bg: colors.success.muted,
+        dot: colors.success.default,
+        text: colors.success.default,
+      };
     case 'warning':
-      return { bg: colors.warning.muted, dot: colors.warning.default, text: colors.warning.default };
+      return {
+        bg: colors.warning.muted,
+        dot: colors.warning.default,
+        text: colors.warning.default,
+      };
     case 'error':
       return { bg: colors.error.muted, dot: colors.error.default, text: colors.error.default };
     case 'info':
       return { bg: colors.info.muted, dot: colors.info.default, text: colors.info.default };
     default:
-      return { bg: colors.secondary.default, dot: colors.text.tertiary, text: colors.text.secondary };
+      return {
+        bg: colors.secondary.default,
+        dot: colors.text.tertiary,
+        text: colors.text.secondary,
+      };
   }
 }
 
@@ -591,20 +539,12 @@ interface EmptyStateProps {
   style?: ViewStyle;
 }
 
-export function MedicalEmptyState({
-  title,
-  description,
-  icon,
-  action,
-  style,
-}: EmptyStateProps) {
+export function MedicalEmptyState({ title, description, icon, action, style }: EmptyStateProps) {
   return (
     <View style={[styles.emptyState, style]}>
       {icon && <View style={styles.emptyStateIcon}>{icon}</View>}
       <Text style={styles.emptyStateTitle}>{title}</Text>
-      {description && (
-        <Text style={styles.emptyStateDescription}>{description}</Text>
-      )}
+      {description && <Text style={styles.emptyStateDescription}>{description}</Text>}
       {action && (
         <PrimaryButton
           title={action.label}

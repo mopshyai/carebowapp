@@ -11,7 +11,6 @@ import {
   Episode,
   EpisodeMessage,
   ForWhom,
-  AgeGroup,
   createEpisode,
   createMessage,
   MessageAttachment,
@@ -111,9 +110,7 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
       updateEpisode: (episodeId, updates) => {
         set((state) => ({
           episodes: state.episodes.map((ep) =>
-            ep.id === episodeId
-              ? { ...ep, ...updates, updatedAt: new Date().toISOString() }
-              : ep
+            ep.id === episodeId ? { ...ep, ...updates, updatedAt: new Date().toISOString() } : ep
           ),
         }));
       },
@@ -138,8 +135,7 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
           return {
             episodes: state.episodes.filter((ep) => ep.id !== episodeId),
             messages: remainingMessages,
-            activeEpisodeId:
-              state.activeEpisodeId === episodeId ? null : state.activeEpisodeId,
+            activeEpisodeId: state.activeEpisodeId === episodeId ? null : state.activeEpisodeId,
           };
         });
       },
@@ -236,9 +232,7 @@ export const useAllEpisodes = () => useEpisodeStore((state) => state.episodes);
  * Use useShallow to compare array contents, not references.
  */
 export const useRecentEpisodes = (limit?: number) =>
-  useEpisodeStore(
-    useShallow((state) => state.getRecentEpisodes(limit))
-  );
+  useEpisodeStore(useShallow((state) => state.getRecentEpisodes(limit)));
 
 // Returns same array ref from state.messages[id], or undefined - no shallow needed
 export const useEpisodeMessages = (episodeId: string) =>

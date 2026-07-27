@@ -5,8 +5,8 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, spacing, radius, typography } from '../../theme';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { colors, spacing, radius } from '../../theme';
 
 // =============================================================================
 // TYPES
@@ -114,9 +114,7 @@ export function BadgeRow({ badges, size = 'small', style, maxBadges }: BadgeRowP
           size={size}
         />
       ))}
-      {remainingCount > 0 && (
-        <Badge label={`+${remainingCount}`} type="default" size={size} />
-      )}
+      {remainingCount > 0 && <Badge label={`+${remainingCount}`} type="default" size={size} />}
     </View>
   );
 }

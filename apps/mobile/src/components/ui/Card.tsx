@@ -4,13 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Pressable,
-  StyleSheet,
-  ViewStyle,
-  PressableProps,
-} from 'react-native';
+import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { colors, spacing, radius, shadows } from '@/theme';
 
 // ============================================
@@ -74,10 +68,7 @@ export function Card({
   if (onPress || onLongPress) {
     return (
       <Pressable
-        style={({ pressed }) => [
-          ...containerStyle,
-          pressed && !disabled && styles.pressed,
-        ]}
+        style={({ pressed }) => [...containerStyle, pressed && !disabled && styles.pressed]}
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}
@@ -181,27 +172,15 @@ interface CardSectionProps {
 }
 
 export function CardHeader({ children, style }: CardSectionProps) {
-  return (
-    <View style={[cardSectionStyles.header, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[cardSectionStyles.header, style]}>{children}</View>;
 }
 
 export function CardBody({ children, style }: CardSectionProps) {
-  return (
-    <View style={[cardSectionStyles.body, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[cardSectionStyles.body, style]}>{children}</View>;
 }
 
 export function CardFooter({ children, style }: CardSectionProps) {
-  return (
-    <View style={[cardSectionStyles.footer, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[cardSectionStyles.footer, style]}>{children}</View>;
 }
 
 const cardSectionStyles = StyleSheet.create({

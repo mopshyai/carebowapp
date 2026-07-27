@@ -18,7 +18,6 @@ import {
   SafetyEventType,
   SafetyEventMetadata,
 } from '../types';
-import { generateId } from '@/types/profile';
 
 // ============================================
 // STORE TYPES
@@ -106,11 +105,6 @@ function isSameLocalDay(date1: Date, date2: Date): boolean {
   );
 }
 
-function getTodayStart(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-}
-
 // ============================================
 // STORE IMPLEMENTATION
 // ============================================
@@ -159,10 +153,7 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
         // If this contact is primary, unset primary on others
         if (contact.isPrimary) {
           set((state) => ({
-            contacts: [
-              ...state.contacts.map((c) => ({ ...c, isPrimary: false })),
-              contact,
-            ],
+            contacts: [...state.contacts.map((c) => ({ ...c, isPrimary: false })), contact],
           }));
         } else {
           set((state) => ({

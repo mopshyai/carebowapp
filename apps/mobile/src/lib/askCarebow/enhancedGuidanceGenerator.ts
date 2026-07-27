@@ -12,20 +12,14 @@ import { SafetyAssessment } from './safetyClassifier';
 
 // Import databases
 import {
-  HOME_REMEDIES_DB,
   searchRemediesBySymptom,
-  getTopRemedies,
   filterRemediesForProfile,
   HomeRemedy,
-  ConditionRemedies,
 } from './databases/homeRemedies';
 
 import {
-  AYURVEDIC_FORMULATIONS,
-  SEASONAL_RECOMMENDATIONS,
   LIFESTYLE_RECOMMENDATIONS,
   getFormulationsForConcern,
-  getCurrentSeason,
   getCurrentSeasonalRecommendations,
   filterFormulationsForProfile,
   AyurvedicFormulation,
@@ -33,22 +27,17 @@ import {
 } from './databases/ayurvedicRemedies';
 
 import {
-  OTC_DATABASE,
   OTC_DISCLAIMER,
   ELDERLY_OTC_CONSIDERATIONS,
   getOTCForSymptom,
   filterOTCForProfile,
-  getPriorityOTC,
   OTCCategory,
   OTCMedication,
 } from './databases/otcSuggestions';
 
 import {
-  SERVICE_CATALOG,
   getCarePathway,
-  getServiceById,
   urgencyToTriageLevel,
-  CarePathwayResult,
   ServiceRecommendation,
   TriageLevel,
 } from './databases/carePathwayRouting';
@@ -157,32 +146,38 @@ interface ExtractedProfile {
   allergies: string[];
 }
 
-function extractProfile(memberProfile?: MemberProfile, healthContext?: HealthContext): ExtractedProfile {
+function extractProfile(
+  memberProfile?: MemberProfile,
+  healthContext?: HealthContext
+): ExtractedProfile {
   const conditions = [
     ...(memberProfile?.conditions || []),
     ...(healthContext?.chronicConditions || []),
-  ].map(c => c.toLowerCase());
+  ].map((c) => c.toLowerCase());
 
-  const allergies = [
-    ...(memberProfile?.allergies || []),
-    ...(healthContext?.allergies || []),
-  ].map(a => a.toLowerCase());
+  const allergies = [...(memberProfile?.allergies || []), ...(healthContext?.allergies || [])].map(
+    (a) => a.toLowerCase()
+  );
 
   return {
     age: memberProfile?.age,
-    isPregnant: conditions.some(c => c.includes('pregnant') || c.includes('pregnancy')),
-    isDiabetic: conditions.some(c => c.includes('diabetes') || c.includes('diabetic')),
-    hasHeartCondition: conditions.some(c =>
-      c.includes('heart') || c.includes('cardiac') || c.includes('hypertension') || c.includes('bp')
+    isPregnant: conditions.some((c) => c.includes('pregnant') || c.includes('pregnancy')),
+    isDiabetic: conditions.some((c) => c.includes('diabetes') || c.includes('diabetic')),
+    hasHeartCondition: conditions.some(
+      (c) =>
+        c.includes('heart') ||
+        c.includes('cardiac') ||
+        c.includes('hypertension') ||
+        c.includes('bp')
     ),
-    hasKidneyDisease: conditions.some(c => c.includes('kidney') || c.includes('renal')),
-    hasLiverDisease: conditions.some(c => c.includes('liver') || c.includes('hepat')),
-    hasThyroid: conditions.some(c => c.includes('thyroid')),
-    hasAutoimmune: conditions.some(c =>
-      c.includes('autoimmune') || c.includes('lupus') || c.includes('rheumatoid')
+    hasKidneyDisease: conditions.some((c) => c.includes('kidney') || c.includes('renal')),
+    hasLiverDisease: conditions.some((c) => c.includes('liver') || c.includes('hepat')),
+    hasThyroid: conditions.some((c) => c.includes('thyroid')),
+    hasAutoimmune: conditions.some(
+      (c) => c.includes('autoimmune') || c.includes('lupus') || c.includes('rheumatoid')
     ),
-    isOnBloodThinners: conditions.some(c =>
-      c.includes('blood thinner') || c.includes('warfarin') || c.includes('aspirin')
+    isOnBloodThinners: conditions.some(
+      (c) => c.includes('blood thinner') || c.includes('warfarin') || c.includes('aspirin')
     ),
     conditions,
     allergies,
@@ -198,7 +193,7 @@ function generateSummary(
   assessment: SafetyAssessment,
   triageLevel: TriageLevel
 ): EnhancedGuidanceResult['summary'] {
-  const { primarySymptom, duration, severity } = healthContext;
+  const { primarySymptom, duration } = healthContext;
 
   let title = '';
   let explanation = '';
@@ -284,7 +279,7 @@ function generateHomeRemedies(
 
   // Collect warning signs from all matched conditions
   const warningSignsSet = new Set<string>();
-  conditionMatches.forEach(c => c.warningSignsToWatch.forEach(w => warningSignsSet.add(w)));
+  conditionMatches.forEach((c) => c.warningSignsToWatch.forEach((w) => warningSignsSet.add(w)));
 
   return {
     condition: primaryCondition.name,
@@ -338,7 +333,7 @@ function generateAyurvedicRecommendations(
 
   // Get relevant lifestyle tips
   const lifestyleTips: string[] = [];
-  const eatingRec = LIFESTYLE_RECOMMENDATIONS.find(r => r.category === 'eating');
+  const eatingRec = LIFESTYLE_RECOMMENDATIONS.find((r) => r.category === 'eating');
   if (eatingRec) {
     lifestyleTips.push(...eatingRec.practices.slice(0, 3));
   }
@@ -390,7 +385,10 @@ function generateOTCSuggestions(
   // Add elderly note if applicable
   let elderlyNote: string | undefined;
   if (profile.age && profile.age >= 60) {
-    elderlyNote = ELDERLY_OTC_CONSIDERATIONS.note + ' ' + ELDERLY_OTC_CONSIDERATIONS.points.slice(0, 2).join('. ');
+    elderlyNote =
+      ELDERLY_OTC_CONSIDERATIONS.note +
+      ' ' +
+      ELDERLY_OTC_CONSIDERATIONS.points.slice(0, 2).join('. ');
   }
 
   return {
@@ -437,16 +435,16 @@ function compileWarningSigns(
   const warningSigns = new Set<string>();
 
   // Add from assessment
-  assessment.redFlagsDetected.forEach(rf => warningSigns.add(rf));
+  assessment.redFlagsDetected.forEach((rf) => warningSigns.add(rf));
 
   // Add from home remedies
   if (homeRemedies) {
-    homeRemedies.warningSignsToWatch.forEach(ws => warningSigns.add(ws));
+    homeRemedies.warningSignsToWatch.forEach((ws) => warningSigns.add(ws));
   }
 
   // Add generic warning signs based on triage level
   if (triageLevel === 'self_care' || triageLevel === 'monitor') {
-    warningSigns.add('Symptoms significantly worsen or don\'t improve');
+    warningSigns.add("Symptoms significantly worsen or don't improve");
     warningSigns.add('New concerning symptoms develop');
     warningSigns.add('Difficulty breathing');
     warningSigns.add('High fever (above 103°F/39.5°C)');
@@ -479,7 +477,7 @@ function generateFollowUp(triageLevel: TriageLevel): EnhancedGuidanceResult['fol
     case 'monitor':
       return {
         checkInTime: '24 hours',
-        message: 'Let\'s check how you\'re feeling tomorrow.',
+        message: "Let's check how you're feeling tomorrow.",
       };
     case 'self_care':
     default:
@@ -598,7 +596,7 @@ export function generateQuickGuidance(
   const topRemedies: QuickGuidance['topRemedies'] = [];
   if (conditionMatches.length > 0 && triageLevel !== 'emergency' && triageLevel !== 'urgent') {
     const remedies = conditionMatches[0].remedies.slice(0, 2);
-    remedies.forEach(r => {
+    remedies.forEach((r) => {
       topRemedies.push({
         name: r.name,
         hindiName: r.hindiName,
@@ -608,14 +606,16 @@ export function generateQuickGuidance(
   }
 
   // Get lifestyle advice
-  const lifestyleAdvice = conditionMatches.length > 0
-    ? conditionMatches[0].lifestyleAdvice.slice(0, 3)
-    : ['Rest and stay hydrated', 'Monitor your symptoms', 'Get adequate sleep'];
+  const lifestyleAdvice =
+    conditionMatches.length > 0
+      ? conditionMatches[0].lifestyleAdvice.slice(0, 3)
+      : ['Rest and stay hydrated', 'Monitor your symptoms', 'Get adequate sleep'];
 
   // Get warning signs
-  const warningSignsToWatch = conditionMatches.length > 0
-    ? conditionMatches[0].warningSignsToWatch.slice(0, 3)
-    : ['Symptoms worsen significantly', 'New symptoms develop', 'High fever'];
+  const warningSignsToWatch =
+    conditionMatches.length > 0
+      ? conditionMatches[0].warningSignsToWatch.slice(0, 3)
+      : ['Symptoms worsen significantly', 'New symptoms develop', 'High fever'];
 
   // Get primary service CTA
   let servicesCTA: QuickGuidance['servicesCTA'] = null;

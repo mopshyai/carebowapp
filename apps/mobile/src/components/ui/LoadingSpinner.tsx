@@ -47,62 +47,33 @@ export function LoadingSpinner({
   text,
   style,
 }: LoadingSpinnerProps) {
-  const sizeValue = getSizeValue(size);
   const spinnerColor = color || colors.accent;
 
   const content = (
     <>
-      <ActivityIndicator
-        size={size === 'small' ? 'small' : 'large'}
-        color={spinnerColor}
-      />
-      {text && (
-        <Text style={[styles.text, size === 'small' && styles.textSmall]}>
-          {text}
-        </Text>
-      )}
+      <ActivityIndicator size={size === 'small' ? 'small' : 'large'} color={spinnerColor} />
+      {text && <Text style={[styles.text, size === 'small' && styles.textSmall]}>{text}</Text>}
     </>
   );
 
   if (variant === 'overlay') {
     return (
       <View style={[styles.overlay, style]}>
-        <View style={styles.overlayContent}>
-          {content}
-        </View>
+        <View style={styles.overlayContent}>{content}</View>
       </View>
     );
   }
 
   if (variant === 'inline') {
-    return (
-      <View style={[styles.inline, style]}>
-        {content}
-      </View>
-    );
+    return <View style={[styles.inline, style]}>{content}</View>;
   }
 
-  return (
-    <View style={[styles.container, style]}>
-      {content}
-    </View>
-  );
+  return <View style={[styles.container, style]}>{content}</View>;
 }
 
 // ============================================
 // SIZE VALUES
 // ============================================
-
-function getSizeValue(size: LoadingSize): 'small' | 'large' {
-  switch (size) {
-    case 'small':
-      return 'small';
-    case 'medium':
-    case 'large':
-    default:
-      return 'large';
-  }
-}
 
 // ============================================
 // STYLES
@@ -411,9 +382,7 @@ export function SkeletonCard({
 
       {/* Header */}
       <View style={skeletonCardStyles.header}>
-        {showAvatar && (
-          <SkeletonAvatar size={48} animated={animated} />
-        )}
+        {showAvatar && <SkeletonAvatar size={48} animated={animated} />}
         <View style={[skeletonCardStyles.headerText, !showAvatar && { marginLeft: 0 }]}>
           <Skeleton width="60%" height={16} animated={animated} />
           <Skeleton width="40%" height={12} animated={animated} style={{ marginTop: 8 }} />
@@ -422,11 +391,7 @@ export function SkeletonCard({
 
       {/* Content */}
       {textLines > 0 && (
-        <SkeletonText
-          lines={textLines}
-          animated={animated}
-          style={{ marginTop: spacing.md }}
-        />
+        <SkeletonText lines={textLines} animated={animated} style={{ marginTop: spacing.md }} />
       )}
     </View>
   );
@@ -552,10 +517,7 @@ export function SkeletonGrid({
   return (
     <View style={[skeletonGridStyles.container, style]}>
       {Array.from({ length: rows }).map((_, rowIndex) => (
-        <View
-          key={rowIndex}
-          style={[skeletonGridStyles.row, rowIndex > 0 && { marginTop: gap }]}
-        >
+        <View key={rowIndex} style={[skeletonGridStyles.row, rowIndex > 0 && { marginTop: gap }]}>
           {Array.from({ length: columns }).map((_, colIndex) => (
             <View
               key={colIndex}
@@ -578,12 +540,7 @@ export function SkeletonGrid({
                 animated={animated}
                 style={{ marginTop: spacing.xs }}
               />
-              <Skeleton
-                width="50%"
-                height={12}
-                animated={animated}
-                style={{ marginTop: 4 }}
-              />
+              <Skeleton width="50%" height={12} animated={animated} style={{ marginTop: 4 }} />
             </View>
           ))}
         </View>

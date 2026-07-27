@@ -4,24 +4,17 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import {
-  CollapsibleSection,
   UnderstandingSection,
   PossibilitiesSection,
   SeriousnessSection,
   SelfCareSection,
   RedFlagsSection,
 } from './CollapsibleSection';
-import type { Message, GuidanceResponse, UrgencyLevel } from '../../types/askCarebow';
+import type { Message } from '../../types/askCarebow';
 import type { ImageAttachment } from './ImageUploadBottomSheet';
 
 // ============================================
@@ -29,7 +22,7 @@ import type { ImageAttachment } from './ImageUploadBottomSheet';
 // ============================================
 
 export type EnhancedResponse = {
-  summary: string;  // Short initial answer
+  summary: string; // Short initial answer
   understanding?: string;
   possibilities?: Array<{ name: string; uncertainty: 'LOW' | 'MED' | 'HIGH' }>;
   triageLevel?: 'emergency' | 'urgent' | 'soon' | 'self_care';
@@ -80,11 +73,7 @@ export function EnhancedChatBubble({
         {attachedImages && attachedImages.length > 0 && (
           <View style={styles.userImagesRow}>
             {attachedImages.map((img) => (
-              <Image
-                key={img.id}
-                source={{ uri: img.uri }}
-                style={styles.userImage}
-              />
+              <Image key={img.id} source={{ uri: img.uri }} style={styles.userImage} />
             ))}
           </View>
         )}
@@ -111,9 +100,7 @@ export function EnhancedChatBubble({
         <View style={styles.assistantContent}>
           {/* Main message bubble */}
           <View style={styles.assistantBubble}>
-            <Text style={styles.assistantText}>
-              {enhancedResponse?.summary || message.text}
-            </Text>
+            <Text style={styles.assistantText}>{enhancedResponse?.summary || message.text}</Text>
           </View>
 
           {/* Enhanced collapsible sections */}
@@ -176,8 +163,8 @@ export function EnhancedChatBubble({
                       button.type === 'primary'
                         ? colors.textInverse
                         : button.type === 'secondary'
-                        ? colors.accent
-                        : colors.textSecondary
+                          ? colors.accent
+                          : colors.textSecondary
                     }
                   />
                   <Text

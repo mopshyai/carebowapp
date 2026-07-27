@@ -255,7 +255,6 @@ describe('followUpStore', () => {
       const { result } = renderHook(() => useFollowUpStore());
 
       let followUp1: FollowUpIntent;
-      let followUp2: FollowUpIntent;
       act(() => {
         followUp1 = result.current.scheduleFollowUp({
           episodeId: 'episode-1',
@@ -263,7 +262,8 @@ describe('followUpStore', () => {
           daysFromNow: 1,
           reasonSnippet: 'Reason 1',
         });
-        followUp2 = result.current.scheduleFollowUp({
+        // Not captured: the assertions below read from the store, not this return.
+        result.current.scheduleFollowUp({
           episodeId: 'episode-2',
           episodeTitle: 'Episode 2',
           daysFromNow: 2,

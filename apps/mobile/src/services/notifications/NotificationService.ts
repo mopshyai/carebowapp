@@ -52,7 +52,8 @@ const importanceMap: Record<string, AndroidImportance> = {
 class NotificationServiceImpl implements INotificationService {
   private scheduledNotifications: Map<string, ScheduledNotification> = new Map();
   private pressCallbacks: Set<(notification: ScheduledNotification) => void> = new Set();
-  private actionCallbacks: Set<(actionId: string, notification: ScheduledNotification) => void> = new Set();
+  private actionCallbacks: Set<(actionId: string, notification: ScheduledNotification) => void> =
+    new Set();
   private initialized = false;
   private foregroundUnsubscribe: (() => void) | null = null;
 
@@ -87,7 +88,11 @@ class NotificationServiceImpl implements INotificationService {
       this.initialized = true;
 
       if (__DEV__) {
-        console.log('[NotificationService] Initialized with', this.scheduledNotifications.size, 'scheduled notifications');
+        console.log(
+          '[NotificationService] Initialized with',
+          this.scheduledNotifications.size,
+          'scheduled notifications'
+        );
       }
     } catch (error) {
       console.error('[NotificationService] Initialization failed:', error);
@@ -128,19 +133,28 @@ class NotificationServiceImpl implements INotificationService {
 
       const status: NotificationPermissionStatus = {
         granted: settings.authorizationStatus >= 1,
-        ios: Platform.OS === 'ios' ? {
-          alert: settings.ios?.alert === 1,
-          badge: settings.ios?.badge === 1,
-          sound: settings.ios?.sound === 1,
-          criticalAlert: settings.ios?.criticalAlert === 1,
-        } : undefined,
-        android: Platform.OS === 'android' ? {
-          alarm: true, // Check exact permissions if needed
-        } : undefined,
+        ios:
+          Platform.OS === 'ios'
+            ? {
+                alert: settings.ios?.alert === 1,
+                badge: settings.ios?.badge === 1,
+                sound: settings.ios?.sound === 1,
+                criticalAlert: settings.ios?.criticalAlert === 1,
+              }
+            : undefined,
+        android:
+          Platform.OS === 'android'
+            ? {
+                alarm: true, // Check exact permissions if needed
+              }
+            : undefined,
       };
 
       if (__DEV__) {
-        console.log('[NotificationService] Permission status:', status.granted ? 'granted' : 'denied');
+        console.log(
+          '[NotificationService] Permission status:',
+          status.granted ? 'granted' : 'denied'
+        );
       }
 
       return status;
@@ -156,15 +170,21 @@ class NotificationServiceImpl implements INotificationService {
 
       return {
         granted: settings.authorizationStatus >= 1,
-        ios: Platform.OS === 'ios' ? {
-          alert: settings.ios?.alert === 1,
-          badge: settings.ios?.badge === 1,
-          sound: settings.ios?.sound === 1,
-          criticalAlert: settings.ios?.criticalAlert === 1,
-        } : undefined,
-        android: Platform.OS === 'android' ? {
-          alarm: true,
-        } : undefined,
+        ios:
+          Platform.OS === 'ios'
+            ? {
+                alert: settings.ios?.alert === 1,
+                badge: settings.ios?.badge === 1,
+                sound: settings.ios?.sound === 1,
+                criticalAlert: settings.ios?.criticalAlert === 1,
+              }
+            : undefined,
+        android:
+          Platform.OS === 'android'
+            ? {
+                alarm: true,
+              }
+            : undefined,
       };
     } catch (error) {
       console.error('[NotificationService] Get permission status failed:', error);
@@ -411,7 +431,7 @@ class NotificationServiceImpl implements INotificationService {
         }
         break;
 
-      case EventType.ACTION_PRESS:
+      case EventType.ACTION_PRESS: {
         const actionId = detail.pressAction?.id;
         if (__DEV__) {
           console.log('[NotificationService] Action pressed:', actionId, 'on', notification.id);
@@ -420,6 +440,7 @@ class NotificationServiceImpl implements INotificationService {
           this.actionCallbacks.forEach((callback) => callback(actionId, scheduledNotification));
         }
         break;
+      }
     }
   }
 
@@ -445,7 +466,9 @@ class NotificationServiceImpl implements INotificationService {
     };
   }
 
-  onActionPressed(callback: (actionId: string, notification: ScheduledNotification) => void): () => void {
+  onActionPressed(
+    callback: (actionId: string, notification: ScheduledNotification) => void
+  ): () => void {
     this.actionCallbacks.add(callback);
     return () => {
       this.actionCallbacks.delete(callback);

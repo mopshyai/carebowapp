@@ -4,7 +4,7 @@
  */
 
 import { NotificationService } from './NotificationService';
-import { NotificationContent, NotificationTrigger, ScheduledNotification } from './types';
+import { NotificationContent, NotificationTrigger } from './types';
 
 // ============================================
 // ID GENERATORS

@@ -43,7 +43,7 @@ export default function PersonalInfoScreen() {
 
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [email] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '');
   const [gender, setGender] = useState<Gender | undefined>(user?.gender);
@@ -72,7 +72,7 @@ export default function PersonalInfoScreen() {
 
     // Email is read-only (account identity), no validation needed here.
 
-    if (phone && !/^[\d\s\-\+\(\)]+$/.test(phone)) {
+    if (phone && !/^[\d\s\-+()]+$/.test(phone)) {
       newErrors.phone = 'Please enter a valid phone number';
     }
 
@@ -92,7 +92,11 @@ export default function PersonalInfoScreen() {
       // identity set at signup and is not editable here.
       if (authUser) {
         await authApi.updateProfile({ name: fullName, phoneNumber: phone.trim() || undefined });
-        updateAuthUser({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() });
+        updateAuthUser({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: phone.trim(),
+        });
       }
 
       // Mirror into the profile store (local profile-specific fields too).
@@ -123,7 +127,10 @@ export default function PersonalInfoScreen() {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Could not save to the server. Please check your connection and try again.');
+      Alert.alert(
+        'Error',
+        'Could not save to the server. Please check your connection and try again.'
+      );
     } finally {
       setIsSaving(false);
     }
@@ -131,14 +138,10 @@ export default function PersonalInfoScreen() {
 
   const handleBack = () => {
     if (hasChanges) {
-      Alert.alert(
-        'Unsaved Changes',
-        'You have unsaved changes. Are you sure you want to leave?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
-        ]
-      );
+      Alert.alert('Unsaved Changes', 'You have unsaved changes. Are you sure you want to leave?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
+      ]);
     } else {
       navigation.goBack();
     }
@@ -176,7 +179,9 @@ export default function PersonalInfoScreen() {
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {firstName ? `${firstName.charAt(0)}${lastName?.charAt(0) || ''}`.toUpperCase() : 'GU'}
+                {firstName
+                  ? `${firstName.charAt(0)}${lastName?.charAt(0) || ''}`.toUpperCase()
+                  : 'GU'}
               </Text>
             </View>
             <TouchableOpacity style={styles.changePhotoButton}>

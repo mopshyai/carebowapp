@@ -56,7 +56,8 @@ const commonRemedies: HomeRemedy[] = [
   {
     id: 'water',
     title: 'Stay Hydrated',
-    description: 'Drink 8-10 glasses of water throughout the day. Clear fluids help flush out toxins.',
+    description:
+      'Drink 8-10 glasses of water throughout the day. Clear fluids help flush out toxins.',
     icon: 'water',
     category: 'hydration',
   },
@@ -251,12 +252,7 @@ const symptomSpecificRemedies: Record<string, HomeRemedy[]> = {
 // COMPONENT
 // ============================================
 
-export function HomeRemediesSheet({
-  visible,
-  onClose,
-  symptoms = [],
-  triageLevel = 'self_care',
-}: HomeRemediesSheetProps) {
+export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemediesSheetProps) {
   const insets = useSafeAreaInsets();
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
 
@@ -315,17 +311,11 @@ export function HomeRemediesSheet({
     }
   };
 
-  const progressPercentage = remedies.length > 0
-    ? Math.round((checkedItems.size / remedies.length) * 100)
-    : 0;
+  const progressPercentage =
+    remedies.length > 0 ? Math.round((checkedItems.size / remedies.length) * 100) : 0;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
@@ -362,9 +352,7 @@ export function HomeRemediesSheet({
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
-              <View
-                style={[styles.progressFill, { width: `${progressPercentage}%` }]}
-              />
+              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
             </View>
             <Text style={styles.progressText}>{progressPercentage}%</Text>
           </View>
@@ -373,7 +361,8 @@ export function HomeRemediesSheet({
           <View style={styles.disclaimer}>
             <Icon name="information-circle" size={16} color={colors.textTertiary} />
             <Text style={styles.disclaimerText}>
-              These are general suggestions. Always consult a healthcare provider for persistent or severe symptoms.
+              These are general suggestions. Always consult a healthcare provider for persistent or
+              severe symptoms.
             </Text>
           </View>
 
@@ -398,26 +387,14 @@ export function HomeRemediesSheet({
                   accessibilityLabel={`${remedy.title}. ${remedy.description}`}
                 >
                   {/* Checkbox */}
-                  <View
-                    style={[
-                      styles.checkbox,
-                      isChecked && styles.checkboxChecked,
-                    ]}
-                  >
-                    {isChecked && (
-                      <Icon name="checkmark" size={14} color={colors.textInverse} />
-                    )}
+                  <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+                    {isChecked && <Icon name="checkmark" size={14} color={colors.textInverse} />}
                   </View>
 
                   {/* Content */}
                   <View style={styles.remedyContent}>
                     <View style={styles.remedyHeader}>
-                      <Text
-                        style={[
-                          styles.remedyTitle,
-                          isChecked && styles.remedyTitleChecked,
-                        ]}
-                      >
+                      <Text style={[styles.remedyTitle, isChecked && styles.remedyTitleChecked]}>
                         {remedy.title}
                       </Text>
                       <View
@@ -426,14 +403,8 @@ export function HomeRemediesSheet({
                           { backgroundColor: categoryInfo.color + '20' },
                         ]}
                       >
-                        <Icon
-                          name={categoryInfo.icon}
-                          size={10}
-                          color={categoryInfo.color}
-                        />
-                        <Text
-                          style={[styles.categoryText, { color: categoryInfo.color }]}
-                        >
+                        <Icon name={categoryInfo.icon} size={10} color={categoryInfo.color} />
+                        <Text style={[styles.categoryText, { color: categoryInfo.color }]}>
                           {categoryInfo.label}
                         </Text>
                       </View>
@@ -453,11 +424,7 @@ export function HomeRemediesSheet({
           </ScrollView>
 
           {/* Close Button */}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
             <Text style={styles.closeButtonText}>Done</Text>
           </TouchableOpacity>
         </Pressable>
