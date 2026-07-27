@@ -47,8 +47,14 @@ react {
     // extraPackagerArgs = []
 
     /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    hermesCommand = "/Users/manvendrakumar/Downloads/Personal/CareBow/Carebow/node_modules/react-native/sdks/hermesc/osx-bin/hermesc"
+    //   The hermes compiler command to run. By default it is 'hermesc'.
+    //
+    //   %OS-BIN% is substituted by the RN gradle plugin with osx-bin, linux64-bin
+    //   or win64-bin. This was previously an absolute path into a checkout on one
+    //   developer's machine, ending in osx-bin — so it could only ever build on
+    //   that machine, and failed outright on a Linux CI runner. The path is
+    //   relative to reactNativeDir above.
+    hermesCommand = "../../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]

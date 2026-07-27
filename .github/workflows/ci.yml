@@ -135,13 +135,18 @@ jobs:
           pod install
 
       - name: Build iOS
+        # generic/platform, not a named device. Pinning "iPhone 16" ties the
+        # build to whatever simulators a given runner image happens to ship
+        # with, and fails with "Unable to find a device matching the provided
+        # destination specifier" the moment that changes. We are compiling, not
+        # running, so no concrete device is needed.
         run: |
           cd apps/mobile
           xcodebuild -workspace ios/CareBow.xcworkspace \
             -scheme CareBow \
             -configuration Release \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
             build
 
   build-android:
