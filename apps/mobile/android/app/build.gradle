@@ -54,7 +54,13 @@ react {
     //   developer's machine, ending in osx-bin — so it could only ever build on
     //   that machine, and failed outright on a Linux CI runner. The path is
     //   relative to reactNativeDir above.
-    hermesCommand = "../../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc"
+    // Absolute, not relative. A bare relative string is resolved against
+    // gradle's working directory, and CI runs `cd apps/mobile/android` before
+    // ./gradlew — so "../../../../" landed one level ABOVE the repo root and
+    // :app:createBundleReleaseJsAndAssets failed with "a problem occurred
+    // starting process". file() below resolves against the project dir
+    // (android/app) like the reactNativeDir above it, so both agree.
+    hermesCommand = file("../../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc").absolutePath
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]
