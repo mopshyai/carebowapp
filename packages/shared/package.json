@@ -11,6 +11,6 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "typescript": "^5.0.4"
+    "typescript": "^7.0.2"
   }
 }
