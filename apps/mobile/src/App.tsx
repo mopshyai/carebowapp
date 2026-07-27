@@ -4,7 +4,19 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, Text as RNText, TextInput as RNTextInput } from 'react-native';
+
+// Dynamic Type: honor the user's OS font-size preference but cap growth so very
+// large accessibility text can't break fixed layouts. Applied globally once.
+const FONT_SCALE_CAP = 1.4;
+(RNText as unknown as { defaultProps?: Record<string, unknown> }).defaultProps = {
+  ...(RNText as unknown as { defaultProps?: Record<string, unknown> }).defaultProps,
+  maxFontSizeMultiplier: FONT_SCALE_CAP,
+};
+(RNTextInput as unknown as { defaultProps?: Record<string, unknown> }).defaultProps = {
+  ...(RNTextInput as unknown as { defaultProps?: Record<string, unknown> }).defaultProps,
+  maxFontSizeMultiplier: FONT_SCALE_CAP,
+};
 import {
   NavigationContainer,
   DarkTheme,
@@ -129,6 +141,11 @@ const linking = {
 // ERROR HANDLERS
 // ============================================
 
+// UNWIRED. NavigationContainer has no `onError` prop (React Navigation exposes
+// onUnhandledAction / onStateChange instead), so there is nowhere to attach
+// this as written. Either wire it to onUnhandledAction or delete it — it is
+// currently dead code that looks like navigation errors are being reported.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handleNavigationError = (error: Error) => {
   ErrorLogger.logError(error, undefined, { source: 'navigation' });
   if (__DEV__) {
@@ -165,11 +182,9 @@ function AppContent() {
 
         logger.debug('Initialization complete');
       } catch (error) {
-        ErrorLogger.logError(
-          error instanceof Error ? error : new Error(String(error)),
-          undefined,
-          { source: 'app_init' }
-        );
+        ErrorLogger.logError(error instanceof Error ? error : new Error(String(error)), undefined, {
+          source: 'app_init',
+        });
       } finally {
         setIsAppReady(true);
       }
@@ -214,10 +229,7 @@ function AppContent() {
     <>
       {/* Splash Screen */}
       {showSplash && (
-        <SplashScreen
-          onAnimationComplete={handleSplashComplete}
-          isVisible={showSplash}
-        />
+        <SplashScreen onAnimationComplete={handleSplashComplete} isVisible={showSplash} />
       )}
 
       {/* Main App */}

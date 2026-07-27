@@ -10,6 +10,10 @@ export interface V1Service {
   priceUnit: string;
   estimatedDuration?: number | null;
   isAvailable: boolean;
+  /** Stable catalog slug, present on the rich (mobile-authored) service rows. */
+  slug?: string | null;
+  /** Full mobile `Service` object (see `data/types.ts`), present on rich rows only. */
+  details?: unknown;
 }
 
 interface V1ServicesResponse {

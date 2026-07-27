@@ -15,15 +15,7 @@ import { SafetySettings, CheckInStatus, CheckInState } from '../types';
 export function parseTimeToToday(timeString: string): Date {
   const [hours, minutes] = timeString.split(':').map(Number);
   const now = new Date();
-  return new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    hours,
-    minutes,
-    0,
-    0
-  );
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 }
 
 /**
@@ -188,9 +180,9 @@ export function getCheckInStatusMessage(state: CheckInState): string {
     case 'CHECKED_IN':
       if (state.checkInTime) {
         const time = formatDisplayTime(new Date(state.checkInTime));
-        return `Checked in at ${time} ✓`;
+        return `Checked in at ${time}`;
       }
-      return 'Checked in today ✓';
+      return 'Checked in today';
 
     case 'CHECKED_IN_LATE':
       if (state.checkInTime) {
@@ -205,9 +197,10 @@ export function getCheckInStatusMessage(state: CheckInState): string {
     case 'DUE':
       return 'Check-in due - tap below';
 
-    case 'NOT_DUE':
+    case 'NOT_DUE': {
       const scheduledTime = formatDisplayTime(new Date(state.scheduledTime));
       return `Check-in scheduled for ${scheduledTime}`;
+    }
 
     default:
       return 'Check-in status unknown';

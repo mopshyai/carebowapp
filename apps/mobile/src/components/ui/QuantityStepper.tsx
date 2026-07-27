@@ -7,6 +7,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography } from '../../theme';
+import { formatMoney } from '../../data/countries';
+import { useProfileStore } from '../../store/useProfileStore';
 
 interface QuantityStepperProps {
   value: number;
@@ -31,6 +33,7 @@ export function QuantityStepper({
   rate,
   showTotal = true,
 }: QuantityStepperProps) {
+  const country = useProfileStore((state) => state.country);
   const canDecrease = value > min;
   const canIncrease = max === undefined || value < max;
   const plural = unitPlural || `${unit}s`;
@@ -57,19 +60,15 @@ export function QuantityStepper({
           onPress={handleDecrease}
           disabled={!canDecrease}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Decrease quantity"
         >
-          <Icon
-            name="remove"
-            size={24}
-            color={canDecrease ? colors.white : colors.textTertiary}
-          />
+          <Icon name="remove" size={24} color={canDecrease ? colors.white : colors.textTertiary} />
         </TouchableOpacity>
 
         <View style={styles.valueContainer}>
           <Text style={styles.valueText}>{value}</Text>
-          <Text style={styles.unitText}>
-            {value === 1 ? unit : plural}
-          </Text>
+          <Text style={styles.unitText}>{value === 1 ? unit : plural}</Text>
         </View>
 
         <TouchableOpacity
@@ -77,21 +76,19 @@ export function QuantityStepper({
           onPress={handleIncrease}
           disabled={!canIncrease}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Increase quantity"
         >
-          <Icon
-            name="add"
-            size={24}
-            color={canIncrease ? colors.white : colors.textTertiary}
-          />
+          <Icon name="add" size={24} color={canIncrease ? colors.white : colors.textTertiary} />
         </TouchableOpacity>
       </View>
 
       {showTotal && rate && (
         <View style={styles.totalRow}>
           <Text style={styles.rateText}>
-            ${rate}/{unit} × {value}
+            {formatMoney(rate, country)}/{unit} × {value}
           </Text>
-          <Text style={styles.totalText}>${total}</Text>
+          <Text style={styles.totalText}>{total !== null ? formatMoney(total, country) : ''}</Text>
         </View>
       )}
 

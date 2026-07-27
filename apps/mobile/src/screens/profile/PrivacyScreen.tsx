@@ -4,13 +4,26 @@
  */
 
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Switch, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { preferencesApi } from '../../services/api/endpoints/preferences';
+import { authApi } from '../../services/api/endpoints/auth';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
@@ -18,6 +31,35 @@ export default function PrivacyScreen() {
 
   const settings = useProfileStore((state) => state.privacySettings);
   const updateSettings = useProfileStore((state) => state.updatePrivacySettings);
+  const logout = useAuthStore((state) => state.logout);
+
+  const [deleteModalVisible, setDeleteModalVisible] = React.useState(false);
+  const [deletePassword, setDeletePassword] = React.useState('');
+  const [deleting, setDeleting] = React.useState(false);
+
+  const confirmDeleteAccount = async () => {
+    if (!deletePassword) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await authApi.deleteAccount(deletePassword);
+      setDeleteModalVisible(false);
+      setDeletePassword('');
+      // Account is gone server-side and tokens are cleared; reset local auth
+      // state so the app returns to the sign-in flow.
+      await logout();
+    } catch (e) {
+      Alert.alert(
+        'Could not delete account',
+        e instanceof Error && e.message
+          ? e.message
+          : 'Your password may be incorrect, or the server is unreachable. Your account was not changed.'
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Hydrate the biometric toggle from the server-side preference on mount.
   React.useEffect(() => {
@@ -56,8 +98,19 @@ export default function PrivacyScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Account deletion unavailable',
-      'The production account-deletion endpoint is not connected to this mobile build. Your account was not changed.'
+      'Delete account?',
+      'This permanently deletes your CareBow account and all associated data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => {
+            setDeletePassword('');
+            setDeleteModalVisible(true);
+          },
+        },
+      ]
     );
   };
 
@@ -221,11 +274,102 @@ export default function PrivacyScreen() {
           <Icon name="open-outline" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Delete-account password confirmation */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !deleting && setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Confirm deletion</Text>
+            <Text style={styles.modalBody}>
+              Enter your password to permanently delete your account.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Password"
+              placeholderTextColor={colors.textTertiary}
+              secureTextEntry
+              autoFocus
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              editable={!deleting}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancel]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deleting}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalDelete,
+                  (!deletePassword || deleting) && styles.modalButtonDisabled,
+                ]}
+                onPress={confirmDeleteAccount}
+                disabled={!deletePassword || deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color={colors.surface} />
+                ) : (
+                  <Text style={styles.modalDeleteText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    ...shadows.card,
+  },
+  modalTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },
+  modalBody: { ...typography.bodySmall, color: colors.textSecondary, marginBottom: spacing.md },
+  modalInput: {
+    ...typography.body,
+    color: colors.textPrimary,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface2,
+  },
+  modalActions: { flexDirection: 'row', gap: spacing.sm },
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonDisabled: { opacity: 0.5 },
+  modalCancel: { backgroundColor: colors.surface2 },
+  modalCancelText: { ...typography.label, color: colors.textPrimary },
+  modalDelete: { backgroundColor: colors.error },
+  modalDeleteText: { ...typography.label, color: colors.surface },
   container: {
     flex: 1,
     backgroundColor: colors.surface2,

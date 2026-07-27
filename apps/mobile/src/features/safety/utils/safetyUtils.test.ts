@@ -7,9 +7,6 @@ import {
   isCheckInDueToday,
   hasMissedDeadline,
   hasCheckedInToday,
-  didCheckInLate,
-  getCheckInState,
-  parseTimeToToday,
   isSameLocalDay,
   formatDisplayTime,
   formatScheduledTime,
@@ -47,18 +44,23 @@ describe('Check-in Service', () => {
     });
 
     it('returns true when past scheduled time', () => {
-      // Set scheduled time to 1 hour ago
-      const pastTime = new Date();
-      pastTime.setHours(pastTime.getHours() - 1);
-      const timeString = `${pastTime.getHours().toString().padStart(2, '0')}:00`;
+      // Pin the clock. Deriving "an hour ago" from the real time broke between
+      // 00:00 and 00:59: getHours() - 1 is -1, setHours(-1) rolls back to 23:00
+      // *yesterday*, and formatting just the hour yields "23:00" — a time still
+      // in the future today. The test passed 23 hours a day.
+      jest.useFakeTimers().setSystemTime(new Date('2026-01-15T12:00:00'));
 
-      const settings = {
-        ...DEFAULT_SAFETY_SETTINGS,
-        dailyCheckInEnabled: true,
-        dailyCheckInTime: timeString,
-      };
+      try {
+        const settings = {
+          ...DEFAULT_SAFETY_SETTINGS,
+          dailyCheckInEnabled: true,
+          dailyCheckInTime: '11:00', // one hour before the pinned now
+        };
 
-      expect(isCheckInDueToday(settings)).toBe(true);
+        expect(isCheckInDueToday(settings)).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('returns false when before scheduled time', () => {
@@ -206,7 +208,6 @@ describe('Check-in Service', () => {
 
       const message = getCheckInStatusMessage(state);
       expect(message).toContain('Checked in');
-      expect(message).toContain('✓');
     });
 
     it('returns correct message for missed status', () => {

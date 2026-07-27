@@ -49,14 +49,16 @@ export type RootStackParamList = {
   NewEntry: undefined;
   AssessmentResult: { entryId: string };
 
-  Conversation: {
-    symptom: string;
-    context: 'family' | 'me';
-    relation: string;
-    age: string;
-    memberName: string;
-    attachedImages?: string; // JSON string of ImageAttachment[]
-  } | undefined;
+  Conversation:
+    | {
+        symptom: string;
+        context: 'family' | 'me';
+        relation: string;
+        age: string;
+        memberName: string;
+        attachedImages?: string; // JSON string of ImageAttachment[]
+      }
+    | undefined;
   Assessment: undefined;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
   Schedule: undefined;
@@ -93,7 +95,7 @@ export type ProfileStackParamList = {
   ProfileIndex: undefined;
   PersonalInfo: undefined;
   FamilyMembers: undefined;
-  MemberDetails: { memberId?: string };
+  MemberDetails: { id?: string };
   Addresses: undefined;
   CareHistory: undefined;
   HealthRecords: undefined;
@@ -104,6 +106,8 @@ export type ProfileStackParamList = {
   Settings: undefined;
   EmergencyContacts: undefined;
   HealthInfo: undefined;
+  NotificationInbox: undefined;
+  Vitals: undefined;
 };
 
 // Safety Stack Navigator
@@ -114,35 +118,39 @@ export type SafetyStackParamList = {
 };
 
 // Screen Props Types
-export type RootStackScreenProps<T extends keyof RootStackParamList> =
-  NativeStackScreenProps<RootStackParamList, T>;
+export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
+  RootStackParamList,
+  T
+>;
 
-export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
-  NativeStackScreenProps<AuthStackParamList, T>;
+export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<
+  AuthStackParamList,
+  T
+>;
 
 export type OnboardingStackScreenProps<T extends keyof OnboardingStackParamList> =
   NativeStackScreenProps<OnboardingStackParamList, T>;
 
-export type MainTabScreenProps<T extends keyof MainTabParamList> =
-  CompositeScreenProps<
-    BottomTabScreenProps<MainTabParamList, T>,
-    RootStackScreenProps<keyof RootStackParamList>
-  >;
+export type MainTabScreenProps<T extends keyof MainTabParamList> = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, T>,
+  RootStackScreenProps<keyof RootStackParamList>
+>;
 
-export type ProfileStackScreenProps<T extends keyof ProfileStackParamList> =
-  CompositeScreenProps<
-    NativeStackScreenProps<ProfileStackParamList, T>,
-    RootStackScreenProps<keyof RootStackParamList>
-  >;
+export type ProfileStackScreenProps<T extends keyof ProfileStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<ProfileStackParamList, T>,
+  RootStackScreenProps<keyof RootStackParamList>
+>;
 
-export type SafetyStackScreenProps<T extends keyof SafetyStackParamList> =
-  CompositeScreenProps<
-    NativeStackScreenProps<SafetyStackParamList, T>,
-    RootStackScreenProps<keyof RootStackParamList>
-  >;
+export type SafetyStackScreenProps<T extends keyof SafetyStackParamList> = CompositeScreenProps<
+  NativeStackScreenProps<SafetyStackParamList, T>,
+  RootStackScreenProps<keyof RootStackParamList>
+>;
 
-// Declaration merging for useNavigation hook
+// Declaration merging for useNavigation hook.
+// A namespace is required here — this is React Navigation's documented way to
+// type the global param list, and ES module syntax cannot express it.
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList {}
   }
@@ -152,5 +160,8 @@ declare global {
 export type AppNavigationProp = {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
   goBack: () => void;
-  reset: (state: { index: number; routes: { name: string; params?: Record<string, unknown> }[] }) => void;
+  reset: (state: {
+    index: number;
+    routes: { name: string; params?: Record<string, unknown> }[];
+  }) => void;
 };

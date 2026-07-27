@@ -26,6 +26,23 @@ export interface V1ProfileShareResponse {
 }
 
 export const profilesApi = {
+  createProfile: async (data: {
+    name: string;
+    dateOfBirth: string;
+    gender: 'MALE' | 'FEMALE' | 'OTHER';
+    relationship: string;
+    bloodGroup?: string;
+    allergies?: string;
+    conditions?: string;
+    medications?: string;
+  }): Promise<V1Profile> => {
+    const response = await ApiClient.post<V1ProfileResponse>('/v1/profiles', data);
+    if (!response.data.success || !response.data.profile) {
+      throw new Error(response.data.error || 'Unable to create profile');
+    }
+    return response.data.profile;
+  },
+
   getProfiles: async (): Promise<V1Profile[]> => {
     const response = await ApiClient.get<V1ProfilesResponse>('/v1/profiles');
     if (!response.data.success) throw new Error(response.data.error || 'Unable to load profiles');

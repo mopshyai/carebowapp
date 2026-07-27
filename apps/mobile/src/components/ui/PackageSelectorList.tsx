@@ -8,6 +8,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ServicePackage } from '../../data/types';
 import { getDiscountPercentage } from '../../data/services';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import { formatMoney } from '../../data/countries';
+import { useProfileStore } from '../../store/useProfileStore';
 
 interface PackageSelectorListProps {
   packages: ServicePackage[];
@@ -20,6 +22,7 @@ export function PackageSelectorList({
   selectedPackageId,
   onSelectPackage,
 }: PackageSelectorListProps) {
+  const country = useProfileStore((state) => state.country);
   return (
     <View style={styles.container}>
       {packages.map((pkg) => {
@@ -59,10 +62,10 @@ export function PackageSelectorList({
 
             <View style={styles.priceContainer}>
               <Text style={[styles.price, isSelected && styles.priceSelected]}>
-                ${pkg.price}
+                {formatMoney(pkg.price, country)}
               </Text>
               {pkg.originalPrice && (
-                <Text style={styles.originalPrice}>${pkg.originalPrice}</Text>
+                <Text style={styles.originalPrice}>{formatMoney(pkg.originalPrice, country)}</Text>
               )}
             </View>
           </TouchableOpacity>

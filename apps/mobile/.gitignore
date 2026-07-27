@@ -56,3 +56,14 @@ android/app/.cxx/
 android/local.properties
 android/*.iml
 android/.idea/
+
+# Release signing material — never commit. CI supplies these from secrets and
+# deletes them after the run; these rules protect a local `fastlane` invocation.
+play-service-account.json
+*.keystore
+*.jks
+*.mobileprovision
+*.p12
+fastlane/report.xml
+fastlane/README.md
+build/ios/

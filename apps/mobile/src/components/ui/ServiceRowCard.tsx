@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { StarRating } from './StarRating';
 import { ServiceItem } from '../../data/types';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { AppIcon, IconContainer, getIconForService, getIconColors } from '../icons';
@@ -34,12 +33,11 @@ export function ServiceRowCard({ service, onPress }: ServiceRowCardProps) {
         <Text style={styles.title} numberOfLines={2}>
           {service.title}
         </Text>
-        <StarRating
-          rating={service.rating}
-          size={12}
-          showReviewCount={!!service.reviewCount}
-          reviewCount={service.reviewCount}
-        />
+        {service.shortTagline ? (
+          <Text style={styles.tagline} numberOfLines={1}>
+            {service.shortTagline}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.arrowContainer}>
         <AppIcon name="chevron-right" size={20} color={colors.textTertiary} />
@@ -70,6 +68,10 @@ const styles = StyleSheet.create({
   title: {
     ...typography.label,
     lineHeight: 18,
+  },
+  tagline: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   arrowContainer: {
     paddingLeft: spacing.xs,

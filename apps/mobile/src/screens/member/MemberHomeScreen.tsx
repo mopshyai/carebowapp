@@ -29,7 +29,11 @@ const TYPE_COPY: Record<
   Exclude<UserTypeSlug, 'customer'>,
   { title: string; peopleLabel: string; workLabel: string }
 > = {
-  healthcare_provider: { title: 'Your practice', peopleLabel: 'Patients', workLabel: 'Appointments' },
+  healthcare_provider: {
+    title: 'Your practice',
+    peopleLabel: 'Patients',
+    workLabel: 'Appointments',
+  },
   service_provider: { title: 'Your work', peopleLabel: 'Clients', workLabel: 'Visits' },
   service_partner: { title: 'Your orders', peopleLabel: 'Customers', workLabel: 'Orders' },
 };
@@ -60,7 +64,8 @@ export default function MemberHomeScreen() {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const userType = useAuthStore((s) => s.userType);
-  const copy = TYPE_COPY[(userType as Exclude<UserTypeSlug, 'customer'>)] ?? TYPE_COPY.service_provider;
+  const copy =
+    TYPE_COPY[userType as Exclude<UserTypeSlug, 'customer'>] ?? TYPE_COPY.service_provider;
 
   const [overview, setOverview] = useState<MemberOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +104,7 @@ export default function MemberHomeScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View>
-          <Text style={styles.greeting}>{greeting()} 👋</Text>
+          <Text style={styles.greeting}>{greeting()}</Text>
           <Text style={styles.name}>{firstName}</Text>
         </View>
         <Pressable
@@ -119,7 +124,13 @@ export default function MemberHomeScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent}
+            />
+          }
         >
           <Text style={styles.sectionLabel}>{copy.title}</Text>
 
@@ -132,10 +143,26 @@ export default function MemberHomeScreen() {
 
           {/* Stat grid */}
           <View style={styles.statGrid}>
-            <StatCard label={`Today's ${copy.workLabel}`} value={String(overview?.todayCount ?? 0)} icon="calendar-outline" />
-            <StatCard label="Pending" value={String(overview?.pendingCount ?? 0)} icon="time-outline" />
-            <StatCard label={copy.peopleLabel} value={String(overview?.totalPatients ?? 0)} icon="people-outline" />
-            <StatCard label="This month" value={rupees(overview?.earningsThisMonthPaise ?? 0)} icon="wallet-outline" />
+            <StatCard
+              label={`Today's ${copy.workLabel}`}
+              value={String(overview?.todayCount ?? 0)}
+              icon="calendar-outline"
+            />
+            <StatCard
+              label="Pending"
+              value={String(overview?.pendingCount ?? 0)}
+              icon="time-outline"
+            />
+            <StatCard
+              label={copy.peopleLabel}
+              value={String(overview?.totalPatients ?? 0)}
+              icon="people-outline"
+            />
+            <StatCard
+              label="This month"
+              value={rupees(overview?.earningsThisMonthPaise ?? 0)}
+              icon="wallet-outline"
+            />
           </View>
 
           {/* Next appointment */}
@@ -213,7 +240,12 @@ const styles = StyleSheet.create({
   },
   avatarText: { ...typography.h4, color: colors.textInverse },
   content: { padding: spacing.lg },
-  sectionLabel: { ...typography.caption, color: colors.textTertiary, textTransform: 'uppercase', marginBottom: spacing.sm },
+  sectionLabel: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -244,7 +276,12 @@ const styles = StyleSheet.create({
   },
   statValue: { ...typography.h2, color: colors.textPrimary },
   statLabel: { ...typography.caption, color: colors.textSecondary },
-  blockTitle: { ...typography.h4, color: colors.textPrimary, marginBottom: spacing.sm, marginTop: spacing.xs },
+  blockTitle: {
+    ...typography.h4,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
+  },
   nextCard: {
     flexDirection: 'row',
     alignItems: 'center',

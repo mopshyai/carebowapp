@@ -28,6 +28,7 @@ export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 
 export type FamilyMember = {
   id: string;
+  backendId?: string;
   firstName: string;
   lastName: string;
   relationship: Relationship;
@@ -110,11 +111,7 @@ export type Medication = {
 
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'unknown';
 
-export type MobilityStatus =
-  | 'fully_mobile'
-  | 'needs_assistance'
-  | 'wheelchair_bound'
-  | 'bedridden';
+export type MobilityStatus = 'fully_mobile' | 'needs_assistance' | 'wheelchair_bound' | 'bedridden';
 
 export const MOBILITY_LABELS: Record<MobilityStatus, string> = {
   fully_mobile: 'Fully Mobile',
@@ -134,11 +131,7 @@ export type CarePreferences = {
   specialInstructions?: string;
 };
 
-export type CareType =
-  | 'home_care'
-  | 'clinic_visit'
-  | 'video_consult'
-  | 'no_preference';
+export type CareType = 'home_care' | 'clinic_visit' | 'video_consult' | 'no_preference';
 
 export const CARE_TYPE_LABELS: Record<CareType, string> = {
   home_care: 'Home Care',
@@ -333,7 +326,8 @@ export type CareReadinessScore = {
 // ============================================
 
 export const WHY_WE_ASK = {
-  allergies: 'Helps prevent unsafe recommendations and ensures providers are aware of potential reactions.',
+  allergies:
+    'Helps prevent unsafe recommendations and ensures providers are aware of potential reactions.',
   conditions: 'Improves triage accuracy and helps us recommend appropriate care.',
   medications: 'Avoids harmful drug interactions and ensures safe treatment.',
   emergencyContact: 'For urgent coordination and to keep your loved ones informed.',

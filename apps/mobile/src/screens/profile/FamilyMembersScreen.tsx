@@ -24,7 +24,6 @@ import {
   FamilyMember,
   Relationship,
   RELATIONSHIP_LABELS,
-  Gender,
   createEmptyMemberHealthInfo,
   createEmptyCarePreferences,
   WHY_WE_ASK,
@@ -125,7 +124,12 @@ export default function FamilyMembersScreen() {
         {/* Info Card */}
         <View style={styles.infoCard}>
           <Icon name="people" size={20} color={colors.accent} />
-          <Text style={styles.infoText}>{WHY_WE_ASK.allergies.replace('Helps prevent unsafe recommendations and ensures providers are aware of potential reactions.', 'Add family members you care for. Their health information helps us provide personalized care recommendations.')}</Text>
+          <Text style={styles.infoText}>
+            {WHY_WE_ASK.allergies.replace(
+              'Helps prevent unsafe recommendations and ensures providers are aware of potential reactions.',
+              'Add family members you care for. Their health information helps us provide personalized care recommendations.'
+            )}
+          </Text>
         </View>
 
         {/* Members List */}
@@ -135,7 +139,9 @@ export default function FamilyMembersScreen() {
               <Pressable
                 key={member.id}
                 style={({ pressed }) => [styles.memberCard, pressed && styles.pressed]}
-                onPress={() => navigation.navigate(`/profile/member-details?id=${member.id}` as any)}
+                onPress={() =>
+                  navigation.navigate('MemberDetails' as never, { id: member.id } as never)
+                }
               >
                 <View style={styles.memberHeader}>
                   <View style={styles.memberAvatar}>
@@ -180,7 +186,7 @@ export default function FamilyMembersScreen() {
                       style={[
                         styles.completenessFill,
                         {
-                          width: `${member.profileCompleteness}%`,
+                          width: `${Math.max(0, Math.min(100, member.profileCompleteness))}%`,
                           backgroundColor: getProgressColor(member.profileCompleteness),
                         },
                       ]}
@@ -435,6 +441,7 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
   },
   completenessBar: {
+    width: '100%',
     height: 4,
     backgroundColor: colors.borderLight,
     borderRadius: 2,
@@ -442,6 +449,7 @@ const styles = StyleSheet.create({
   },
   completenessFill: {
     height: '100%',
+    maxWidth: '100%',
     borderRadius: 2,
   },
   quickActions: {

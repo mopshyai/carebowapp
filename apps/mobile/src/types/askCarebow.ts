@@ -15,18 +15,18 @@
 // ============================================
 
 export type EntryPointType =
-  | 'tab'                    // Bottom tab navigation
-  | 'today_cta'              // "AI Health Assistant" CTA on Today screen
-  | 'service_context'        // "Ask about this service"
-  | 'symptom_context'        // "Ask about symptoms"
-  | 'pre_booking'            // "Ask before booking"
-  | 'order_followup';        // Follow-up on existing order
+  | 'tab' // Bottom tab navigation
+  | 'today_cta' // "AI Health Assistant" CTA on Today screen
+  | 'service_context' // "Ask about this service"
+  | 'symptom_context' // "Ask about symptoms"
+  | 'pre_booking' // "Ask before booking"
+  | 'order_followup'; // Follow-up on existing order
 
 export type EntryPointContext = {
   type: EntryPointType;
-  serviceId?: string;        // If entering from a service
+  serviceId?: string; // If entering from a service
   serviceName?: string;
-  orderId?: string;          // If following up on an order
+  orderId?: string; // If following up on an order
   prefilledSymptom?: string; // Pre-filled symptom text
 };
 
@@ -36,17 +36,9 @@ export type EntryPointContext = {
 
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
 
-export type MobilityStatus =
-  | 'fully_mobile'
-  | 'needs_assistance'
-  | 'wheelchair_bound'
-  | 'bedridden';
+export type MobilityStatus = 'fully_mobile' | 'needs_assistance' | 'wheelchair_bound' | 'bedridden';
 
-export type CarePreference =
-  | 'home_care'
-  | 'clinic_visit'
-  | 'video_consult'
-  | 'no_preference';
+export type CarePreference = 'home_care' | 'clinic_visit' | 'video_consult' | 'no_preference';
 
 export type MemberProfile = {
   id: string;
@@ -54,9 +46,9 @@ export type MemberProfile = {
   relationship: string;
   age: number;
   gender?: Gender;
-  conditions: string[];       // Chronic conditions
-  medications: string[];      // Current medications
-  allergies: string[];        // Known allergies
+  conditions: string[]; // Chronic conditions
+  medications: string[]; // Current medications
+  allergies: string[]; // Known allergies
   mobilityStatus?: MobilityStatus;
   carePreferences?: CarePreference[];
   profileCompleteness: number; // 0-100%
@@ -132,20 +124,23 @@ export type SuggestedAction = {
 // ============================================
 
 export type UrgencyLevel =
-  | 'self_care'        // Can manage at home
-  | 'monitor'          // Watch and wait
-  | 'non_urgent'       // See doctor when convenient
-  | 'soon'             // See doctor within 24-48 hours
-  | 'urgent'           // See doctor today
-  | 'emergency';       // Seek immediate care
+  | 'self_care' // Can manage at home
+  | 'monitor' // Watch and wait
+  | 'non_urgent' // See doctor when convenient
+  | 'soon' // See doctor within 24-48 hours
+  | 'urgent' // See doctor today
+  | 'emergency'; // Seek immediate care
 
-export const urgencyConfig: Record<UrgencyLevel, {
-  label: string;
-  description: string;
-  color: string;
-  bgColor: string;
-  action: string;
-}> = {
+export const urgencyConfig: Record<
+  UrgencyLevel,
+  {
+    label: string;
+    description: string;
+    color: string;
+    bgColor: string;
+    action: string;
+  }
+> = {
   self_care: {
     label: 'Self-Care',
     description: 'This can likely be managed at home with rest and care.',
@@ -206,18 +201,14 @@ export type Duration =
   | 'more_than_2_weeks'
   | 'chronic';
 
-export type Frequency =
-  | 'constant'
-  | 'intermittent'
-  | 'occasional'
-  | 'first_time';
+export type Frequency = 'constant' | 'intermittent' | 'occasional' | 'first_time';
 
 export type AgeGroup =
-  | 'infant'      // 0-1
-  | 'child'       // 2-12
-  | 'teen'        // 13-17
-  | 'adult'       // 18-64
-  | 'senior';     // 65+
+  | 'infant' // 0-1
+  | 'child' // 2-12
+  | 'teen' // 13-17
+  | 'adult' // 18-64
+  | 'senior'; // 65+
 
 export type HealthContext = {
   primarySymptom: string;
@@ -352,12 +343,12 @@ export type FollowUpQuestion = {
 // ============================================
 
 export type ConversationPhase =
-  | 'initial'           // Waiting for first input
-  | 'gathering'         // Asking follow-up questions
-  | 'assessing'         // Analyzing collected data
-  | 'guidance'          // Providing recommendations
-  | 'service_routing'   // Helping book a service
-  | 'completed';        // Session ended
+  | 'initial' // Waiting for first input
+  | 'gathering' // Asking follow-up questions
+  | 'assessing' // Analyzing collected data
+  | 'guidance' // Providing recommendations
+  | 'service_routing' // Helping book a service
+  | 'completed'; // Session ended
 
 export type ConversationState = {
   phase: ConversationPhase;
@@ -522,7 +513,7 @@ export const RED_FLAG_SYMPTOMS = [
   'chest pain',
   'difficulty breathing',
   'shortness of breath',
-  'can\'t breathe',
+  "can't breathe",
   'unconscious',
   'passed out',
   'fainted',
@@ -542,7 +533,7 @@ export const RED_FLAG_SYMPTOMS = [
   'poisoning',
   'severe allergic reaction',
   'anaphylaxis',
-  'can\'t swallow',
+  "can't swallow",
   'choking',
   'severe burns',
   'electric shock',
@@ -614,20 +605,20 @@ export const COPY_RULES = {
   forbidden: [
     "don't worry",
     "you'll be fine",
-    "definitely",
-    "certainly",
-    "100%",
-    "always",
-    "never",
-    "nothing to worry about",
+    'definitely',
+    'certainly',
+    '100%',
+    'always',
+    'never',
+    'nothing to worry about',
   ],
   preferred: {
-    diagnosis: "may be related to",
-    certainty: "in some cases",
-    recommendation: "a healthcare professional can confirm",
+    diagnosis: 'may be related to',
+    certainty: 'in some cases',
+    recommendation: 'a healthcare professional can confirm',
     understanding: "based on what you've shared",
-    guidance: "this can sometimes be caused by",
-    watchFor: "if you notice",
+    guidance: 'this can sometimes be caused by',
+    watchFor: 'if you notice',
   },
 } as const;
 
@@ -638,10 +629,13 @@ export const COPY_RULES = {
 export const OPENING_PROMPTS: Record<EntryPointType, string> = {
   tab: "Tell me what's going on. I can help you understand symptoms, suggest next steps, or help book care.",
   today_cta: "Hi! I'm here to help with any health concerns. What would you like to talk about?",
-  service_context: "I can help you understand if this service is right for your situation. What symptoms or concerns do you have?",
-  symptom_context: "Let's talk about what you're experiencing. Describe your symptoms and I'll help guide you.",
-  pre_booking: "Before you book, let me make sure this is the right service for your needs. What's going on?",
-  order_followup: "I see you recently used our services. How are you feeling now? Any concerns?",
+  service_context:
+    'I can help you understand if this service is right for your situation. What symptoms or concerns do you have?',
+  symptom_context:
+    "Let's talk about what you're experiencing. Describe your symptoms and I'll help guide you.",
+  pre_booking:
+    "Before you book, let me make sure this is the right service for your needs. What's going on?",
+  order_followup: 'I see you recently used our services. How are you feeling now? Any concerns?',
 };
 
 export const OPENING_CHIPS: Record<EntryPointType, string[]> = {
@@ -691,8 +685,9 @@ export const createEmptyAskCareBowContext = (): AskCareBowContext => ({
 
 export const DISCLAIMER = {
   short: "This guidance doesn't replace a medical professional.",
-  full: "This information is for educational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.",
-  emergency: "If you are experiencing a medical emergency, call 911 or your local emergency services immediately.",
+  full: 'This information is for educational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.',
+  emergency:
+    'If you are experiencing a medical emergency, call 911 or your local emergency services immediately.',
 } as const;
 
 // ============================================
@@ -703,10 +698,11 @@ export const DISCLAIMER = {
  * Generate session summary from completed session
  */
 export const generateSessionSummary = (session: AskCarebowSession): SessionSummary => {
-  const { healthContext, messages, conversationState, urgencyLevel, riskLevel, detectedSymptoms } = session;
+  const { healthContext, messages, conversationState, urgencyLevel, riskLevel, detectedSymptoms } =
+    session;
 
   // Extract chief complaint from first user message
-  const firstUserMessage = messages.find(m => m.role === 'user');
+  const firstUserMessage = messages.find((m) => m.role === 'user');
   const chiefComplaint = firstUserMessage?.text || healthContext.primarySymptom || 'Not specified';
 
   // Format duration for display
@@ -715,15 +711,13 @@ export const generateSessionSummary = (session: AskCarebowSession): SessionSumma
     : 'Not specified';
 
   // Format severity
-  const severityText = healthContext.severity
-    ? `${healthContext.severity}/10`
-    : 'Not specified';
+  const severityText = healthContext.severity ? `${healthContext.severity}/10` : 'Not specified';
 
   // Build recommended actions from suggested actions
-  const recommendedActions = session.suggestedActions?.map(a => a.label) || [];
+  const recommendedActions = session.suggestedActions?.map((a) => a.label) || [];
 
   // Calculate unanswered questions
-  const unansweredQuestions = conversationState.questionsRemaining.map(q => {
+  const unansweredQuestions = conversationState.questionsRemaining.map((q) => {
     const questionMap: Record<FollowUpQuestionType, string> = {
       duration: 'How long has this been going on?',
       severity: 'How severe is it on a scale of 1-10?',
@@ -758,18 +752,15 @@ export const generateSessionSummary = (session: AskCarebowSession): SessionSumma
       duration: durationText,
       severity: severityText,
       associatedSymptoms: healthContext.associatedSymptoms,
-      relevantHistory: [
-        ...healthContext.chronicConditions,
-        ...healthContext.recentEvents,
-      ],
+      relevantHistory: [...healthContext.chronicConditions, ...healthContext.recentEvents],
       medications: healthContext.medications,
       allergies: healthContext.allergies,
     },
     triageOutcome: {
       urgencyLevel: urgencyLevel || 'monitor',
       riskLevel: riskLevel || 'low',
-      redFlagsDetected: detectedSymptoms.filter(s =>
-        RED_FLAG_SYMPTOMS.some(rf => s.toLowerCase().includes(rf))
+      redFlagsDetected: detectedSymptoms.filter((s) =>
+        RED_FLAG_SYMPTOMS.some((rf) => s.toLowerCase().includes(rf))
       ),
       differentialPossibilities: [], // To be filled by guidanceBuilder
       recommendedTimeframe: timeframeMap[urgencyLevel || 'monitor'],
@@ -810,7 +801,8 @@ const calculateAssessmentConfidence = (session: AskCarebowSession): number => {
   if (healthContext.chronicConditions.length > 0) score += 10;
 
   // Questions answered ratio (+10 max)
-  const answeredRatio = conversationState.questionsAsked.length /
+  const answeredRatio =
+    conversationState.questionsAsked.length /
     (conversationState.questionsAsked.length + conversationState.questionsRemaining.length);
   score += Math.round(answeredRatio * 10);
 
@@ -848,24 +840,32 @@ Duration: ${summary.collectedData.duration}
 Severity: ${summary.collectedData.severity}
 
 Associated Symptoms:
-${summary.collectedData.associatedSymptoms.length > 0
-  ? summary.collectedData.associatedSymptoms.map(s => `  - ${s}`).join('\n')
-  : '  None reported'}
+${
+  summary.collectedData.associatedSymptoms.length > 0
+    ? summary.collectedData.associatedSymptoms.map((s) => `  - ${s}`).join('\n')
+    : '  None reported'
+}
 
 Relevant Medical History:
-${summary.collectedData.relevantHistory.length > 0
-  ? summary.collectedData.relevantHistory.map(h => `  - ${h}`).join('\n')
-  : '  None reported'}
+${
+  summary.collectedData.relevantHistory.length > 0
+    ? summary.collectedData.relevantHistory.map((h) => `  - ${h}`).join('\n')
+    : '  None reported'
+}
 
 Current Medications:
-${summary.collectedData.medications.length > 0
-  ? summary.collectedData.medications.map(m => `  - ${m}`).join('\n')
-  : '  None reported'}
+${
+  summary.collectedData.medications.length > 0
+    ? summary.collectedData.medications.map((m) => `  - ${m}`).join('\n')
+    : '  None reported'
+}
 
 Known Allergies:
-${summary.collectedData.allergies.length > 0
-  ? summary.collectedData.allergies.map(a => `  - ${a}`).join('\n')
-  : '  None reported'}
+${
+  summary.collectedData.allergies.length > 0
+    ? summary.collectedData.allergies.map((a) => `  - ${a}`).join('\n')
+    : '  None reported'
+}
 
 AI TRIAGE ASSESSMENT
 --------------------
@@ -874,24 +874,30 @@ Risk Level: ${summary.triageOutcome.riskLevel.toUpperCase()}
 Recommended Timeframe: ${summary.triageOutcome.recommendedTimeframe}
 Safety Check: ${summary.triageOutcome.safetyCheckPassed ? 'PASSED' : 'RED FLAGS DETECTED'}
 
-${summary.triageOutcome.redFlagsDetected.length > 0
-  ? `Red Flags Detected:\n${summary.triageOutcome.redFlagsDetected.map(f => `  ⚠️ ${f}`).join('\n')}`
-  : ''}
+${
+  summary.triageOutcome.redFlagsDetected.length > 0
+    ? `Red Flags Detected:\n${summary.triageOutcome.redFlagsDetected.map((f) => `  - ${f}`).join('\n')}`
+    : ''
+}
 
 ACTIONS RECOMMENDED
 -------------------
-${summary.recommendedActions.length > 0
-  ? summary.recommendedActions.map((a, i) => `${i + 1}. ${a}`).join('\n')
-  : 'None specified'}
+${
+  summary.recommendedActions.length > 0
+    ? summary.recommendedActions.map((a, i) => `${i + 1}. ${a}`).join('\n')
+    : 'None specified'
+}
 
 DATA COMPLETENESS
 -----------------
 Assessment Confidence: ${summary.assessmentConfidence}%
 
 Unanswered Questions:
-${summary.unansweredQuestions.length > 0
-  ? summary.unansweredQuestions.map(q => `  - ${q}`).join('\n')
-  : '  All key questions answered'}
+${
+  summary.unansweredQuestions.length > 0
+    ? summary.unansweredQuestions.map((q) => `  - ${q}`).join('\n')
+    : '  All key questions answered'
+}
 
 ================================================================================
 DISCLAIMER: This AI-generated summary is for informational purposes only and
@@ -918,7 +924,7 @@ export const formatSessionForExport = (session: AskCarebowSession): object => {
       updatedAt: session.updatedAt,
     },
     summary,
-    conversationLog: session.messages.map(m => ({
+    conversationLog: session.messages.map((m) => ({
       role: m.role,
       text: m.text,
       timestamp: m.timestamp,

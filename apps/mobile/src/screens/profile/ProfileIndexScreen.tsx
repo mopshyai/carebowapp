@@ -4,14 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Pressable,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../../navigation/types';
@@ -20,30 +13,75 @@ import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore, useCareReadiness, useSelectedMember } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
-type MenuItemId = 'personal' | 'family' | 'addresses' | 'history' | 'records' | 'insurance' | 'notifications' | 'privacy' | 'help';
-
 const menuSections = [
   {
     title: 'Account',
     items: [
-      { id: 'personal' as const, icon: 'person-outline', title: 'Personal Information', screen: 'PersonalInfo' },
-      { id: 'family' as const, icon: 'people-outline', title: 'Family Members', screen: 'FamilyMembers' },
-      { id: 'addresses' as const, icon: 'location-outline', title: 'Care Addresses', screen: 'Addresses' },
+      {
+        id: 'personal' as const,
+        icon: 'person-outline',
+        title: 'Personal Information',
+        screen: 'PersonalInfo',
+      },
+      {
+        id: 'family' as const,
+        icon: 'people-outline',
+        title: 'Family Members',
+        screen: 'FamilyMembers',
+      },
+      {
+        id: 'addresses' as const,
+        icon: 'location-outline',
+        title: 'Care Addresses',
+        screen: 'Addresses',
+      },
     ],
   },
   {
     title: 'Health',
     items: [
-      { id: 'history' as const, icon: 'document-text-outline', title: 'Care History', screen: 'CareHistory' },
-      { id: 'records' as const, icon: 'folder-outline', title: 'Health Records', screen: 'HealthRecords' },
-      { id: 'insurance' as const, icon: 'shield-checkmark-outline', title: 'Insurance', screen: 'Insurance' },
+      {
+        id: 'history' as const,
+        icon: 'document-text-outline',
+        title: 'Care History',
+        screen: 'CareHistory',
+      },
+      {
+        id: 'records' as const,
+        icon: 'folder-outline',
+        title: 'Health Records',
+        screen: 'HealthRecords',
+      },
+      { id: 'vitals' as const, icon: 'pulse-outline', title: 'Vitals', screen: 'Vitals' },
+      {
+        id: 'insurance' as const,
+        icon: 'shield-checkmark-outline',
+        title: 'Insurance',
+        screen: 'Insurance',
+      },
     ],
   },
   {
     title: 'Preferences',
     items: [
-      { id: 'notifications' as const, icon: 'notifications-outline', title: 'Notifications', screen: 'Notifications' },
-      { id: 'privacy' as const, icon: 'lock-closed-outline', title: 'Privacy & Security', screen: 'Privacy' },
+      {
+        id: 'notificationInbox' as const,
+        icon: 'mail-outline',
+        title: 'Notification Inbox',
+        screen: 'NotificationInbox',
+      },
+      {
+        id: 'notifications' as const,
+        icon: 'notifications-outline',
+        title: 'Notification Settings',
+        screen: 'Notifications',
+      },
+      {
+        id: 'privacy' as const,
+        icon: 'lock-closed-outline',
+        title: 'Privacy & Security',
+        screen: 'Privacy',
+      },
       { id: 'help' as const, icon: 'help-circle-outline', title: 'Help & Support', screen: 'Help' },
     ],
   },
@@ -54,7 +92,6 @@ export default function ProfileIndexScreen() {
   const navigation = useNavigation() as AppNavigationProp;
 
   const user = useProfileStore((state) => state.user);
-  const members = useProfileStore((state) => state.members);
   const emergencyContacts = useProfileStore((state) => state.emergencyContacts);
   // Use the auth-store logout: clears JWT + SecureStorage and flips
   // isAuthenticated (returns to login). It also clears the profile store.
@@ -82,7 +119,7 @@ export default function ProfileIndexScreen() {
       icon: 'warning-outline' as const,
       title: 'Allergies',
       value: selectedMember?.healthInfo?.allergies?.length
-        ? selectedMember.healthInfo.allergies.map(a => a.name).join(', ')
+        ? selectedMember.healthInfo.allergies.map((a) => a.name).join(', ')
         : 'Not set',
       color: colors.error,
       screen: 'HealthInfo',
@@ -93,7 +130,7 @@ export default function ProfileIndexScreen() {
       icon: 'heart-outline' as const,
       title: 'Conditions',
       value: selectedMember?.healthInfo?.conditions?.length
-        ? selectedMember.healthInfo.conditions.map(c => c.name).join(', ')
+        ? selectedMember.healthInfo.conditions.map((c) => c.name).join(', ')
         : 'Not set',
       color: colors.nursing,
       screen: 'HealthInfo',
@@ -104,7 +141,7 @@ export default function ProfileIndexScreen() {
       icon: 'medical-outline' as const,
       title: 'Medications',
       value: selectedMember?.healthInfo?.medications?.length
-        ? selectedMember.healthInfo.medications.map(m => m.name).join(', ')
+        ? selectedMember.healthInfo.medications.map((m) => m.name).join(', ')
         : 'Not set',
       color: colors.info,
       screen: 'HealthInfo',
@@ -114,9 +151,10 @@ export default function ProfileIndexScreen() {
       id: 'emergency',
       icon: 'call-outline' as const,
       title: 'Emergency Contact',
-      value: emergencyContacts.length > 0
-        ? `${emergencyContacts[0].name} (${emergencyContacts[0].relationship})`
-        : 'Not set',
+      value:
+        emergencyContacts.length > 0
+          ? `${emergencyContacts[0].name} (${emergencyContacts[0].relationship})`
+          : 'Not set',
       color: colors.success,
       screen: 'EmergencyContacts',
       params: {},
@@ -146,10 +184,7 @@ export default function ProfileIndexScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: 32 + insets.bottom },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* User Card */}
@@ -218,10 +253,7 @@ export default function ProfileIndexScreen() {
                 </View>
                 <Text style={styles.healthTitle}>{item.title}</Text>
                 <Text
-                  style={[
-                    styles.healthValue,
-                    item.value === 'Not set' && styles.healthValueEmpty,
-                  ]}
+                  style={[styles.healthValue, item.value === 'Not set' && styles.healthValueEmpty]}
                   numberOfLines={1}
                 >
                   {item.value}

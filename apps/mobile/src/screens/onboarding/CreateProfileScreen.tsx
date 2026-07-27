@@ -22,16 +22,17 @@ import Icon from 'react-native-vector-icons/Feather';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
-import {
-  createEmptyMemberHealthInfo,
-  createEmptyCarePreferences,
-} from '@/types/profile';
+import { createEmptyMemberHealthInfo, createEmptyCarePreferences } from '@/types/profile';
+import { COUNTRY_LIST, type CountryCode } from '@/data/countries';
 import type { OnboardingStackParamList } from '@/navigation/types';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('CreateProfile');
 
-type CreateProfileNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'CreateProfile'>;
+type CreateProfileNavigationProp = NativeStackNavigationProp<
+  OnboardingStackParamList,
+  'CreateProfile'
+>;
 type CreateProfileRouteProp = RouteProp<OnboardingStackParamList, 'CreateProfile'>;
 
 type RelationshipType = 'self' | 'parent' | 'spouse' | 'child' | 'other';
@@ -62,7 +63,8 @@ export default function CreateProfileScreen() {
   const navigation = useNavigation<CreateProfileNavigationProp>();
   const route = useRoute<CreateProfileRouteProp>();
   const { updateUser, setOnboardingStep } = useAuthStore();
-  const { addMember } = useProfileStore();
+  const { addMember, setCountry } = useProfileStore();
+  const storeCountry = useProfileStore((state) => state.country);
 
   const role = route.params?.role || 'family_member';
   const isFamilyMember = role === 'family_member';
@@ -74,6 +76,7 @@ export default function CreateProfileScreen() {
     isFamilyMember ? 'self' : 'other'
   );
   const [gender, setGender] = useState<GenderType | null>(null);
+  const [country, setSelectedCountry] = useState<CountryCode>(storeCountry);
 
   const [errors, setErrors] = useState<{
     name?: string;
@@ -139,6 +142,9 @@ export default function CreateProfileScreen() {
         });
       }
 
+      // Persist the chosen country — drives currency/pricing across the app.
+      setCountry(country);
+
       setOnboardingStep('complete');
       navigation.navigate('OnboardingComplete');
     } catch (error) {
@@ -160,10 +166,7 @@ export default function CreateProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <Pressable
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
             <Icon name="arrow-left" size={24} color={colors.textPrimary} />
           </Pressable>
 
@@ -174,7 +177,7 @@ export default function CreateProfileScreen() {
             <Text style={styles.subtitle}>
               {isFamilyMember
                 ? 'Start by adding yourself or a family member'
-                : 'Add the person you\'ll be caring for'}
+                : "Add the person you'll be caring for"}
             </Text>
           </View>
 
@@ -183,10 +186,7 @@ export default function CreateProfileScreen() {
             {/* Name Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Name</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.name && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, errors.name && styles.inputError]}>
                 <Icon name="user" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -196,25 +196,20 @@ export default function CreateProfileScreen() {
                   onChangeText={(text) => {
                     setName(text);
                     if (errors.name) {
-                      setErrors(prev => ({ ...prev, name: undefined }));
+                      setErrors((prev) => ({ ...prev, name: undefined }));
                     }
                   }}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
               </View>
-              {errors.name ? (
-                <Text style={styles.errorText}>{errors.name}</Text>
-              ) : null}
+              {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
             </View>
 
             {/* Age Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Age</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.age && styles.inputError,
-              ]}>
+              <View style={[styles.inputContainer, errors.age && styles.inputError]}>
                 <Icon name="calendar" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
@@ -224,16 +219,14 @@ export default function CreateProfileScreen() {
                   onChangeText={(text) => {
                     setAge(text.replace(/[^0-9]/g, ''));
                     if (errors.age) {
-                      setErrors(prev => ({ ...prev, age: undefined }));
+                      setErrors((prev) => ({ ...prev, age: undefined }));
                     }
                   }}
                   keyboardType="number-pad"
                   maxLength={3}
                 />
               </View>
-              {errors.age ? (
-                <Text style={styles.errorText}>{errors.age}</Text>
-              ) : null}
+              {errors.age ? <Text style={styles.errorText}>{errors.age}</Text> : null}
             </View>
 
             {/* Relationship */}
@@ -244,10 +237,7 @@ export default function CreateProfileScreen() {
                   {relationshipOptions.map((option) => (
                     <Pressable
                       key={option.id}
-                      style={[
-                        styles.chip,
-                        relationship === option.id && styles.chipSelected,
-                      ]}
+                      style={[styles.chip, relationship === option.id && styles.chipSelected]}
                       onPress={() => setRelationship(option.id)}
                     >
                       <Icon
@@ -255,10 +245,12 @@ export default function CreateProfileScreen() {
                         size={16}
                         color={relationship === option.id ? colors.accent : colors.textSecondary}
                       />
-                      <Text style={[
-                        styles.chipText,
-                        relationship === option.id && styles.chipTextSelected,
-                      ]}>
+                      <Text
+                        style={[
+                          styles.chipText,
+                          relationship === option.id && styles.chipTextSelected,
+                        ]}
+                      >
                         {option.label}
                       </Text>
                     </Pressable>
@@ -282,22 +274,40 @@ export default function CreateProfileScreen() {
                     onPress={() => {
                       setGender(option.id);
                       if (errors.gender) {
-                        setErrors(prev => ({ ...prev, gender: undefined }));
+                        setErrors((prev) => ({ ...prev, gender: undefined }));
                       }
                     }}
                   >
-                    <Text style={[
-                      styles.chipText,
-                      gender === option.id && styles.chipTextSelected,
-                    ]}>
+                    <Text
+                      style={[styles.chipText, gender === option.id && styles.chipTextSelected]}
+                    >
                       {option.label}
                     </Text>
                   </Pressable>
                 ))}
               </View>
-              {errors.gender ? (
-                <Text style={styles.errorText}>{errors.gender}</Text>
-              ) : null}
+              {errors.gender ? <Text style={styles.errorText}>{errors.gender}</Text> : null}
+            </View>
+
+            {/* Country */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Country</Text>
+              <Text style={styles.helperText}>Sets your currency and service pricing</Text>
+              <View style={styles.chipsContainer}>
+                {COUNTRY_LIST.map((option) => (
+                  <Pressable
+                    key={option.code}
+                    style={[styles.chip, country === option.code && styles.chipSelected]}
+                    onPress={() => setSelectedCountry(option.code)}
+                  >
+                    <Text
+                      style={[styles.chipText, country === option.code && styles.chipTextSelected]}
+                    >
+                      {option.name} ({option.symbol})
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           </View>
 
@@ -379,6 +389,14 @@ const styles = StyleSheet.create({
   label: {
     ...typography.label,
     color: colors.textPrimary,
+  },
+  helperText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: spacing.xxs,
+  },
+  chipFlag: {
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: 'row',

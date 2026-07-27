@@ -1,0 +1,15 @@
+# Identifiers only. No credentials live in this repo — everything secret comes
+# from GitHub Actions secrets at run time (see .github/workflows/deploy.yml).
+#
+# NOTE: the two platforms currently disagree on the identifier.
+#   iOS     PRODUCT_BUNDLE_IDENTIFIER = com.carebow.app
+#   Android applicationId             = com.carebow
+# That is legal but worth reconciling — analytics, deep links and support
+# tooling all key off these, and two ids means two of everything.
+
+app_identifier(ENV['IOS_BUNDLE_ID'] || 'com.carebow.app')
+package_name(ENV['ANDROID_PACKAGE_NAME'] || 'com.carebow')
+
+# Supplied by the App Store Connect API key in CI; unset locally.
+apple_id(ENV['APPLE_ID']) if ENV['APPLE_ID']
+team_id(ENV['APPLE_TEAM_ID']) if ENV['APPLE_TEAM_ID']

@@ -128,12 +128,17 @@ const Header = ({ navigation }: { navigation: any }) => {
       <View style={styles.headerLeft}>
         <CareBowLogoAccurate size={36} />
         <View style={styles.greetingContainer}>
-          <Text style={styles.greeting}>{greeting} 👋</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.userName}>{firstName}</Text>
         </View>
       </View>
       <View style={styles.headerRight}>
-        <Pressable style={styles.notificationBtn} onPress={handleNotificationPress}>
+        <Pressable
+          style={styles.notificationBtn}
+          onPress={handleNotificationPress}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+        >
           <View style={styles.notificationDot} />
           <AppIcon name="bell" size={22} color={colors.textPrimary} />
         </Pressable>
@@ -175,7 +180,7 @@ const AIHeroCard = ({ navigation }: { navigation: any }) => (
         <View style={styles.heroLeft}>
           {/* AI Badge */}
           <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>✨ AI Powered</Text>
+            <Text style={styles.heroBadgeText}>AI Powered</Text>
           </View>
 
           <Text style={styles.heroTitle}>Ask CareBow</Text>
@@ -473,7 +478,7 @@ const CareReadinessCard = ({ navigation }: { navigation: any }) => {
   if (!topMissing) {
     return (
       <AnimatedPressable delay={1050} style={styles.readinessCard}>
-        <Text style={styles.readinessAllSetText}>🎉 Your care profile is fully set up</Text>
+        <Text style={styles.readinessAllSetText}>Your care profile is fully set up</Text>
       </AnimatedPressable>
     );
   }
@@ -493,13 +498,18 @@ const CareReadinessCard = ({ navigation }: { navigation: any }) => {
             Your care profile is {careReadiness.score}% ready
           </Text>
           <Text style={styles.readinessHint}>{topMissing.label} to personalize your care →</Text>
+          <View style={styles.readinessBar}>
+            <View
+              style={[
+                styles.readinessFill,
+                { width: `${Math.max(0, Math.min(100, careReadiness.score))}%` },
+              ]}
+            />
+          </View>
         </View>
         <View style={styles.readinessRing}>
           <Text style={styles.readinessRingText}>{careReadiness.score}%</Text>
         </View>
-      </View>
-      <View style={styles.readinessBar}>
-        <View style={[styles.readinessFill, { width: `${careReadiness.score}%` }]} />
       </View>
     </AnimatedPressable>
   );
@@ -614,7 +624,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Closing note */}
-        <Text style={styles.closingNote}>That's everything for now — take care 👋</Text>
+        <Text style={styles.closingNote}>That's everything for now — take care</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1205,6 +1215,7 @@ const styles = StyleSheet.create({
 
   // Care Readiness — peak moment card
   readinessCard: {
+    marginTop: spacing.lg,
     backgroundColor: colors.accentMuted,
     borderRadius: radius.xl,
     paddingHorizontal: spacing.lg,
@@ -1215,7 +1226,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
   },
   readinessTextBlock: {
     flex: 1,
@@ -1246,13 +1256,17 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   readinessBar: {
+    width: '100%',
     height: 4,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xs,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   readinessFill: {
     height: 4,
+    maxWidth: '100%',
     borderRadius: radius.full,
     backgroundColor: colors.accent,
   },

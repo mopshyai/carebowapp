@@ -3,48 +3,50 @@
  * Displays all service categories with horizontal service cards
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { CategorySection } from '../components/ui/CategorySection';
-import { servicesApi, V1Service } from '../services/api/endpoints/services';
+import { serviceCategories } from '../data/services';
+import type { ServiceCategory } from '../data/types';
+import { servicesApi } from '../services/api/endpoints/services';
 import { groupLiveServices } from '../lib/liveServiceCatalog';
 import { colors, space, radius, typography, layout } from '../theme/tokens';
 
 export default function ServicesScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
-  const [services, setServices] = useState<V1Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const categories = useMemo(() => groupLiveServices(services), [services]);
-
-  const loadServices = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setServices(await servicesApi.getServices());
-    } catch {
-      setError('We could not load the live service catalog. Check your connection and try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [categories, setCategories] = useState<ServiceCategory[]>(serviceCategories);
+  const [, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadServices();
-  }, [loadServices]);
+    let active = true;
+    setIsLoading(true);
+
+    servicesApi
+      .getServices()
+      .then((services) => {
+        if (!active) return;
+        const live = groupLiveServices(services);
+        // Fall back to the local catalog if the backend has no rich services yet,
+        // so the user never sees an empty screen.
+        setCategories(live.length > 0 ? live : serviceCategories);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCategories(serviceCategories);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleServicePress = (serviceId: string) => {
     navigation.navigate('ServiceDetails', { id: serviceId });
@@ -56,11 +58,20 @@ export default function ServicesScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Services</Text>
-        <TouchableOpacity style={styles.searchButton}>
+        <TouchableOpacity
+          style={styles.searchButton}
+          accessibilityRole="button"
+          accessibilityLabel="Search services"
+        >
           <Icon name="search" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
@@ -71,37 +82,13 @@ export default function ServicesScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {loading ? (
-          <View style={styles.stateContainer}>
-            <ActivityIndicator size="large" color={colors.primary.default} />
-            <Text style={styles.stateText}>Loading available services…</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.stateContainer}>
-            <Icon name="cloud-offline-outline" size={48} color={colors.text.tertiary} />
-            <Text style={styles.stateTitle}>Services unavailable</Text>
-            <Text style={styles.stateText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadServices}>
-              <Text style={styles.retryText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : categories.length === 0 ? (
-          <View style={styles.stateContainer}>
-            <Icon name="medical-outline" size={48} color={colors.text.tertiary} />
-            <Text style={styles.stateTitle}>No services available</Text>
-            <Text style={styles.stateText}>
-              The care team has not published any bookable services yet.
-            </Text>
-          </View>
-        ) : (
-          categories.map((category) => (
-            <CategorySection
-              key={category.id}
-              category={category}
-              onServicePress={handleServicePress}
-            />
-          ))
-        )}
+        {categories.map((category) => (
+          <CategorySection
+            key={category.id}
+            category={category}
+            onServicePress={handleServicePress}
+          />
+        ))}
       </ScrollView>
     </View>
   );

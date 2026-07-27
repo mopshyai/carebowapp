@@ -4,12 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,11 +13,14 @@ import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { useAuthStore, UserRole } from '@/store/useAuthStore';
 import type { OnboardingStackParamList } from '@/navigation/types';
 
-type RoleSelectionNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'RoleSelection'>;
+type RoleSelectionNavigationProp = NativeStackNavigationProp<
+  OnboardingStackParamList,
+  'RoleSelection'
+>;
 
 interface RoleOption {
   id: UserRole;
-  emoji: string;
+  icon: string;
   title: string;
   description: string;
   features: string[];
@@ -31,7 +29,7 @@ interface RoleOption {
 const roleOptions: RoleOption[] = [
   {
     id: 'family_member',
-    emoji: '👨‍👩‍👧‍👦',
+    icon: 'users',
     title: 'Family Member',
     description: 'I want to manage health for myself and my family',
     features: [
@@ -43,7 +41,7 @@ const roleOptions: RoleOption[] = [
   },
   {
     id: 'caregiver',
-    emoji: '🩺',
+    icon: 'activity',
     title: 'Professional Caregiver',
     description: 'I provide care for elderly or patients',
     features: [
@@ -73,9 +71,7 @@ export default function RoleSelectionScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>How will you use CareBow?</Text>
-          <Text style={styles.subtitle}>
-            This helps us personalize your experience
-          </Text>
+          <Text style={styles.subtitle}>This helps us personalize your experience</Text>
         </View>
 
         {/* Role Options */}
@@ -83,24 +79,18 @@ export default function RoleSelectionScreen() {
           {roleOptions.map((role) => (
             <Pressable
               key={role.id}
-              style={[
-                styles.roleCard,
-                selectedRole === role.id && styles.roleCardSelected,
-              ]}
+              style={[styles.roleCard, selectedRole === role.id && styles.roleCardSelected]}
               onPress={() => setSelectedRole(role.id)}
             >
               {/* Selection Indicator */}
               <View style={styles.cardHeader}>
                 <View style={styles.emojiContainer}>
-                  <Text style={styles.emoji}>{role.emoji}</Text>
+                  <Icon name={role.icon} size={26} color={colors.accent} />
                 </View>
-                <View style={[
-                  styles.radioOuter,
-                  selectedRole === role.id && styles.radioOuterSelected,
-                ]}>
-                  {selectedRole === role.id && (
-                    <View style={styles.radioInner} />
-                  )}
+                <View
+                  style={[styles.radioOuter, selectedRole === role.id && styles.radioOuterSelected]}
+                >
+                  {selectedRole === role.id && <View style={styles.radioInner} />}
                 </View>
               </View>
 
@@ -117,10 +107,12 @@ export default function RoleSelectionScreen() {
                       size={14}
                       color={selectedRole === role.id ? colors.accent : colors.textTertiary}
                     />
-                    <Text style={[
-                      styles.featureText,
-                      selectedRole === role.id && styles.featureTextSelected,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.featureText,
+                        selectedRole === role.id && styles.featureTextSelected,
+                      ]}
+                    >
                       {feature}
                     </Text>
                   </View>

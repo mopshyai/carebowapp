@@ -19,18 +19,22 @@ import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
+import { useProfileStore } from '../store/useProfileStore';
 import { colors, spacing, radius, typography, shadows } from '../theme';
-import { formatInr } from '../lib/liveServiceCatalog';
-import { memberApi } from '../services/api/endpoints/member';
+import { formatMoney } from '../data/countries';
+import { useBookingsStore } from '../store';
+import { ensureBackendProfile } from '../lib/profileSync';
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
+  const country = useProfileStore((state) => state.country);
   const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute();
   const { serviceId } = (route.params as { serviceId: string }) || {};
 
   // Store hooks
   const { bookingDraft } = useCartStore();
+  const createBooking = useBookingsStore((s) => s.create);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Format date for display
@@ -51,13 +55,35 @@ export default function CheckoutScreen() {
       const scheduledAt = new Date(
         `${bookingDraft.date}T${bookingDraft.startTime}:00`
       ).toISOString();
-      const result = await memberApi.createBooking({
+
+      // The service catalog is backend-driven, so bookingDraft.serviceId is
+      // already a real /v1/services row id.
+      const noteParts = [
+        `Requested: ${bookingDraft.serviceTitle}`,
+        bookingDraft.selectedPackageLabel ? `Package: ${bookingDraft.selectedPackageLabel}` : null,
+        bookingDraft.requestNotes ? bookingDraft.requestNotes : null,
+      ].filter(Boolean) as string[];
+
+      let backendProfileId: string;
+      try {
+        backendProfileId = await ensureBackendProfile(bookingDraft.memberId);
+      } catch (error) {
+        Alert.alert(
+          'Could not prepare your profile',
+          "Please make sure you're signed in and try again."
+        );
+        return;
+      }
+
+      // Through the store: the created booking is merged into the cache, so
+      // Orders and Care History show it without refetching.
+      const result = await createBooking({
         serviceId: bookingDraft.serviceId,
-        profileId: bookingDraft.memberId,
+        profileId: backendProfileId,
         scheduledAt,
-        notes: bookingDraft.requestNotes || undefined,
+        notes: noteParts.join(' · ') || undefined,
       });
-      if (!result.success) throw new Error(result.error || 'Booking could not be submitted');
+      if (!result.ok) throw new Error(result.error);
       Alert.alert(
         'Booking requested',
         'Your request was saved to CareBow. The care team will confirm the provider and time.',
@@ -99,7 +125,12 @@ export default function CheckoutScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Checkout</Text>
@@ -205,14 +236,14 @@ export default function CheckoutScreen() {
 
           <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>{bookingDraft.pricingLabel}</Text>
-            <Text style={styles.pricingValue}>{formatInr(bookingDraft.subtotal)}</Text>
+            <Text style={styles.pricingValue}>{formatMoney(bookingDraft.subtotal, country)}</Text>
           </View>
 
           {bookingDraft.discount > 0 && (
             <View style={styles.pricingRow}>
               <Text style={[styles.pricingLabel, styles.discountLabel]}>Discount</Text>
               <Text style={[styles.pricingValue, styles.discountValue]}>
-                -{formatInr(bookingDraft.discount)}
+                -{formatMoney(bookingDraft.discount, country)}
               </Text>
             </View>
           )}
@@ -221,7 +252,7 @@ export default function CheckoutScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{formatInr(bookingDraft.total)}</Text>
+            <Text style={styles.totalValue}>{formatMoney(bookingDraft.total, country)}</Text>
           </View>
         </View>
 
@@ -268,7 +299,7 @@ export default function CheckoutScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerPriceRow}>
           <Text style={styles.footerPriceLabel}>Total</Text>
-          <Text style={styles.footerPriceValue}>{formatInr(bookingDraft.total)}</Text>
+          <Text style={styles.footerPriceValue}>{formatMoney(bookingDraft.total, country)}</Text>
         </View>
         <TouchableOpacity
           style={[styles.payButton, isSubmitting && styles.buttonDisabled]}

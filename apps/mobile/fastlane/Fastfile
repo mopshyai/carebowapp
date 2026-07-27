@@ -1,0 +1,124 @@
+# Release automation for the bare React Native app.
+#
+#   merge to main ──> build_ios      ──> TestFlight
+#                └──> build_android  ──> Play internal testing
+#
+# Nothing here holds a credential. Signing material and API keys arrive as
+# environment variables from GitHub Actions secrets; run locally and it will
+# tell you which one is missing rather than doing something surprising.
+#
+# Build numbers come from the CI run number, not from the committed
+# versionCode/CFBundleVersion. Both stores reject a duplicate build number, and
+# a hand-maintained counter in git is a merge conflict waiting to happen.
+
+default_platform(:ios)
+
+APP_STORE_KEY_ID    = 'APP_STORE_CONNECT_KEY_ID'
+APP_STORE_ISSUER_ID = 'APP_STORE_CONNECT_ISSUER_ID'
+APP_STORE_KEY_B64   = 'APP_STORE_CONNECT_KEY_B64'
+
+def require_env!(*names)
+  missing = names.reject { |n| ENV[n] && !ENV[n].empty? }
+  return if missing.empty?
+
+  UI.user_error!(
+    "Missing required environment: #{missing.join(', ')}.\n" \
+    "In CI these come from GitHub Actions secrets — see the checklist in " \
+    ".github/workflows/deploy.yml. Locally, export them before running."
+  )
+end
+
+platform :ios do
+  desc 'Build and upload to TestFlight'
+  lane :beta do
+    require_env!(APP_STORE_KEY_ID, APP_STORE_ISSUER_ID, APP_STORE_KEY_B64)
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV[APP_STORE_KEY_ID],
+      issuer_id: ENV[APP_STORE_ISSUER_ID],
+      key_content: ENV[APP_STORE_KEY_B64],
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # A throwaway keychain per run. The runner is ephemeral, but an unlocked
+    # default keychain is still the wrong place to put a signing identity.
+    create_keychain(
+      name: 'carebow_ci',
+      password: ENV['KEYCHAIN_PASSWORD'] || SecureRandom.hex(16),
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
+    )
+
+    match(
+      type: 'appstore',
+      keychain_name: 'carebow_ci',
+      keychain_password: ENV['KEYCHAIN_PASSWORD'],
+      readonly: true,
+      api_key: api_key
+    )
+
+    cocoapods(podfile: 'ios/Podfile', repo_update: true)
+
+    increment_build_number(
+      xcodeproj: 'ios/CareBow.xcodeproj',
+      build_number: ENV['BUILD_NUMBER'] || Time.now.to_i.to_s
+    )
+
+    build_app(
+      workspace: 'ios/CareBow.xcworkspace',
+      scheme: 'CareBow',
+      configuration: 'Release',
+      export_method: 'app-store',
+      clean: true,
+      output_directory: 'build/ios'
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      changelog: ENV['RELEASE_NOTES'] || 'Automated build from main.'
+    )
+  end
+end
+
+platform :android do
+  desc 'Build and upload to Play internal testing'
+  lane :beta do
+    require_env!('PLAY_SERVICE_ACCOUNT_JSON', 'ANDROID_KEYSTORE_B64')
+
+    # supply reads the service account from a file path, so materialise it for
+    # the length of the run and remove it afterwards.
+    sa_path = File.expand_path('../play-service-account.json', __dir__)
+    File.write(sa_path, ENV['PLAY_SERVICE_ACCOUNT_JSON'])
+
+    begin
+      gradle(
+        project_dir: 'android',
+        task: 'bundle',
+        build_type: 'Release',
+        properties: {
+          'android.injected.version.code' => (ENV['BUILD_NUMBER'] || Time.now.to_i).to_i,
+          'android.injected.signing.store.file' => ENV['ANDROID_KEYSTORE_PATH'],
+          'android.injected.signing.store.password' => ENV['ANDROID_KEYSTORE_PASSWORD'],
+          'android.injected.signing.key.alias' => ENV['ANDROID_KEY_ALIAS'],
+          'android.injected.signing.key.password' => ENV['ANDROID_KEY_PASSWORD']
+        }.compact
+      )
+
+      upload_to_play_store(
+        track: 'internal',
+        json_key: sa_path,
+        aab: 'android/app/build/outputs/bundle/release/app-release.aab',
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true,
+        release_status: 'draft'
+      )
+    ensure
+      File.delete(sa_path) if File.exist?(sa_path)
+    end
+  end
+end

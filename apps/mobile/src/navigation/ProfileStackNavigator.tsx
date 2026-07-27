@@ -23,6 +23,8 @@ import HelpScreen from '../screens/profile/HelpScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import EmergencyContactsScreen from '../screens/profile/EmergencyContactsScreen';
 import HealthInfoScreen from '../screens/profile/HealthInfoScreen';
+import NotificationInboxScreen from '../screens/profile/NotificationInboxScreen';
+import VitalsScreen from '../screens/profile/VitalsScreen';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
@@ -49,6 +51,8 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="EmergencyContacts" component={EmergencyContactsScreen} />
       <Stack.Screen name="HealthInfo" component={HealthInfoScreen} />
+      <Stack.Screen name="NotificationInbox" component={NotificationInboxScreen} />
+      <Stack.Screen name="Vitals" component={VitalsScreen} />
     </Stack.Navigator>
   );
 }

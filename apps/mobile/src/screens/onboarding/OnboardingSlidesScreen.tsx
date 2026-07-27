@@ -23,12 +23,14 @@ import type { OnboardingStackParamList } from '@/navigation/types';
 
 const { width } = Dimensions.get('window');
 
-type OnboardingSlidesNavigationProp = NativeStackNavigationProp<OnboardingStackParamList, 'OnboardingSlides'>;
+type OnboardingSlidesNavigationProp = NativeStackNavigationProp<
+  OnboardingStackParamList,
+  'OnboardingSlides'
+>;
 
 interface Slide {
   id: string;
   icon: string;
-  emoji: string;
   title: string;
   description: string;
   color: string;
@@ -38,7 +40,6 @@ const slides: Slide[] = [
   {
     id: '1',
     icon: 'message-circle',
-    emoji: '💬',
     title: 'Log symptoms quickly',
     description:
       'Describe health concerns in your own words. Our AI understands context and asks the right follow-up questions.',
@@ -47,7 +48,6 @@ const slides: Slide[] = [
   {
     id: '2',
     icon: 'alert-circle',
-    emoji: '🎯',
     title: 'Know when to seek care',
     description:
       'Get clear guidance on urgency levels - from home care tips to when you should visit a doctor immediately.',
@@ -56,10 +56,9 @@ const slides: Slide[] = [
   {
     id: '3',
     icon: 'users',
-    emoji: '👨‍👩‍👧‍👦',
     title: 'Track your whole family',
     description:
-      'Create profiles for parents, children, and loved ones. Keep everyone\'s health information organized in one place.',
+      "Create profiles for parents, children, and loved ones. Keep everyone's health information organized in one place.",
     color: colors.success,
   },
 ];
@@ -93,7 +92,7 @@ export default function OnboardingSlidesScreen() {
   const renderSlide = ({ item }: { item: Slide }) => (
     <View style={styles.slide}>
       <View style={[styles.iconContainer, { backgroundColor: `${item.color}15` }]}>
-        <Text style={styles.slideEmoji}>{item.emoji}</Text>
+        <Icon name={item.icon} size={44} color={item.color} />
       </View>
       <Text style={styles.slideTitle}>{item.title}</Text>
       <Text style={styles.slideDescription}>{item.description}</Text>
@@ -106,10 +105,7 @@ export default function OnboardingSlidesScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Skip Button */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.skipButton}
-          onPress={handleSkip}
-        >
+        <Pressable style={styles.skipButton} onPress={handleSkip}>
           <Text style={styles.skipText}>Skip</Text>
         </Pressable>
       </View>
@@ -133,32 +129,17 @@ export default function OnboardingSlidesScreen() {
         {/* Pagination Dots */}
         <View style={styles.pagination}>
           {slides.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                index === currentIndex && styles.dotActive,
-              ]}
-            />
+            <View key={index} style={[styles.dot, index === currentIndex && styles.dotActive]} />
           ))}
         </View>
 
         {/* Next/Get Started Button */}
         <Pressable
-          style={({ pressed }) => [
-            styles.nextButton,
-            pressed && styles.buttonPressed,
-          ]}
+          style={({ pressed }) => [styles.nextButton, pressed && styles.buttonPressed]}
           onPress={handleNext}
         >
-          <Text style={styles.nextButtonText}>
-            {isLastSlide ? 'Get Started' : 'Next'}
-          </Text>
-          <Icon
-            name={isLastSlide ? 'check' : 'arrow-right'}
-            size={20}
-            color={colors.textInverse}
-          />
+          <Text style={styles.nextButtonText}>{isLastSlide ? 'Get Started' : 'Next'}</Text>
+          <Icon name={isLastSlide ? 'check' : 'arrow-right'} size={20} color={colors.textInverse} />
         </Pressable>
       </View>
     </SafeAreaView>

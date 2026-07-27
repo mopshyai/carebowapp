@@ -132,9 +132,26 @@ function extractSymptoms(messages: EpisodeMessage[]): string[] {
   const symptoms: string[] = [];
 
   const symptomKeywords = [
-    'pain', 'ache', 'hurt', 'sore', 'fever', 'headache', 'nausea',
-    'vomiting', 'dizziness', 'fatigue', 'tired', 'rash', 'swelling',
-    'cough', 'cold', 'flu', 'breathing', 'chest', 'stomach', 'back',
+    'pain',
+    'ache',
+    'hurt',
+    'sore',
+    'fever',
+    'headache',
+    'nausea',
+    'vomiting',
+    'dizziness',
+    'fatigue',
+    'tired',
+    'rash',
+    'swelling',
+    'cough',
+    'cold',
+    'flu',
+    'breathing',
+    'chest',
+    'stomach',
+    'back',
   ];
 
   for (const msg of userMessages) {
@@ -161,7 +178,10 @@ function extractSymptoms(messages: EpisodeMessage[]): string[] {
  * Extract onset/duration from messages
  */
 function extractOnset(messages: EpisodeMessage[]): string | null {
-  const allText = messages.map((m) => m.text).join(' ').toLowerCase();
+  const allText = messages
+    .map((m) => m.text)
+    .join(' ')
+    .toLowerCase();
 
   const onsetPatterns = [
     /(?:started|began|since)\s+(yesterday|today|this morning|last night|few days ago|a week ago|[0-9]+ (?:days?|hours?|weeks?) ago)/i,
@@ -183,7 +203,10 @@ function extractOnset(messages: EpisodeMessage[]): string | null {
  * Extract severity from messages
  */
 function extractSeverity(messages: EpisodeMessage[]): string | null {
-  const allText = messages.map((m) => m.text).join(' ').toLowerCase();
+  const allText = messages
+    .map((m) => m.text)
+    .join(' ')
+    .toLowerCase();
 
   // Look for numeric scale
   const scaleMatch = allText.match(/(?:severity|pain|rate)[:\s]+([0-9]+)(?:\/10|\s*out of\s*10)?/i);
@@ -234,7 +257,7 @@ function generateDefaultRedFlags(symptoms: string[]): string[] {
 /**
  * Generate questions to ask a doctor
  */
-function generateDoctorQuestions(summary: Partial<EpisodeSummary>): string[] {
+function generateDoctorQuestions(_summary: Partial<EpisodeSummary>): string[] {
   const questions: string[] = [];
 
   questions.push('What do you think is causing these symptoms?');
@@ -252,10 +275,7 @@ function generateDoctorQuestions(summary: Partial<EpisodeSummary>): string[] {
 /**
  * Build a complete episode summary
  */
-export function buildEpisodeSummary(
-  episode: Episode,
-  messages: EpisodeMessage[]
-): EpisodeSummary {
+export function buildEpisodeSummary(episode: Episode, messages: EpisodeMessage[]): EpisodeSummary {
   // Parse structured sections from AI responses
   const structured = parseStructuredSections(messages);
 
@@ -416,7 +436,7 @@ function generateShareableText(summary: EpisodeSummary): string {
 
   // Red flags
   if (summary.redFlags.length > 0) {
-    lines.push('⚠️ WATCH FOR THESE RED FLAGS');
+    lines.push('WATCH FOR THESE RED FLAGS');
     lines.push('────────────────────────────');
     for (const flag of summary.redFlags) {
       lines.push(`• ${flag}`);

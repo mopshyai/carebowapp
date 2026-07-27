@@ -20,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
-import { StarRating } from '../components/ui/StarRating';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../components/icons';
 import { PackageSelectorList } from '../components/ui/PackageSelectorList';
 import { HorizontalDatePicker } from '../components/ui/HorizontalDatePicker';
@@ -29,12 +28,14 @@ import { RequestTextArea } from '../components/ui/RequestTextArea';
 import { StickyCheckoutBar } from '../components/ui/StickyCheckoutBar';
 import { TimePicker } from '../components/ui/TimePicker';
 import { QuantityStepper } from '../components/ui/QuantityStepper';
-import { calculatePrice } from '../data/services';
+import { calculatePrice, getServiceById } from '../data/services';
 import { Member, PackageOption } from '../data/types';
 import { useCartStore } from '../store/useCartStore';
-import { servicesApi } from '../services/api/endpoints/services';
+import { useProfileStore } from '../store/useProfileStore';
 import { profilesApi } from '../services/api/endpoints/profiles';
-import { formatInr, preferredTimeOptions, toBookingService } from '../lib/liveServiceCatalog';
+import { servicesApi } from '../services/api/endpoints/services';
+import { preferredTimeOptions, toBookingService } from '../lib/liveServiceCatalog';
+import { formatMoney } from '../data/countries';
 import type { Service } from '../data/types';
 
 // Icon mapping for service categories
@@ -66,6 +67,7 @@ export default function ServiceDetailsScreen() {
 
   // Store hooks
   const { bookingDraft, initBookingDraft, updateBookingDraft, clearBookingDraft } = useCartStore();
+  const country = useProfileStore((state) => state.country);
   const [service, setService] = useState<Service | null>(null);
   const [bookingMembers, setBookingMembers] = useState<Member[]>([]);
   const [isLoadingService, setIsLoadingService] = useState(true);
@@ -84,20 +86,55 @@ export default function ServiceDetailsScreen() {
     let active = true;
     setIsLoadingService(true);
     setLoadError(null);
-    Promise.all([servicesApi.getServiceDetails(id || ''), profilesApi.getProfiles()])
-      .then(([liveService, profiles]) => {
+
+    // Service loads from the live backend catalog so bookings reference a
+    // real service id; fall back to the local catalog if the backend call
+    // fails so details still render offline.
+    servicesApi
+      .getServiceDetails(id || '')
+      .then((v1Service) => {
         if (!active) return;
-        setService(toBookingService(liveService));
-        setBookingMembers(
-          profiles.map((profile) => ({
-            id: profile.id,
-            name: profile.name,
-            relationship: profile.relationship,
-          }))
-        );
+        setService(toBookingService(v1Service));
       })
       .catch(() => {
-        if (active) setLoadError('We could not load this service from CareBow.');
+        if (!active) return;
+        const localService = getServiceById(id || '');
+        if (!localService) {
+          setLoadError('This service is no longer available.');
+          return;
+        }
+        setService(localService);
+      });
+
+    // Members (for booking) come from the backend profiles. If the backend
+    // has none yet (or the call fails), fall back to the locally-created
+    // family members so the picker is never empty — those get synced to the
+    // backend lazily at booking time (see profileSync.ensureBackendProfile).
+    const localMembers: Member[] = useProfileStore.getState().members.map((member) => ({
+      id: member.id,
+      name: `${member.firstName} ${member.lastName}`.trim(),
+      relationship: member.relationship,
+    }));
+
+    profilesApi
+      .getProfiles()
+      .then((profiles) => {
+        if (!active) return;
+        if (profiles.length > 0) {
+          setBookingMembers(
+            profiles.map((profile) => ({
+              id: profile.id,
+              name: profile.name,
+              relationship: profile.relationship,
+            }))
+          );
+        } else {
+          setBookingMembers(localMembers);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setBookingMembers(localMembers);
       })
       .finally(() => {
         if (active) setIsLoadingService(false);
@@ -265,13 +302,16 @@ export default function ServiceDetailsScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <AppIcon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Service Details</Text>
-        <TouchableOpacity style={styles.shareButton}>
-          <AppIcon name="arrow-right" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <View style={styles.backButton} />
       </View>
 
       <KeyboardAvoidingView
@@ -304,16 +344,6 @@ export default function ServiceDetailsScreen() {
           <View style={styles.infoContainer}>
             {category && <Text style={styles.categoryLabel}>{category.title}</Text>}
             <Text style={styles.serviceTitle}>{service.title}</Text>
-            {service.reviewCount > 0 && service.rating > 0 && (
-              <View style={styles.ratingRow}>
-                <StarRating
-                  rating={service.rating}
-                  size={16}
-                  showReviewCount
-                  reviewCount={service.reviewCount}
-                />
-              </View>
-            )}
             <Text style={styles.tagline}>{service.shortTagline}</Text>
           </View>
 
@@ -427,10 +457,12 @@ export default function ServiceDetailsScreen() {
               <View style={styles.fixedPriceCard}>
                 <Text style={styles.fixedPriceLabel}>Service fee</Text>
                 <View style={styles.fixedPriceRow}>
-                  <Text style={styles.fixedPrice}>{formatInr(service.pricing.price)}</Text>
+                  <Text style={styles.fixedPrice}>
+                    {formatMoney(service.pricing.price, country)}
+                  </Text>
                   {service.pricing.originalPrice && (
                     <Text style={styles.fixedOriginalPrice}>
-                      {formatInr(service.pricing.originalPrice)}
+                      {formatMoney(service.pricing.originalPrice, country)}
                     </Text>
                   )}
                 </View>
@@ -590,7 +622,7 @@ const styles = StyleSheet.create({
 
   // Hero
   heroContainer: {
-    height: 140,
+    height: 100,
     backgroundColor: colors.accentSoft,
     borderRadius: radius.xl,
     justifyContent: 'center',
