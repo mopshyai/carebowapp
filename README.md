@@ -55,23 +55,27 @@ CareBow is a comprehensive healthcare platform designed for modern families:
 
 ### Production backend boundary
 
-This repository owns the React Native app and a legacy API used only for local development.
-The deployed REST API, authentication system, Prisma schema, and production PostgreSQL
-database are owned by [`mopshyai/carebow-main`](https://github.com/mopshyai/carebow-main).
-Do not apply `apps/api/prisma/schema.prisma` to a remote database; the schemas are not
-compatible. The package database commands enforce this boundary by accepting only local
-or Docker Compose database hosts.
+This repository owns the React Native app and nothing else. The REST API,
+authentication, Prisma schema, and production PostgreSQL database all live in
+[`mopshyai/carebow-main`](https://github.com/mopshyai/carebow-main) — including
+its own migrations and deploy pipeline.
+
+A second copy of the backend used to sit in `apps/api` with its own divergent
+12-model schema and NextAuth setup. Nothing consumed it: the mobile app points
+at `carebow-main`. It was deleted rather than maintained, because two schemas
+for one product is how they drift apart unnoticed. Do backend work in
+`carebow-main`.
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **Home Dashboard** | Quick access to services, orders, and health insights |
-| **Ask CareBow** | AI-powered health triage with voice support |
-| **Service Booking** | Browse, compare, and book healthcare services |
-| **Safety Hub** | SOS emergency alerts and scheduled check-ins |
-| **Family Profiles** | Manage health data for multiple family members |
-| **Order Management** | Track bookings and service requests |
+| Feature              | Description                                           |
+| -------------------- | ----------------------------------------------------- |
+| **Home Dashboard**   | Quick access to services, orders, and health insights |
+| **Ask CareBow**      | AI-powered health triage with voice support           |
+| **Service Booking**  | Browse, compare, and book healthcare services         |
+| **Safety Hub**       | SOS emergency alerts and scheduled check-ins          |
+| **Family Profiles**  | Manage health data for multiple family members        |
+| **Order Management** | Track bookings and service requests                   |
 
 ## Quick Start
 
@@ -81,7 +85,6 @@ or Docker Compose database hosts.
 - pnpm 8+ (`npm install -g pnpm`)
 - Xcode 15+ (for iOS)
 - Android Studio (for Android)
-- PostgreSQL 15+ (for backend)
 
 ### Installation
 
@@ -95,10 +98,6 @@ pnpm install
 
 # Set up environment variables
 cp apps/mobile/.env.example apps/mobile/.env
-cp apps/api/.env.example apps/api/.env
-
-# Set up the database
-pnpm db:push
 
 # iOS: Install pods
 pnpm pod-install
@@ -115,9 +114,6 @@ pnpm ios
 
 # Run Android emulator
 pnpm android
-
-# Run API server
-pnpm dev:api
 ```
 
 Or use Make commands:
@@ -134,7 +130,7 @@ make android   # Run Android app
 ```
 carebow/
 ├── apps/
-│   ├── mobile/              # React Native mobile app
+│   └── mobile/              # React Native mobile app
 │   │   ├── src/
 │   │   │   ├── screens/     # 56+ app screens
 │   │   │   ├── components/  # Reusable UI components
@@ -146,20 +142,16 @@ carebow/
 │   │   │   └── theme/       # Design system tokens
 │   │   ├── ios/             # iOS native project
 │   │   └── android/         # Android native project
-│   └── api/                 # Legacy local-development API (not production)
-│       ├── app/api/         # API routes
-│       ├── lib/             # Auth, Prisma, utilities
-│       └── prisma/          # Database schema
 ├── packages/
 │   └── shared/              # Shared types & utilities
 ├── .github/                 # GitHub Actions & templates
-├── docker-compose.yml       # Docker setup
 └── Makefile                 # Development commands
 ```
 
 ## Tech Stack
 
 ### Mobile App
+
 - **React Native 0.76** with New Architecture (Fabric)
 - **TypeScript** for type safety
 - **React Navigation 7** for routing
@@ -167,28 +159,26 @@ carebow/
 - **React Native Reanimated** for animations
 - **Sentry** for error tracking
 
-### Backend API
-- **Next.js 15** with App Router
-- **Prisma 6** ORM with PostgreSQL
-- **NextAuth v5** for authentication
-- **Zod** for validation
+### Backend
+
+Lives in [`carebow-main`](https://github.com/mopshyai/carebow-main): Next.js 15,
+Prisma 6 + PostgreSQL, custom JWT auth, Zod.
 
 ### Infrastructure
+
 - **pnpm** workspaces
 - **Turborepo** build orchestration
-- **Docker** for containerization
 - **GitHub Actions** for CI/CD
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
-| [SECURITY.md](SECURITY.md) | Security policy |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| Document                                              | Description                  |
+| ----------------------------------------------------- | ---------------------------- |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                    | How to contribute            |
+| [SECURITY.md](SECURITY.md)                            | Security policy              |
+| [CHANGELOG.md](CHANGELOG.md)                          | Version history              |
 | [Mobile Docs](apps/mobile/DEVELOPER_DOCUMENTATION.md) | Mobile app development guide |
-| [Design System](apps/mobile/DESIGN_SYSTEM.md) | UI design tokens |
-| [API Docs](apps/api/README.md) | Backend API documentation |
+| [Design System](apps/mobile/DESIGN_SYSTEM.md)         | UI design tokens             |
 
 ## Scripts
 
@@ -196,7 +186,6 @@ carebow/
 # Development
 pnpm dev              # Start all dev servers
 pnpm dev:mobile       # Start Metro bundler
-pnpm dev:api          # Start API server
 
 # Quality
 pnpm lint             # Lint all code
@@ -208,31 +197,11 @@ pnpm test:coverage    # Run tests with coverage
 
 # Build
 pnpm build            # Build all apps
-pnpm build:api        # Build API only
-
-# Database
-pnpm db:push          # Push Prisma schema
-pnpm db:migrate       # Create migration
-pnpm db:studio        # Prisma visual editor
-pnpm db:seed          # Seed database
 
 # Mobile
 pnpm ios              # Build & run iOS
 pnpm android          # Build & run Android
 pnpm pod-install      # Install iOS CocoaPods
-```
-
-## Docker
-
-```bash
-# Start all services (API + PostgreSQL + Redis)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
 ```
 
 ## Contributing

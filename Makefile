@@ -1,4 +1,4 @@
-.PHONY: help install dev build test lint format clean docker-up docker-down db-push db-migrate db-studio ios android
+.PHONY: help install dev build test lint format clean ios android
 
 # Default target
 help:
@@ -9,7 +9,6 @@ help:
 	@echo "Development:"
 	@echo "  install      Install all dependencies"
 	@echo "  dev          Start all development servers"
-	@echo "  dev-api      Start API server only"
 	@echo "  dev-mobile   Start Metro bundler only"
 	@echo ""
 	@echo "Mobile:"
@@ -26,17 +25,6 @@ help:
 	@echo "  format       Format code"
 	@echo "  typecheck    Run TypeScript checks"
 	@echo ""
-	@echo "Database:"
-	@echo "  db-push      Push Prisma schema"
-	@echo "  db-migrate   Create migration"
-	@echo "  db-studio    Open Prisma Studio"
-	@echo "  db-seed      Seed the database"
-	@echo ""
-	@echo "Docker:"
-	@echo "  docker-up    Start Docker containers"
-	@echo "  docker-down  Stop Docker containers"
-	@echo "  docker-build Build Docker images"
-	@echo ""
 	@echo "Maintenance:"
 	@echo "  clean        Clean all build artifacts"
 	@echo "  update       Update dependencies"
@@ -48,9 +36,6 @@ install:
 # Development
 dev:
 	pnpm dev
-
-dev-api:
-	pnpm dev:api
 
 dev-mobile:
 	pnpm dev:mobile
@@ -68,9 +53,6 @@ pod-install:
 # Build
 build:
 	pnpm build
-
-build-api:
-	pnpm build:api
 
 # Testing
 test:
@@ -95,38 +77,11 @@ format:
 typecheck:
 	pnpm typecheck
 
-# Database
-db-push:
-	pnpm db:push
-
-db-migrate:
-	pnpm db:migrate
-
-db-studio:
-	pnpm db:studio
-
-db-seed:
-	cd apps/api && pnpm db:seed
-
-# Docker
-docker-up:
-	docker-compose up -d
-
-docker-down:
-	docker-compose down
-
-docker-build:
-	docker-compose build
-
-docker-logs:
-	docker-compose logs -f
-
 # Maintenance
 clean:
 	pnpm clean
 	rm -rf .turbo
 	rm -rf coverage
-	rm -rf apps/api/.next
 	rm -rf apps/mobile/android/app/build
 
 update:

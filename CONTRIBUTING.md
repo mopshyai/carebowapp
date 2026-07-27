@@ -28,28 +28,25 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 ### Local Development Setup
 
 1. **Fork and clone the repository**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/carebowapp.git
    cd carebowapp
    ```
 
 2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp apps/mobile/.env.example apps/mobile/.env
-   cp apps/api/.env.example apps/api/.env
    ```
 
-4. **Set up the database**
-   ```bash
-   pnpm db:push
-   ```
-
-5. **Start development servers**
+4. **Start development servers**
    ```bash
    pnpm dev
    ```

@@ -4,8 +4,7 @@
 # Mobile app
 /apps/mobile/ @mopshyai/mobile-team
 
-# Backend API
-/apps/api/ @mopshyai/backend-team
+# The backend lives in the carebow-main repository, not here.
 
 # Shared packages
 /packages/ @mopshyai/core-team

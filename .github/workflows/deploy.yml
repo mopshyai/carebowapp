@@ -1,120 +1,182 @@
-name: Deploy
+name: Release Mobile
+
+# Ships the React Native app to TestFlight and Play internal testing.
+#
+# This repo contains ONLY the mobile app. The backend lives in carebow-main and
+# has its own deploy workflow — the previous version of this file tried to push
+# apps/api to Vercel, which was neither the real backend nor a real host, and
+# had never succeeded in any recorded run.
+#
+#   merge to main ──┬──> iOS      ──> fastlane ios beta      ──> TestFlight
+#                   └──> Android  ──> fastlane android beta  ──> Play internal
+#
+# ── Required secrets ────────────────────────────────────────────────────────
+# Nothing runs until these exist. The gate job below checks first and skips
+# with a clear message rather than failing every run with a red X, because a
+# permanently-red pipeline is how a team learns to ignore CI.
+#
+#   iOS
+#     APP_STORE_CONNECT_KEY_ID       App Store Connect API key id
+#     APP_STORE_CONNECT_ISSUER_ID    the issuer UUID
+#     APP_STORE_CONNECT_KEY_B64      the .p8 key, base64-encoded
+#     MATCH_GIT_URL                  private repo holding signing certificates
+#     MATCH_PASSWORD                 passphrase for that repo
+#     MATCH_GIT_BASIC_AUTHORIZATION  base64 "user:token" to read it
+#     KEYCHAIN_PASSWORD              any value; scopes the throwaway CI keychain
+#
+#   Android
+#     PLAY_SERVICE_ACCOUNT_JSON      Play Console service account JSON
+#     ANDROID_KEYSTORE_B64           upload keystore, base64-encoded
+#     ANDROID_KEYSTORE_PASSWORD
+#     ANDROID_KEY_ALIAS
+#     ANDROID_KEY_PASSWORD
+#
+# Add them in Settings → Secrets and variables → Actions. Do not commit any of
+# them, and do not paste them into a chat window.
 
 on:
   push:
     branches: [main]
     paths:
-      - 'apps/api/**'
-      - 'packages/**'
+      - "apps/mobile/**"
+      - "packages/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
 
 env:
-  NODE_VERSION: '20'
-  PNPM_VERSION: '10'
+  NODE_VERSION: "20"
+  PNPM_VERSION: "10"
 
 jobs:
-  deploy-api:
-    name: Deploy API
+  gate:
+    name: Check release credentials
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+    outputs:
+      ios: ${{ steps.check.outputs.ios }}
+      android: ${{ steps.check.outputs.android }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - id: check
+        run: |
+          IOS=false
+          ANDROID=false
+          [ -n "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" ] && [ -n "${{ secrets.MATCH_GIT_URL }}" ] && IOS=true
+          [ -n "${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}" ] && [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ] && ANDROID=true
+          echo "ios=$IOS" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID" >> "$GITHUB_OUTPUT"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+          {
+            echo "### Release readiness"
+            echo ""
+            echo "| Platform | Credentials | Result |"
+            echo "|---|---|---|"
+            echo "| iOS | $IOS | $([ "$IOS" = true ] && echo 'will publish' || echo 'skipped') |"
+            echo "| Android | $ANDROID | $([ "$ANDROID" = true ] && echo 'will publish' || echo 'skipped') |"
+            if [ "$IOS" != true ] || [ "$ANDROID" != true ]; then
+              echo ""
+              echo "Missing secrets are listed at the top of .github/workflows/deploy.yml."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+  ios:
+    name: TestFlight
+    needs: gate
+    if: needs.gate.outputs.ios == 'true'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build API
-        run: pnpm build:api
-
-      - name: Deploy to Vercel (Staging)
-        if: github.event.inputs.environment == 'staging' || github.event.inputs.environment == ''
-        run: |
-          cd apps/api
-          npx vercel --token=${{ secrets.VERCEL_TOKEN }} --prod
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Deploy to Vercel (Production)
-        if: github.event.inputs.environment == 'production'
-        run: |
-          cd apps/api
-          npx vercel --token=${{ secrets.VERCEL_TOKEN }} --prod
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_PROD }}
-
-  deploy-mobile:
-    name: Deploy Mobile (EAS)
-    runs-on: ubuntu-latest
-    if: github.event.inputs.environment == 'production'
-    environment: production
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+          cache: pnpm
+      - uses: ruby/setup-ruby@v1
         with:
-          version: ${{ env.PNPM_VERSION }}
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: apps/mobile
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - run: pnpm install --frozen-lockfile
+
+      # .env is gitignored, but react-native-dotenv inlines it at build time —
+      # without this the bundle falls back to defaults. See apps/mobile/.env.example.
+      - name: Materialise .env
+        working-directory: apps/mobile
+        run: |
+          if [ -n "${{ secrets.MOBILE_DOTENV }}" ]; then
+            printf '%s' "${{ secrets.MOBILE_DOTENV }}" > .env
+          else
+            cp .env.example .env
+            echo "::warning::MOBILE_DOTENV not set — building from .env.example defaults."
+          fi
+
+      - name: Build and upload
+        working-directory: apps/mobile
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_B64: ${{ secrets.APP_STORE_CONNECT_KEY_B64 }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+        run: bundle exec fastlane ios beta
+
+  android:
+    name: Play internal
+    needs: gate
+    if: needs.gate.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: "${{ env.PNPM_VERSION }}" }
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
+          cache: pnpm
+      - uses: actions/setup-java@v4
         with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build and Submit iOS
-        run: |
-          cd apps/mobile
-          eas build --platform ios --non-interactive --auto-submit
-
-      - name: Build and Submit Android
-        run: |
-          cd apps/mobile
-          eas build --platform android --non-interactive --auto-submit
-
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [deploy-api]
-    if: always()
-    steps:
-      - name: Slack Notification
-        uses: 8398a7/action-slack@v3
+          distribution: temurin
+          java-version: "17"
+      - uses: ruby/setup-ruby@v1
         with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: apps/mobile
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Materialise .env
+        working-directory: apps/mobile
+        run: |
+          if [ -n "${{ secrets.MOBILE_DOTENV }}" ]; then
+            printf '%s' "${{ secrets.MOBILE_DOTENV }}" > .env
+          else
+            cp .env.example .env
+            echo "::warning::MOBILE_DOTENV not set — building from .env.example defaults."
+          fi
+
+      # Written to the runner's temp dir, never the workspace, so it cannot be
+      # picked up by a later step or cached.
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.keystore" >> "$GITHUB_ENV"
+
+      - name: Build and upload
+        working-directory: apps/mobile
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: env.SLACK_WEBHOOK_URL != ''
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+        run: bundle exec fastlane android beta
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.keystore"
