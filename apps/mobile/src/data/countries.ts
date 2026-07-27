@@ -6,8 +6,13 @@
  * country is chosen during profile building (see CreateProfileScreen) and stored
  * in the profile store; every price is displayed with `formatMoney(usd, code)`.
  *
- * fxRates are approximate and intentionally easy to tune in one place. They are
- * a display convenience, not a billing source of truth.
+ * The fxRate on each country is a BUNDLED FALLBACK, used only until live rates
+ * arrive from GET /api/v1/fx (see services/fx). Hardcoded rates drift: these
+ * were last 83/0.79/1.37/1.53 for INR/GBP/CAD/AUD against real values of
+ * 96.6/0.75/1.41/1.43 — AUD alone was 7% out.
+ *
+ * Display only. What a booking costs is decided server-side at order time and
+ * snapshotted onto the payment; nothing here can influence a charge.
  */
 
 export type CountryCode = 'US' | 'IN' | 'GB' | 'AE' | 'CA' | 'AU';
@@ -46,7 +51,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currency: 'INR',
     symbol: '₹',
     locale: 'en-IN',
-    fxRate: 83,
+    fxRate: 96.62,
     roundTo: 10,
   },
   GB: {
@@ -56,7 +61,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currency: 'GBP',
     symbol: '£',
     locale: 'en-GB',
-    fxRate: 0.79,
+    fxRate: 0.75,
     roundTo: 1,
   },
   AE: {
@@ -76,7 +81,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currency: 'CAD',
     symbol: 'CA$',
     locale: 'en-CA',
-    fxRate: 1.37,
+    fxRate: 1.41,
     roundTo: 1,
   },
   AU: {
@@ -86,7 +91,7 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currency: 'AUD',
     symbol: 'A$',
     locale: 'en-AU',
-    fxRate: 1.53,
+    fxRate: 1.43,
     roundTo: 1,
   },
 };
@@ -99,10 +104,36 @@ export function getCountryConfig(code: CountryCode | null | undefined): CountryC
   return (code && COUNTRIES[code]) || COUNTRIES[DEFAULT_COUNTRY];
 }
 
+/**
+ * Live rates from the backend, keyed by ISO currency. Empty until hydrated at
+ * launch, so the bundled fxRate above is what renders on a cold first run.
+ *
+ * A module-level override keeps formatMoney() synchronous — it is called from
+ * render in eight places, and making those async would be a much larger change
+ * for a value that only affects a label.
+ */
+let liveRates: Record<string, number> = {};
+
+/** Called by services/fx once rates are fetched or restored from cache. */
+export function setLiveRates(rates: Record<string, number>): void {
+  liveRates = { ...rates };
+}
+
+export function getLiveRates(): Record<string, number> {
+  return { ...liveRates };
+}
+
+/** The rate actually used: live if hydrated, else the bundled fallback. */
+export function getEffectiveRate(code: CountryCode): number {
+  const config = getCountryConfig(code);
+  const live = liveRates[config.currency];
+  return typeof live === 'number' && Number.isFinite(live) && live > 0 ? live : config.fxRate;
+}
+
 /** Convert a USD-base amount to the country's local currency (rounded). */
 export function convertFromUsd(usd: number, code: CountryCode): number {
-  const { fxRate, roundTo } = getCountryConfig(code);
-  const local = usd * fxRate;
+  const { roundTo } = getCountryConfig(code);
+  const local = usd * getEffectiveRate(code);
   return Math.round(local / roundTo) * roundTo;
 }
 

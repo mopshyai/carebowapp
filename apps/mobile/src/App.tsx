@@ -33,6 +33,7 @@ import { initializeFeedbackDevTools } from './utils/feedbackDevTools';
 import { NetworkProvider } from './utils/NetworkProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { initializeSentry } from './services/monitoring/SentryService';
+import { hydrateExchangeRates } from './services/fx';
 import { useAuthStore } from './store/useAuthStore';
 import { ThemeProvider, useTheme } from './theme';
 import { createLogger } from './utils/logger';
@@ -176,6 +177,15 @@ function AppContent() {
       try {
         // Hydrate auth tokens from secure storage
         await hydrateTokens();
+
+        // Live display rates. Not awaited on the critical path: prices render
+        // from bundled fallbacks until this lands, and a failure here must
+        // never delay or block launch.
+        hydrateExchangeRates()
+          .then((source) => logger.debug('Exchange rates hydrated from', source))
+          .catch(() => {
+            /* hydrateExchangeRates already degrades internally */
+          });
 
         // Add any other initialization logic here
         // e.g., fetch user preferences, check for updates, etc.
