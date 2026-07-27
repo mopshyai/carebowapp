@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, radius, spacing, typography, shadows } from '../../theme';
 import { useAskCarebowStore } from '../../store/askCarebowStore';
-import { memberApi, V1Booking } from '../../services/api/endpoints/member';
+import { useBookingsStore } from '../../store';
 
 type Tab = 'all' | 'bookings' | 'conversations';
 
@@ -22,27 +22,30 @@ export default function CareHistoryScreen() {
   const navigation = useNavigation<any>();
   const sessions = useAskCarebowStore((state) => state.sessions);
   const [tab, setTab] = useState<Tab>('all');
-  const [bookings, setBookings] = useState<V1Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Shared store, so history and the bookings list cannot disagree.
+  const bookings = useBookingsStore((s) => s.bookings);
+  const status = useBookingsStore((s) => s.status);
+  const storeError = useBookingsStore((s) => s.error);
+  const fetchBookings = useBookingsStore((s) => s.fetch);
 
-  const load = useCallback(async (refresh = false) => {
-    refresh ? setRefreshing(true) : setLoading(true);
-    setError(null);
-    try {
-      const response = await memberApi.getBookings();
-      if (!response.success) throw new Error(response.error || 'Unable to load history');
-      setBookings(response.bookings ?? []);
-    } catch {
-      setError(
-        'Booking history could not be loaded. Your conversations remain available on this device.'
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loading = status === 'loading' && bookings.length === 0;
+  const error = storeError
+    ? 'Booking history could not be loaded. Your conversations remain available on this device.'
+    : null;
+
+  const load = useCallback(
+    async (refresh = false) => {
+      if (refresh) setRefreshing(true);
+      try {
+        await fetchBookings({ force: true });
+      } finally {
+        if (refresh) setRefreshing(false);
+      }
+    },
+    [fetchBookings]
+  );
 
   useEffect(() => {
     load();

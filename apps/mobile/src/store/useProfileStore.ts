@@ -8,6 +8,7 @@ import React from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CountryCode, DEFAULT_COUNTRY } from '../data/countries';
 import {
   UserProfile,
   FamilyMember,
@@ -26,8 +27,6 @@ import {
   Condition,
   Medication,
   generateId,
-  createEmptyMemberHealthInfo,
-  createEmptyCarePreferences,
   createDefaultNotificationPreferences,
   createDefaultPrivacySettings,
   createDefaultAppSettings,
@@ -63,6 +62,9 @@ type ProfileState = {
   privacySettings: PrivacySettings;
   appSettings: AppSettings;
 
+  // Country (drives currency/pricing across the app)
+  country: CountryCode;
+
   // UI state
   isLoading: boolean;
   hasCompletedOnboarding: boolean;
@@ -75,7 +77,9 @@ type ProfileActions = {
   logout: () => void;
 
   // Family members
-  addMember: (member: Omit<FamilyMember, 'id' | 'createdAt' | 'updatedAt' | 'profileCompleteness'>) => FamilyMember;
+  addMember: (
+    member: Omit<FamilyMember, 'id' | 'createdAt' | 'updatedAt' | 'profileCompleteness'>
+  ) => FamilyMember;
   updateMember: (id: string, updates: Partial<FamilyMember>) => void;
   deleteMember: (id: string) => void;
   setDefaultMember: (id: string) => void;
@@ -125,6 +129,9 @@ type ProfileActions = {
   // Care readiness
   calculateCareReadiness: (memberId?: string) => CareReadinessScore;
 
+  // Country
+  setCountry: (code: CountryCode) => void;
+
   // Onboarding
   completeOnboarding: () => void;
 
@@ -149,6 +156,7 @@ const initialState: ProfileState = {
   notificationPreferences: createDefaultNotificationPreferences(),
   privacySettings: createDefaultPrivacySettings(),
   appSettings: createDefaultAppSettings(),
+  country: DEFAULT_COUNTRY,
   isLoading: false,
   hasCompletedOnboarding: false,
 };
@@ -638,6 +646,11 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         set({ hasCompletedOnboarding: true });
       },
 
+      // ========== COUNTRY ==========
+      setCountry: (code) => {
+        set({ country: code });
+      },
+
       // ========== UTILS ==========
       setLoading: (loading) => {
         set({ isLoading: loading });
@@ -662,6 +675,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         notificationPreferences: state.notificationPreferences,
         privacySettings: state.privacySettings,
         appSettings: state.appSettings,
+        country: state.country,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
       }),
     }
@@ -699,7 +713,10 @@ function calculateMemberCompleteness(member: Partial<FamilyMember>): number {
   if (member.healthInfo?.medications && member.healthInfo.medications.length > 0)
     score += weights.medications;
   if (member.healthInfo?.mobilityStatus) score += weights.mobility;
-  if (member.carePreferences?.preferredCareType && member.carePreferences.preferredCareType.length > 0)
+  if (
+    member.carePreferences?.preferredCareType &&
+    member.carePreferences.preferredCareType.length > 0
+  )
     score += weights.carePreferences;
 
   return score;
@@ -722,8 +739,7 @@ export const useSelectedMember = () =>
 export const useDefaultMember = () =>
   useProfileStore((state) => state.members.find((m) => m.isDefault) || state.members[0]);
 
-export const useEmergencyContacts = () =>
-  useProfileStore((state) => state.emergencyContacts);
+export const useEmergencyContacts = () => useProfileStore((state) => state.emergencyContacts);
 
 export const useAddresses = () => useProfileStore((state) => state.addresses);
 
@@ -827,7 +843,6 @@ export const useCareReadiness = (memberId?: string): CareReadinessScore => {
 export const useNotificationPreferences = () =>
   useProfileStore((state) => state.notificationPreferences);
 
-export const usePrivacySettings = () =>
-  useProfileStore((state) => state.privacySettings);
+export const usePrivacySettings = () => useProfileStore((state) => state.privacySettings);
 
 export const useAppSettings = () => useProfileStore((state) => state.appSettings);

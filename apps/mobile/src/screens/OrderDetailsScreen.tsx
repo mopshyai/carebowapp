@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { memberApi, V1Booking } from '../services/api/endpoints/member';
+import { useBookingsStore, selectBookingById } from '../store';
 import { colors, radius, spacing, typography } from '../theme';
 
 const money = (paise: number) =>
@@ -16,7 +16,12 @@ export default function OrderDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const id = (route.params as { id?: string } | undefined)?.id;
-  const [booking, setBooking] = useState<V1Booking | null>(null);
+  // Read through the store so a cancel here is visible on the bookings list
+  // immediately, without either screen refetching.
+  const booking = useBookingsStore(selectBookingById(id ?? '')) ?? null;
+  const fetchOne = useBookingsStore((s) => s.fetchOne);
+  const cancelBooking = useBookingsStore((s) => s.cancel);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,17 +33,10 @@ export default function OrderDetailsScreen() {
     }
     setLoading(true);
     setError(null);
-    try {
-      const response = await memberApi.getBooking(id);
-      if (!response.success || !response.booking)
-        throw new Error(response.error || 'Booking not found');
-      setBooking(response.booking);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load booking');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+    const fetched = await fetchOne(id);
+    if (!fetched) setError('Booking not found');
+    setLoading(false);
+  }, [id, fetchOne]);
 
   useEffect(() => {
     load();
@@ -46,12 +44,11 @@ export default function OrderDetailsScreen() {
 
   const cancel = async () => {
     if (!id) return;
-    try {
-      const response = await memberApi.cancelBooking(id);
-      if (!response.success) throw new Error(response.error || 'Cancellation failed');
-      await load();
-    } catch (err) {
-      Alert.alert('Could not cancel', err instanceof Error ? err.message : 'Try again later.');
+    // The store reconciles from the server response, so the bookings list
+    // reflects the cancellation without this screen refetching it.
+    const result = await cancelBooking(id);
+    if (!result.ok) {
+      Alert.alert('Could not cancel', result.error);
     }
   };
 

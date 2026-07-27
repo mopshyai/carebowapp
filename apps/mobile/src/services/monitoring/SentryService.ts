@@ -17,6 +17,7 @@
 
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
+import { SENTRY_DSN as ENV_SENTRY_DSN } from '@env';
 
 // ============================================
 // TYPES
@@ -38,11 +39,14 @@ export type SeverityLevel = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 // CONFIGURATION
 // ============================================
 
-// Get DSN from environment (in production, use react-native-config)
-const SENTRY_DSN = process.env.SENTRY_DSN || '';
+// From '@env' (react-native-dotenv), not process.env — the latter is never
+// populated in React Native, so this previously resolved to '' in every build
+// and crash reporting was silently disabled.
+const SENTRY_DSN = ENV_SENTRY_DSN || '';
 
-// Enable in production, optionally in development
-const SENTRY_ENABLED = !__DEV__ || process.env.SENTRY_DEBUG === 'true';
+// Enable in production whenever a DSN is actually configured. Enabling without
+// a DSN just makes Sentry.init a no-op that looks like it worked.
+const SENTRY_ENABLED = Boolean(SENTRY_DSN) && !__DEV__;
 
 // App version for release tracking
 const APP_VERSION = '1.0.0';
@@ -113,9 +117,7 @@ class SentryServiceClass {
         },
 
         // Add default tags
-        integrations: [
-          Sentry.reactNativeTracingIntegration(),
-        ],
+        integrations: [Sentry.reactNativeTracingIntegration()],
       });
 
       // Set default tags
@@ -231,10 +233,7 @@ class SentryServiceClass {
   /**
    * Start a performance transaction
    */
-  startTransaction(
-    name: string,
-    operation: string
-  ): Sentry.Span | undefined {
+  startTransaction(name: string, operation: string): Sentry.Span | undefined {
     if (!this.isInitialized) return undefined;
 
     return Sentry.startInactiveSpan({
@@ -278,7 +277,7 @@ class SentryServiceClass {
    */
   wrap<P extends object>(
     Component: React.ComponentType<P>,
-    fallback?: React.ReactNode
+    _fallback?: React.ReactNode
   ): React.ComponentType<P> {
     // Sentry.wrap is typed for ComponentType<Record<string, unknown>>; bridge the generic.
     return Sentry.wrap(

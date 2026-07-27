@@ -4,17 +4,27 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL, API_TIMEOUT } from '@env';
 import { HttpMethod, RequestConfig, ApiResponse, ApiError, AuthTokens } from './types';
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
+// Read from '@env', not process.env. react-native-dotenv (see babel.config.js)
+// inlines `@env` imports at build time; it does NOT populate process.env, which
+// in React Native only ever carries NODE_ENV. This file previously read
+// process.env.API_BASE_URL, so the value in .env was silently ignored and the
+// fallback below was always what shipped.
 const API_CONFIG = {
   // Live backend on Hostinger VPS. The `www` is mandatory: the bare domain
   // 302/307-redirects to www, and RN fetch drops POST bodies on redirect.
-  baseUrl: process.env.API_BASE_URL || 'https://www.carebow.com/api',
-  timeout: 30000, // 30 seconds
+  //
+  // No version suffix here — endpoints carry their own prefix, because the app
+  // calls both versioned (/v1/auth/login) and unversioned (/auth/enabled-methods,
+  // /ask-carebow/message) paths. A baseUrl ending in /v1 would break both.
+  baseUrl: API_BASE_URL || 'https://www.carebow.com/api',
+  timeout: Number(API_TIMEOUT) || 30000, // 30 seconds
   retries: 2,
 };
 

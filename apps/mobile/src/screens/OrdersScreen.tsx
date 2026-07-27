@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { memberApi, V1Booking } from '../services/api/endpoints/member';
+import { useBookingsStore } from '../store';
 import { colors, layout, radius, shadows, space, typography } from '../theme/tokens';
 
 const formatMoney = (paise: number) =>
@@ -25,29 +25,37 @@ const formatMoney = (paise: number) =>
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const [bookings, setBookings] = useState<V1Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Booking data lives in the store, not in screen state, so the details and
+  // history screens see the same rows after a cancel instead of each holding
+  // their own copy.
+  const bookings = useBookingsStore((s) => s.bookings);
+  const status = useBookingsStore((s) => s.status);
+  const error = useBookingsStore((s) => s.error);
+  const fetchBookings = useBookingsStore((s) => s.fetch);
 
-  const load = useCallback(async (refresh = false) => {
-    refresh ? setRefreshing(true) : setLoading(true);
-    setError(null);
-    try {
-      const response = await memberApi.getBookings();
-      if (!response.success) throw new Error(response.error || 'Unable to load bookings');
-      setBookings(response.bookings ?? []);
-    } catch {
-      setError('We could not load your bookings. Check your connection and try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Only a first load shows the full-screen spinner; a refetch behind existing
+  // rows should not blank the list.
+  const loading = status === 'loading' && bookings.length === 0;
+
+  const load = useCallback(
+    async (refresh = false) => {
+      if (refresh) setRefreshing(true);
+      try {
+        await fetchBookings({ force: true });
+      } finally {
+        if (refresh) setRefreshing(false);
+      }
+    },
+    [fetchBookings]
+  );
 
   useEffect(() => {
-    load();
-  }, [load]);
+    // Not forced: returning to this screen within the freshness window reuses
+    // the cache instead of refetching on every mount.
+    fetchBookings();
+  }, [fetchBookings]);
 
   return (
     <View style={styles.container}>
