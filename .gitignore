@@ -37,3 +37,11 @@ coverage/
 # Misc
 *.tsbuildinfo
 .cache/
+
+# Android release signing. The upload key and its password must never be
+# committed — a previous keystore was, in a public repo, and is now dead.
+apps/mobile/android/keystore.properties
+apps/mobile/android/app/*.keystore
+apps/mobile/android/app/*.jks
+apps/mobile/android/app/*.keystore.b64
+!apps/mobile/android/app/debug.keystore

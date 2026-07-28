@@ -108,11 +108,30 @@ android {
             keyPassword 'android'
         }
         release {
-            if (project.hasProperty('CAREBOW_RELEASE_STORE_FILE')) {
-                storeFile file(CAREBOW_RELEASE_STORE_FILE)
-                storePassword CAREBOW_RELEASE_STORE_PASSWORD
-                keyAlias CAREBOW_RELEASE_KEY_ALIAS
-                keyPassword CAREBOW_RELEASE_KEY_PASSWORD
+            // Credentials come from keystore.properties (gitignored) for local
+            // release builds, or from the environment. Never from a tracked
+            // file — the previous keystore and its password were both committed
+            // to this public repo and had to be treated as compromised.
+            //
+            // CI does not use this block at all: fastlane injects signing via
+            // android.injected.signing.* so no secret is ever written to disk
+            // in a tracked location.
+            def props = new Properties()
+            def propsFile = rootProject.file('keystore.properties')
+            if (propsFile.exists()) {
+                propsFile.withInputStream { props.load(it) }
+            }
+
+            def storeFileName = props['CAREBOW_RELEASE_STORE_FILE'] ?: System.getenv('ANDROID_KEYSTORE_PATH')
+            def storePw = props['CAREBOW_RELEASE_STORE_PASSWORD'] ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            def alias = props['CAREBOW_RELEASE_KEY_ALIAS'] ?: System.getenv('ANDROID_KEY_ALIAS')
+            def keyPw = props['CAREBOW_RELEASE_KEY_PASSWORD'] ?: System.getenv('ANDROID_KEY_PASSWORD')
+
+            if (storeFileName && storePw && alias && keyPw) {
+                storeFile file(storeFileName)
+                storePassword storePw
+                keyAlias alias
+                keyPassword keyPw
             }
         }
     }
