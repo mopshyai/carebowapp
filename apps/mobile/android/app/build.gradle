@@ -138,3 +138,22 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// react-native-vector-icons' fonts.gradle copies fonts into
+// build/intermediates/ReactNativeVectorIcons and adds that directory to
+// assets.srcDirs, but never tells the lint model tasks that the directory is
+// produced by a task. Gradle 8 sees a task consuming another task's output with
+// no declared dependency and fails the release build.
+//
+// It is right to complain: without an ordering rule the lint model can be built
+// before the fonts are copied, so which assets lint sees depends on task order.
+// The icons themselves are load-bearing here — the UI uses vector icons instead
+// of emoji, which render as tofu on iOS.
+//
+// CI does not currently reach these tasks, so it never hit this; a local
+// `./gradlew assembleRelease` fails without it.
+tasks.matching {
+    it.name.startsWith('lintVital') || it.name.contains('LintVitalReportModel')
+}.configureEach {
+    dependsOn 'copyReactNativeVectorIconFonts'
+}
