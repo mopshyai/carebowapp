@@ -1066,6 +1066,33 @@ export function searchRemediesBySymptom(symptom: string): ConditionRemedies[] {
     itching: ['skin_rash'],
     sleep: ['sleep_difficulty'],
     insomnia: ['sleep_difficulty'],
+    // How people actually describe these when they are not using the clinical
+    // word. Without these, "burning in chest" matches nothing, the generator
+    // returns null, and we show no remedy at all for the commonest complaint.
+    'burning in chest': ['acidity'],
+    'chest burning': ['acidity'],
+    'burning sensation': ['acidity'],
+    sour: ['acidity'],
+    'stomach pain': ['acidity', 'gas_bloating'],
+    'stomach upset': ['gas_bloating', 'acidity'],
+    'not able to pass stool': ['constipation'],
+    'hard stool': ['constipation'],
+    'blocked nose': ['common_cold'],
+    'runny nose': ['common_cold'],
+    sneezing: ['common_cold'],
+    'chest congestion': ['cough', 'common_cold'],
+    'throat pain': ['common_cold', 'cough'],
+    temperature: ['fever'],
+    'head pain': ['headache'],
+    migraine: ['headache'],
+    'body pain': ['body_ache'],
+    weakness: ['body_ache'],
+    joint: ['body_ache'],
+    itchy: ['skin_rash'],
+    'skin irritation': ['skin_rash'],
+    'cannot sleep': ['sleep_difficulty'],
+    "can't sleep": ['sleep_difficulty'],
+    restless: ['sleep_difficulty'],
   };
 
   // Find matching conditions
@@ -1121,10 +1148,12 @@ export function filterRemediesForProfile(
         }
         return false;
       }
-      if (contraindication.includes('infant') && profile.age && profile.age < 1) {
+      // `profile.age &&` would be falsy at age 0 — i.e. it would skip the check
+      // for the exact patient the infant contraindication exists to protect.
+      if (contraindication.includes('infant') && profile.age !== undefined && profile.age < 1) {
         return false;
       }
-      if (contraindication.includes('children_under') && profile.age) {
+      if (contraindication.includes('children_under') && profile.age !== undefined) {
         const ageMatch = contraindication.match(/children_under_(\d+)/);
         if (ageMatch && profile.age < parseInt(ageMatch[1])) {
           return false;
@@ -1133,7 +1162,7 @@ export function filterRemediesForProfile(
     }
 
     // Check suitability
-    if (profile.age) {
+    if (profile.age !== undefined) {
       if (profile.age >= 60 && !remedy.suitableFor.some((s) => s.includes('elderly'))) {
         // Still allow if suitable for all_ages or adults
         if (!remedy.suitableFor.some((s) => s === 'all_ages' || s === 'adults')) {
