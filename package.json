@@ -41,7 +41,7 @@
     "lint-staged": "^15.2.0",
     "prettier": "^3.2.4",
     "standard-version": "^9.5.0",
-    "turbo": "^2.7.5",
+    "turbo": "^2.10.7",
     "turbo-darwin-arm64": "^2.7.5",
     "typescript": "^5.3.3"
   },
