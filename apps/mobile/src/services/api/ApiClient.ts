@@ -54,6 +54,16 @@ class ApiClientImpl {
     this.defaultRetries = API_CONFIG.retries;
   }
 
+  /** For callers that need to build a request this class doesn't wrap (e.g. sseClient.ts's raw XHR streaming). */
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /** Same rationale as getBaseUrl — current in-memory token, not read fresh from storage. */
+  getAccessToken(): string | null {
+    return this.accessToken;
+  }
+
   // ========================================
   // INITIALIZATION
   // ========================================

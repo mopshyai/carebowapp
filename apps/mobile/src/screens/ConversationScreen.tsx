@@ -34,7 +34,7 @@ import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottom
 // AI Engine
 import { processUserInput } from '../lib/askCarebow';
 import { askCareBowApi } from '../services/api/endpoints/askCareBow';
-import { getOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
+import { streamOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
 import { ASK_CAREBOW_ORCHESTRATOR_ENABLED } from '../config/featureFlags';
 import { createLogger } from '../utils/logger';
 
@@ -72,6 +72,11 @@ export default function ConversationScreen() {
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
+  // E4: the medical agent's answer as it streams in, token by token. null
+  // when nothing is streaming (including the rewrite-only fallback path,
+  // which isn't streamed); '' once a stream has started but no text has
+  // arrived yet.
+  const [streamingText, setStreamingText] = useState<string | null>(null);
 
   // Episode store
   const {
@@ -214,11 +219,14 @@ export default function ConversationScreen() {
           draftResponse &&
           currentSession?.memberId
         ) {
-          const orchestratorReply = await getOrchestratorReply({
+          setStreamingText('');
+          const orchestratorReply = await streamOrchestratorReply({
             localSessionId: currentSession.id,
             profileId: currentSession.memberId,
             text,
+            onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
           });
+          setStreamingText(null);
           if (orchestratorReply) {
             displayMessages = response.messages.map((message, index) =>
               index === 0 ? { ...message, text: orchestratorReply.text } : message
@@ -308,6 +316,7 @@ export default function ConversationScreen() {
       } catch (error) {
         logger.error('Error processing message', error);
         setIsTyping(false);
+        setStreamingText(null);
         addAssistantMessage({
           role: 'assistant',
           contentType: 'text',
@@ -429,8 +438,24 @@ export default function ConversationScreen() {
           />
         ))}
 
-        {/* Typing Indicator */}
-        {isTyping && <TypingIndicator />}
+        {/* Typing Indicator — shown until the orchestrator's stream (E4) has
+            produced its first token, if this turn is streaming at all */}
+        {isTyping && !streamingText && <TypingIndicator />}
+
+        {/* Streaming preview — the medical agent's answer rendering token by
+            token, before it's added to the message list as a real message */}
+        {!!streamingText && (
+          <ChatBubble
+            message={{
+              id: 'streaming-preview',
+              role: 'assistant',
+              contentType: 'text',
+              text: streamingText,
+              timestamp: new Date().toISOString(),
+            }}
+            episodeId={currentEpisodeId || undefined}
+          />
+        )}
 
         {/* Quick Options */}
         {showQuickOptions && lastMessage.quickOptions && (
