@@ -50,6 +50,10 @@
 	<string>CareBow needs access to your microphone for voice input when describing symptoms.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>CareBow uses speech recognition to convert your spoken symptoms into text.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CareBow needs access to your camera to take photos when describing symptoms to Ask CareBow.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CareBow needs access to your photo library to attach photos when describing symptoms to Ask CareBow.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
