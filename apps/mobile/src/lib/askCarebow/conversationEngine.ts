@@ -26,7 +26,7 @@ import {
 } from './followUpQuestions';
 import { getServiceRecommendations } from './serviceRouter';
 import { buildGuidanceResponse } from './guidanceBuilder';
-import { classifyIntent } from './intentClassifier';
+import { classifyIntent, ConversationIntent } from './intentClassifier';
 
 // ============================================
 // TYPES
@@ -40,6 +40,12 @@ export type ConversationResponse = {
   serviceRecommendations?: ServiceRecommendation[];
   isEmergency?: boolean;
   questionAsked?: FollowUpQuestionType;
+  // Which branch this turn resolved to. 'emergency' is set here (rather than
+  // living in ConversationIntent) because it's decided by detectEmergency
+  // before classifyIntent ever runs — see STEP 1 in processUserInput.
+  // ConversationScreen uses this to decide symptom-help turns should call the
+  // orchestrator (E7) instead of the rewrite-only endpoint.
+  intent?: ConversationIntent | 'emergency';
 };
 
 // ============================================
@@ -143,6 +149,7 @@ function handleInitialInput(
     phaseUpdate: 'gathering',
     healthContextUpdates,
     questionAsked: firstQuestionType,
+    intent: 'symptom_help',
   };
 }
 
@@ -161,6 +168,7 @@ function handleTalkIntent(): ConversationResponse {
   return {
     messages: [{ role: 'assistant', contentType: 'text', text: opener }],
     phaseUpdate: 'talking',
+    intent: 'talk',
   };
 }
 
@@ -190,6 +198,7 @@ function handleTalkingInput(
       },
     ],
     phaseUpdate: 'talking',
+    intent: 'talk',
   };
 }
 
@@ -212,6 +221,7 @@ function handleWantDoctorIntent(): ConversationResponse {
     ],
     phaseUpdate: 'service_routing',
     serviceRecommendations: [recommendation],
+    intent: 'want_doctor',
   };
 }
 
@@ -234,6 +244,7 @@ function handleWantTestIntent(): ConversationResponse {
     ],
     phaseUpdate: 'service_routing',
     serviceRecommendations: [recommendation],
+    intent: 'want_test',
   };
 }
 
@@ -273,6 +284,7 @@ function handleGatheringInput(
         phaseUpdate: 'gathering',
         healthContextUpdates,
         questionAsked: nextQuestionType,
+        intent: 'symptom_help',
       };
     }
   }
@@ -297,6 +309,7 @@ function handlePostGuidanceInput(
         text: followUpResponse,
       },
     ],
+    intent: 'symptom_help',
   };
 }
 
@@ -342,6 +355,7 @@ function generateEmergencyResponse(
     phaseUpdate: 'completed',
     urgencyLevel: 'emergency',
     isEmergency: true,
+    intent: 'emergency',
   };
 }
 
@@ -406,6 +420,7 @@ function generateAssessmentAndGuidance(
     healthContextUpdates,
     urgencyLevel: assessment.urgency,
     serviceRecommendations,
+    intent: 'symptom_help',
   };
 }
 

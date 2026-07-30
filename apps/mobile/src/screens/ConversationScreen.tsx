@@ -34,6 +34,8 @@ import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottom
 // AI Engine
 import { processUserInput } from '../lib/askCarebow';
 import { askCareBowApi } from '../services/api/endpoints/askCareBow';
+import { getOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
+import { ASK_CAREBOW_ORCHESTRATOR_ENABLED } from '../config/featureFlags';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('Conversation');
@@ -200,7 +202,32 @@ export default function ConversationScreen() {
           .map((message) => message.text)
           .filter(Boolean)
           .join('\n\n');
-        if (draftResponse) {
+
+        // Symptom-help turns get the real LLM-reasoned, RAG-grounded
+        // orchestrator response (E7) instead of the rewrite-only endpoint.
+        // Every other intent (talk / want_doctor / want_test / emergency)
+        // keeps using the rewrite-only call, unchanged.
+        let usedOrchestrator = false;
+        if (
+          ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
+          response.intent === 'symptom_help' &&
+          draftResponse &&
+          currentSession?.memberId
+        ) {
+          const orchestratorReply = await getOrchestratorReply({
+            localSessionId: currentSession.id,
+            profileId: currentSession.memberId,
+            text,
+          });
+          if (orchestratorReply) {
+            displayMessages = response.messages.map((message, index) =>
+              index === 0 ? { ...message, text: orchestratorReply.text } : message
+            );
+            usedOrchestrator = true;
+          }
+        }
+
+        if (!usedOrchestrator && draftResponse) {
           try {
             const liveResponse = await askCareBowApi.rewrite({
               messageText: text,
