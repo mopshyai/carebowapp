@@ -14,6 +14,8 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { askCarebowOrchestratorApi } from '../../services/api/endpoints/askCarebowOrchestrator';
+import { ApiClient } from '../../services/api/ApiClient';
+import { postSSE } from '../../services/api/sseClient';
 
 const SESSION_CACHE_PREFIX = '@carebow/orchestrator_session/';
 
@@ -61,6 +63,70 @@ export async function getOrchestratorReply(params: {
   } catch {
     // Network/backend/auth failure — caller falls back to the rewrite-only
     // response, same as askCareBowApi.rewrite's existing failure mode.
+    return null;
+  }
+}
+
+/**
+ * E4: same contract as getOrchestratorReply (null on any failure, caller
+ * falls back to rewrite-only), but calls onTextDelta as the medical agent's
+ * answer streams in from the backend's SSE-mode endpoint (`stream: true`
+ * in the request body — see messages/route.ts in carebow-main). Every other
+ * intent/agent path on the backend still answers in one shot; those arrive
+ * as a single 'delta' event immediately followed by 'done', which this
+ * still renders correctly, just without incremental deltas.
+ */
+export async function streamOrchestratorReply(params: {
+  localSessionId: string;
+  profileId: string;
+  text: string;
+  onTextDelta: (delta: string) => void;
+}): Promise<OrchestratorReply | null> {
+  try {
+    const backendSessionId = await getOrCreateBackendSessionId(
+      params.localSessionId,
+      params.profileId
+    );
+
+    const token = ApiClient.getAccessToken();
+
+    interface DoneEvent {
+      assistantMessage?: { content?: string };
+      isEmergency?: boolean;
+      urgencyLevel?: string;
+    }
+    let doneEvent: DoneEvent | null = null;
+
+    await postSSE(
+      `${ApiClient.getBaseUrl()}/chat/sessions/${backendSessionId}/messages`,
+      { content: params.text, stream: true },
+      {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      (event) => {
+        const e = event as { type?: string; text?: string } & DoneEvent;
+        if (e.type === 'delta' && e.text) {
+          params.onTextDelta(e.text);
+        } else if (e.type === 'done') {
+          doneEvent = e;
+        }
+      }
+    );
+
+    // Re-bind through an explicit cast: doneEvent is only ever reassigned
+    // inside the postSSE callback above, and TS's flow analysis does not
+    // carry that reassignment back into this scope, so it (wrongly) treats
+    // doneEvent as still null here without this.
+    const finalEvent = doneEvent as DoneEvent | null;
+    if (!finalEvent?.assistantMessage?.content) return null;
+
+    return {
+      text: finalEvent.assistantMessage.content,
+      isEmergency: finalEvent.isEmergency ?? false,
+      urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
+    };
+  } catch {
     return null;
   }
 }
