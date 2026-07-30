@@ -1,9 +1,15 @@
 /**
  * HomeRemediesSheet Component
- * Bottom sheet with personalized home remedies checklist based on symptoms
+ * Bottom sheet with a personalized home remedies checklist based on symptoms.
+ *
+ * Remedy content comes from the backend (src/lib/agents/tools/remedies-tool.ts
+ * in carebow-main), not a bundled local list — the backend filters out
+ * anything unsafe for this specific patient (pregnancy, diabetes, age,
+ * allergies) before it ever reaches this screen. The old inline list here had
+ * no such filtering at all.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,272 +20,70 @@ import {
   ScrollView,
   Share,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import type { TriageLevel } from '../../utils/triageCTAMapping';
-
-// ============================================
-// TYPES
-// ============================================
-
-interface HomeRemedy {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  category: 'hydration' | 'rest' | 'nutrition' | 'medication' | 'monitoring' | 'comfort';
-}
+import { getRemediesForSymptom } from '../../lib/askCarebow/remediesClient';
+import type { Remedy } from '../../services/api/endpoints/remedies';
 
 interface HomeRemediesSheetProps {
   visible: boolean;
   onClose: () => void;
   symptoms?: string[];
   triageLevel?: TriageLevel;
+  profileId?: string;
 }
 
-// ============================================
-// REMEDY DATABASE
-// ============================================
+type LoadState = 'idle' | 'loading' | 'loaded' | 'empty' | 'error';
 
-const remedyCategories = {
-  hydration: { label: 'Hydration', icon: 'water', color: '#3B82F6' },
-  rest: { label: 'Rest & Recovery', icon: 'bed', color: '#8B5CF6' },
-  nutrition: { label: 'Nutrition', icon: 'nutrition', color: '#10B981' },
-  medication: { label: 'Over-the-counter', icon: 'medical', color: '#F59E0B' },
-  monitoring: { label: 'Self-Monitoring', icon: 'pulse', color: '#EF4444' },
-  comfort: { label: 'Comfort Measures', icon: 'happy', color: '#EC4899' },
-};
-
-const commonRemedies: HomeRemedy[] = [
-  {
-    id: 'water',
-    title: 'Stay Hydrated',
-    description:
-      'Drink 8-10 glasses of water throughout the day. Clear fluids help flush out toxins.',
-    icon: 'water',
-    category: 'hydration',
-  },
-  {
-    id: 'rest',
-    title: 'Get Adequate Rest',
-    description: 'Aim for 7-9 hours of sleep. Your body heals best during rest.',
-    icon: 'bed',
-    category: 'rest',
-  },
-  {
-    id: 'nutrition',
-    title: 'Eat Light, Nutritious Meals',
-    description: 'Focus on soups, fruits, and vegetables. Avoid heavy or spicy foods.',
-    icon: 'leaf',
-    category: 'nutrition',
-  },
-  {
-    id: 'monitor',
-    title: 'Monitor Your Symptoms',
-    description: 'Keep track of any changes. Note timing, severity, and triggers.',
-    icon: 'clipboard',
-    category: 'monitoring',
-  },
-];
-
-const symptomSpecificRemedies: Record<string, HomeRemedy[]> = {
-  fever: [
-    {
-      id: 'fever-1',
-      title: 'Cool Compress',
-      description: 'Apply a cool, damp cloth to forehead and wrists to help reduce temperature.',
-      icon: 'snow',
-      category: 'comfort',
-    },
-    {
-      id: 'fever-2',
-      title: 'Light Clothing',
-      description: 'Wear loose, breathable clothing. Avoid bundling up.',
-      icon: 'shirt',
-      category: 'comfort',
-    },
-    {
-      id: 'fever-3',
-      title: 'Acetaminophen or Ibuprofen',
-      description: 'Take as directed on package. Do not exceed recommended dose.',
-      icon: 'medical',
-      category: 'medication',
-    },
-  ],
-  headache: [
-    {
-      id: 'headache-1',
-      title: 'Rest in a Dark Room',
-      description: 'Dim lights and reduce screen time to ease eye strain.',
-      icon: 'moon',
-      category: 'rest',
-    },
-    {
-      id: 'headache-2',
-      title: 'Apply Cold or Warm Compress',
-      description: 'Try both to see which provides more relief for you.',
-      icon: 'thermometer',
-      category: 'comfort',
-    },
-    {
-      id: 'headache-3',
-      title: 'Caffeine (in moderation)',
-      description: 'A small amount of caffeine may help. Avoid if sensitive.',
-      icon: 'cafe',
-      category: 'nutrition',
-    },
-  ],
-  cough: [
-    {
-      id: 'cough-1',
-      title: 'Honey and Warm Water',
-      description: 'Mix 1-2 tsp honey in warm water or tea. Soothes throat irritation.',
-      icon: 'flask',
-      category: 'nutrition',
-    },
-    {
-      id: 'cough-2',
-      title: 'Steam Inhalation',
-      description: 'Breathe in steam from hot water (carefully) to loosen mucus.',
-      icon: 'cloud',
-      category: 'comfort',
-    },
-    {
-      id: 'cough-3',
-      title: 'Elevate Your Head',
-      description: 'Use extra pillows when sleeping to reduce nighttime coughing.',
-      icon: 'bed',
-      category: 'rest',
-    },
-  ],
-  'sore throat': [
-    {
-      id: 'throat-1',
-      title: 'Salt Water Gargle',
-      description: 'Gargle with 1/4 tsp salt in warm water several times daily.',
-      icon: 'water',
-      category: 'hydration',
-    },
-    {
-      id: 'throat-2',
-      title: 'Warm Liquids',
-      description: 'Drink warm tea, broth, or soup to soothe irritation.',
-      icon: 'cafe',
-      category: 'hydration',
-    },
-    {
-      id: 'throat-3',
-      title: 'Throat Lozenges',
-      description: 'Use sugar-free lozenges to keep throat moist.',
-      icon: 'ellipse',
-      category: 'medication',
-    },
-  ],
-  'body aches': [
-    {
-      id: 'ache-1',
-      title: 'Gentle Stretching',
-      description: 'Light stretches can help relieve muscle tension.',
-      icon: 'body',
-      category: 'rest',
-    },
-    {
-      id: 'ache-2',
-      title: 'Warm Bath or Shower',
-      description: 'Warm water relaxes muscles and improves circulation.',
-      icon: 'water',
-      category: 'comfort',
-    },
-    {
-      id: 'ache-3',
-      title: 'Anti-inflammatory',
-      description: 'Ibuprofen can help reduce inflammation and pain.',
-      icon: 'medical',
-      category: 'medication',
-    },
-  ],
-  fatigue: [
-    {
-      id: 'fatigue-1',
-      title: 'Short Rest Periods',
-      description: 'Take 20-30 minute power naps. Avoid sleeping too long during day.',
-      icon: 'time',
-      category: 'rest',
-    },
-    {
-      id: 'fatigue-2',
-      title: 'Balanced Meals',
-      description: 'Eat regular, balanced meals to maintain energy levels.',
-      icon: 'restaurant',
-      category: 'nutrition',
-    },
-    {
-      id: 'fatigue-3',
-      title: 'Light Activity',
-      description: 'Short walks can boost energy when appropriate.',
-      icon: 'walk',
-      category: 'rest',
-    },
-  ],
-  nausea: [
-    {
-      id: 'nausea-1',
-      title: 'Ginger',
-      description: 'Try ginger tea, ginger ale, or ginger candies.',
-      icon: 'leaf',
-      category: 'nutrition',
-    },
-    {
-      id: 'nausea-2',
-      title: 'Small, Bland Meals',
-      description: 'Eat crackers, toast, or rice in small amounts.',
-      icon: 'restaurant',
-      category: 'nutrition',
-    },
-    {
-      id: 'nausea-3',
-      title: 'Fresh Air',
-      description: 'Step outside or open windows for fresh air circulation.',
-      icon: 'sunny',
-      category: 'comfort',
-    },
-  ],
-};
-
-// ============================================
-// COMPONENT
-// ============================================
-
-export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemediesSheetProps) {
+export function HomeRemediesSheet({
+  visible,
+  onClose,
+  symptoms = [],
+  profileId,
+}: HomeRemediesSheetProps) {
   const insets = useSafeAreaInsets();
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [remedies, setRemedies] = useState<Remedy[]>([]);
+  const [warningSignsToWatch, setWarningSignsToWatch] = useState<string[]>([]);
+  const [lifestyleAdvice, setLifestyleAdvice] = useState<string[]>([]);
+  const [withheld, setWithheld] = useState<{ name: string; reason: string }[]>([]);
+  const [disclaimer, setDisclaimer] = useState<string>(
+    'Traditional self-care, not medical advice or a diagnosis. If symptoms are severe, ' +
+      'worsening, or last more than a few days, see a clinician.'
+  );
+  const [fromCache, setFromCache] = useState(false);
 
-  // Build remedies list based on symptoms
-  const getRemedies = useCallback((): HomeRemedy[] => {
-    const remedies: HomeRemedy[] = [...commonRemedies];
-    const addedIds = new Set(commonRemedies.map((r) => r.id));
+  const primarySymptom = symptoms[0];
 
-    // Add symptom-specific remedies
-    symptoms.forEach((symptom) => {
-      const normalizedSymptom = symptom.toLowerCase();
-      Object.entries(symptomSpecificRemedies).forEach(([key, items]) => {
-        if (normalizedSymptom.includes(key)) {
-          items.forEach((remedy) => {
-            if (!addedIds.has(remedy.id)) {
-              remedies.push(remedy);
-              addedIds.add(remedy.id);
-            }
-          });
-        }
-      });
-    });
+  const load = useCallback(async () => {
+    if (!primarySymptom) {
+      setLoadState('empty');
+      return;
+    }
+    setLoadState('loading');
+    const result = await getRemediesForSymptom({ symptom: primarySymptom, profileId });
+    if (!result || !result.data.remedies?.length) {
+      setRemedies([]);
+      setLoadState('empty');
+      return;
+    }
+    setRemedies(result.data.remedies);
+    setWarningSignsToWatch(result.data.warningSignsToWatch ?? []);
+    setLifestyleAdvice(result.data.lifestyleAdvice ?? []);
+    setWithheld(result.data.withheld ?? []);
+    if (result.data.disclaimer) setDisclaimer(result.data.disclaimer);
+    setFromCache(result.fromCache);
+    setLoadState('loaded');
+  }, [primarySymptom, profileId]);
 
-    return remedies;
-  }, [symptoms]);
-
-  const remedies = getRemedies();
+  useEffect(() => {
+    if (visible) load();
+  }, [visible, load]);
 
   const toggleItem = (id: string) => {
     setCheckedItems((prev) => {
@@ -294,18 +98,15 @@ export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemed
   };
 
   const handleShare = async () => {
-    const checkedRemedies = remedies.filter((r) => checkedItems.has(r.id));
+    const checkedRemedies = remedies.filter((r) => checkedItems.has(r.name));
     const remedyList = checkedRemedies.length > 0 ? checkedRemedies : remedies;
 
     const message = `My Home Care Checklist\n\n${remedyList
-      .map((r, i) => `${i + 1}. ${r.title}\n   ${r.description}`)
+      .map((r, i) => `${i + 1}. ${r.name}\n   ${r.howTo}`)
       .join('\n\n')}\n\nGenerated by CareBow`;
 
     try {
-      await Share.share({
-        message,
-        title: 'Home Care Checklist',
-      });
+      await Share.share({ message, title: 'Home Care Checklist' });
     } catch {
       Alert.alert('Unable to Share', 'There was an error sharing your checklist.');
     }
@@ -321,12 +122,10 @@ export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemed
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
           onPress={(e) => e.stopPropagation()}
         >
-          {/* Handle */}
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
           </View>
 
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.iconContainer}>
@@ -335,95 +134,146 @@ export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemed
               <View>
                 <Text style={styles.title}>Home Care Checklist</Text>
                 <Text style={styles.subtitle}>
-                  {checkedItems.size} of {remedies.length} completed
+                  {loadState === 'loaded'
+                    ? `${checkedItems.size} of ${remedies.length} completed`
+                    : ' '}
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShare}
-              accessibilityLabel="Share checklist"
-              accessibilityRole="button"
-            >
-              <Icon name="share-outline" size={20} color={colors.accent} />
-            </TouchableOpacity>
+            {loadState === 'loaded' && (
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+                accessibilityLabel="Share checklist"
+                accessibilityRole="button"
+              >
+                <Icon name="share-outline" size={20} color={colors.accent} />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+          {loadState === 'loaded' && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{progressPercentage}%</Text>
             </View>
-            <Text style={styles.progressText}>{progressPercentage}%</Text>
-          </View>
+          )}
 
-          {/* Disclaimer */}
           <View style={styles.disclaimer}>
             <Icon name="information-circle" size={16} color={colors.textTertiary} />
             <Text style={styles.disclaimerText}>
-              These are general suggestions. Always consult a healthcare provider for persistent or
-              severe symptoms.
+              {disclaimer}
+              {fromCache ? ' (showing the last saved version — you appear to be offline.)' : ''}
             </Text>
           </View>
 
-          {/* Remedies List */}
-          <ScrollView
-            style={styles.scrollView}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {remedies.map((remedy) => {
-              const isChecked = checkedItems.has(remedy.id);
-              const categoryInfo = remedyCategories[remedy.category];
+          {loadState === 'loading' && (
+            <View style={styles.centerState}>
+              <ActivityIndicator color={colors.accent} />
+              <Text style={styles.centerStateText}>Finding safe remedies for you…</Text>
+            </View>
+          )}
 
-              return (
-                <TouchableOpacity
-                  key={remedy.id}
-                  style={[styles.remedyItem, isChecked && styles.remedyItemChecked]}
-                  onPress={() => toggleItem(remedy.id)}
-                  activeOpacity={0.7}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isChecked }}
-                  accessibilityLabel={`${remedy.title}. ${remedy.description}`}
-                >
-                  {/* Checkbox */}
-                  <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
-                    {isChecked && <Icon name="checkmark" size={14} color={colors.textInverse} />}
-                  </View>
+          {loadState === 'empty' && (
+            <View style={styles.centerState}>
+              <Icon name="cloud-offline-outline" size={28} color={colors.textTertiary} />
+              <Text style={styles.centerStateText}>
+                {primarySymptom
+                  ? "We couldn't find a saved remedy for this right now — try again once you're back online, or talk to a doctor."
+                  : 'Describe your symptom first so we can suggest something safe.'}
+              </Text>
+            </View>
+          )}
 
-                  {/* Content */}
-                  <View style={styles.remedyContent}>
-                    <View style={styles.remedyHeader}>
-                      <Text style={[styles.remedyTitle, isChecked && styles.remedyTitleChecked]}>
-                        {remedy.title}
-                      </Text>
-                      <View
-                        style={[
-                          styles.categoryBadge,
-                          { backgroundColor: categoryInfo.color + '20' },
-                        ]}
-                      >
-                        <Icon name={categoryInfo.icon} size={10} color={categoryInfo.color} />
-                        <Text style={[styles.categoryText, { color: categoryInfo.color }]}>
-                          {categoryInfo.label}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text
-                      style={[
-                        styles.remedyDescription,
-                        isChecked && styles.remedyDescriptionChecked,
-                      ]}
+          {loadState === 'loaded' && (
+            <>
+              <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+              >
+                {remedies.map((remedy) => {
+                  const isChecked = checkedItems.has(remedy.name);
+
+                  return (
+                    <TouchableOpacity
+                      key={remedy.name}
+                      style={[styles.remedyItem, isChecked && styles.remedyItemChecked]}
+                      onPress={() => toggleItem(remedy.name)}
+                      activeOpacity={0.7}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: isChecked }}
+                      accessibilityLabel={`${remedy.name}. ${remedy.description}`}
                     >
-                      {remedy.description}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                      <View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+                        {isChecked && (
+                          <Icon name="checkmark" size={14} color={colors.textInverse} />
+                        )}
+                      </View>
 
-          {/* Close Button */}
+                      <View style={styles.remedyContent}>
+                        <View style={styles.remedyHeader}>
+                          <Text
+                            style={[styles.remedyTitle, isChecked && styles.remedyTitleChecked]}
+                          >
+                            {remedy.name}
+                          </Text>
+                          <View style={styles.categoryBadge}>
+                            <Text style={styles.categoryText}>{remedy.evidenceLevel}</Text>
+                          </View>
+                        </View>
+                        <Text
+                          style={[
+                            styles.remedyDescription,
+                            isChecked && styles.remedyDescriptionChecked,
+                          ]}
+                        >
+                          {remedy.howTo}
+                        </Text>
+                        {!!remedy.timing && (
+                          <Text style={styles.remedyTiming}>{remedy.timing}</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {warningSignsToWatch.length > 0 && (
+                  <View style={styles.warningBox}>
+                    <View style={styles.warningHeader}>
+                      <Icon name="warning" size={16} color={colors.warning || '#B45309'} />
+                      <Text style={styles.warningTitle}>Stop self-treating and see someone if</Text>
+                    </View>
+                    {warningSignsToWatch.map((sign) => (
+                      <Text key={sign} style={styles.warningItem}>
+                        • {sign}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {lifestyleAdvice.length > 0 && (
+                  <View style={styles.lifestyleBox}>
+                    {lifestyleAdvice.map((tip) => (
+                      <Text key={tip} style={styles.lifestyleItem}>
+                        • {tip}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {withheld.length > 0 && (
+                  <Text style={styles.withheldText}>
+                    {withheld.length} remedy suggestion{withheld.length > 1 ? 's' : ''} not shown —
+                    may not be safe for you ({withheld.map((w) => w.name).join(', ')}).
+                  </Text>
+                )}
+              </ScrollView>
+            </>
+          )}
+
           <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
             <Text style={styles.closeButtonText}>Done</Text>
           </TouchableOpacity>
@@ -432,10 +282,6 @@ export function HomeRemediesSheet({ visible, onClose, symptoms = [] }: HomeRemed
     </Modal>
   );
 }
-
-// ============================================
-// STYLES
-// ============================================
 
 const styles = StyleSheet.create({
   overlay: {
@@ -536,6 +382,18 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  centerStateText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   scrollView: {
     flex: 1,
   },
@@ -590,17 +448,16 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
   },
   categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: radius.sm,
     marginLeft: spacing.xs,
+    backgroundColor: colors.accentMuted,
   },
   categoryText: {
     fontSize: 9,
     fontWeight: '600',
+    color: colors.accent,
   },
   remedyDescription: {
     ...typography.caption,
@@ -609,6 +466,48 @@ const styles = StyleSheet.create({
   },
   remedyDescriptionChecked: {
     color: colors.textTertiary,
+  },
+  remedyTiming: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  warningBox: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  warningTitle: {
+    ...typography.label,
+    color: '#92400E',
+  },
+  warningItem: {
+    ...typography.caption,
+    color: '#92400E',
+    lineHeight: 18,
+  },
+  lifestyleBox: {
+    marginBottom: spacing.sm,
+  },
+  lifestyleItem: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  withheldText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    marginBottom: spacing.sm,
   },
   closeButton: {
     backgroundColor: colors.accent,
