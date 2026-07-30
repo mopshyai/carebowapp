@@ -178,6 +178,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # signingConfigs.release (apps/mobile/android/app/build.gradle) needs a
+      # keystore or it fails packaging with "SigningConfig is missing required
+      # property storeFile" — this job only verifies the release variant still
+      # compiles and packages, so a disposable key is enough. It is never the
+      # real upload key: that lives in the ANDROID_KEYSTORE_B64 secret used by
+      # deploy.yml's publish job, gitignored locally, and untouched here.
+      - name: Generate ephemeral release-signing keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/ci-release.keystore" \
+            -alias ci-release \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -storepass ci-release-only \
+            -keypass ci-release-only \
+            -dname "CN=CI, OU=CI, O=CareBow, L=CI, ST=CI, C=US"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/ci-release.keystore" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=ci-release-only" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=ci-release" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=ci-release-only" >> "$GITHUB_ENV"
+
       - name: Build Android
         run: |
           cd apps/mobile/android
