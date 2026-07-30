@@ -105,7 +105,9 @@ export function selectionFromDraft(draft: {
 }): PaymentSelection | null {
   switch (draft.pricingModel) {
     case 'packages':
-      return draft.selectedPackageId ? { kind: 'package', packageId: draft.selectedPackageId } : null;
+      return draft.selectedPackageId
+        ? { kind: 'package', packageId: draft.selectedPackageId }
+        : null;
     case 'hourly':
       return draft.hours && draft.hours > 0 ? { kind: 'hourly', hours: draft.hours } : null;
     case 'daily':
