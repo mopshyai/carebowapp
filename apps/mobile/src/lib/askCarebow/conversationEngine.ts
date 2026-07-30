@@ -26,6 +26,7 @@ import {
 } from './followUpQuestions';
 import { getServiceRecommendations } from './serviceRouter';
 import { buildGuidanceResponse } from './guidanceBuilder';
+import { classifyIntent } from './intentClassifier';
 
 // ============================================
 // TYPES
@@ -72,6 +73,9 @@ export async function processUserInput(
     case 'service_routing':
       return handlePostGuidanceInput(userText, normalizedText, healthContext);
 
+    case 'talking':
+      return handleTalkingInput(userText, normalizedText, healthContext);
+
     default:
       return handleInitialInput(userText, normalizedText, healthContext);
   }
@@ -86,6 +90,14 @@ function handleInitialInput(
   normalizedText: string,
   healthContext: HealthContext
 ): ConversationResponse {
+  // Not every message is a symptom to triage — check what the patient
+  // actually wants before defaulting into the onset/location/severity
+  // question sequence below.
+  const intent = classifyIntent(originalText);
+  if (intent === 'talk') return handleTalkIntent();
+  if (intent === 'want_doctor') return handleWantDoctorIntent();
+  if (intent === 'want_test') return handleWantTestIntent();
+
   // Extract primary symptom from initial input
   const primarySymptom = extractPrimarySymptom(originalText);
 
@@ -131,6 +143,97 @@ function handleInitialInput(
     phaseUpdate: 'gathering',
     healthContextUpdates,
     questionAsked: firstQuestionType,
+  };
+}
+
+// ============================================
+// INTENT BRANCHES (talk / want_doctor / want_test)
+// ============================================
+
+const TALK_OPENERS = [
+  "I'm here to listen. What's on your mind?",
+  "I'm listening — take your time and tell me what's going on.",
+  "Okay, I'm here. What would you like to talk about?",
+];
+
+function handleTalkIntent(): ConversationResponse {
+  const opener = TALK_OPENERS[Math.floor(Math.random() * TALK_OPENERS.length)];
+  return {
+    messages: [{ role: 'assistant', contentType: 'text', text: opener }],
+    phaseUpdate: 'talking',
+  };
+}
+
+/**
+ * Stays in supportive-listening mode turn after turn, but keeps checking —
+ * someone who started out just wanting to talk can still pivot to wanting
+ * symptom help, a doctor, or a test mid-conversation, and this should not
+ * trap them in listening mode once that happens.
+ */
+function handleTalkingInput(
+  originalText: string,
+  normalizedText: string,
+  healthContext: HealthContext
+): ConversationResponse {
+  const intent = classifyIntent(originalText);
+  if (intent === 'want_doctor') return handleWantDoctorIntent();
+  if (intent === 'want_test') return handleWantTestIntent();
+  if (intent === 'symptom_help')
+    return handleInitialInput(originalText, normalizedText, healthContext);
+
+  return {
+    messages: [
+      {
+        role: 'assistant',
+        contentType: 'text',
+        text: "That sounds like a lot to carry. Go on, I'm listening — and if at any point you'd rather talk to a doctor or look into your symptoms, just say so.",
+      },
+    ],
+    phaseUpdate: 'talking',
+  };
+}
+
+function handleWantDoctorIntent(): ConversationResponse {
+  const recommendation: ServiceRecommendation = {
+    serviceId: 'video_consult',
+    serviceTitle: 'Video Consultation',
+    reason: 'You asked to speak with a doctor.',
+    urgency: 'soon',
+    prefilledNotes: '',
+  };
+  return {
+    messages: [
+      {
+        role: 'assistant',
+        contentType: 'service_recommendation',
+        text: "Sure — let's get you connected with a doctor.",
+        serviceRecommendation: recommendation,
+      },
+    ],
+    phaseUpdate: 'service_routing',
+    serviceRecommendations: [recommendation],
+  };
+}
+
+function handleWantTestIntent(): ConversationResponse {
+  const recommendation: ServiceRecommendation = {
+    serviceId: 'lab_test',
+    serviceTitle: 'Lab Test',
+    reason: 'You asked about getting tested.',
+    urgency: 'non_urgent',
+    prefilledNotes: '',
+  };
+  return {
+    messages: [
+      {
+        role: 'assistant',
+        contentType: 'service_recommendation',
+        text: "Sure — let's find the right test for you.",
+        serviceRecommendation: recommendation,
+      },
+    ],
+    phaseUpdate: 'service_routing',
+    serviceRecommendations: [recommendation],
   };
 }
 

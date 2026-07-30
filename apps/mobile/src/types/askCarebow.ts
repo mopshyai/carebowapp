@@ -348,6 +348,7 @@ export type ConversationPhase =
   | 'assessing' // Analyzing collected data
   | 'guidance' // Providing recommendations
   | 'service_routing' // Helping book a service
+  | 'talking' // Supportive listening, not symptom triage
   | 'completed'; // Session ended
 
 export type ConversationState = {
