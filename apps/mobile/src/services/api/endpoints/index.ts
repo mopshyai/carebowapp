@@ -11,6 +11,7 @@ export { safetyApi } from './safety';
 export { inventoryApi } from './inventory';
 export { notificationsApi } from './notifications';
 export { vitalsApi } from './vitals';
+export { paymentsApi, selectionFromDraft } from './payments';
 export { preferencesApi } from './preferences';
 export { deviceTokenApi } from './deviceToken';
 
@@ -37,5 +38,11 @@ export type {
   NotificationsMutateResponse,
 } from './notifications';
 export type { Vital, VitalsListResponse, VitalResponse } from './vitals';
+export type {
+  PaymentSelection,
+  CreateBookingOrderRequest,
+  CreateBookingOrderResponse,
+  PaymentStatusResponse,
+} from './payments';
 export type { AppPreferences, PreferencesResponse } from './preferences';
 export type { DeviceTokenResponse } from './deviceToken';

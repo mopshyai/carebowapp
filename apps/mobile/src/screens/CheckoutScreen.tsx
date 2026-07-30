@@ -3,7 +3,7 @@
  * Professional checkout with order summary and payment
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,18 +12,20 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  AppState,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { formatTime, formatDuration } from '../data/services';
+import { formatTime, formatDuration, getServiceById } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
 import { useProfileStore } from '../store/useProfileStore';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatMoney } from '../data/countries';
-import { useBookingsStore } from '../store';
 import { ensureBackendProfile } from '../lib/profileSync';
+import { paymentsApi, selectionFromDraft } from '../services/api/endpoints/payments';
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -34,8 +36,68 @@ export default function CheckoutScreen() {
 
   // Store hooks
   const { bookingDraft } = useCartStore();
-  const createBooking = useBookingsStore((s) => s.create);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /**
+   * Order id of a hosted payment the customer has been sent away to complete.
+   * A ref, not state: the AppState listener below reads it on resume, and a
+   * stale closure would silently stop us checking whether they actually paid.
+   */
+  const pendingOrderId = useRef<string | null>(null);
+
+  /**
+   * Ask the server what happened. The app is not present when payment
+   * completes — Razorpay's page is — so the webhook is what creates the
+   * booking, and this only ever reads the result. PENDING for a few seconds is
+   * normal while the webhook lands.
+   */
+  const checkPendingPayment = useCallback(async () => {
+    const orderId = pendingOrderId.current;
+    if (!orderId) return;
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        const res = await paymentsApi.getPaymentStatus(orderId);
+        if (res.status === 'SUCCESS' && res.booking) {
+          pendingOrderId.current = null;
+          setIsSubmitting(false);
+          Alert.alert(
+            'Payment received',
+            'Your booking is confirmed. The care team will be in touch with provider details.',
+            [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+          );
+          return;
+        }
+        if (res.status === 'FAILED') {
+          pendingOrderId.current = null;
+          setIsSubmitting(false);
+          Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
+          return;
+        }
+      } catch {
+        // Network blip on resume; the next attempt covers it.
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+
+    // Still pending after ~12s. Do NOT claim failure — the webhook may simply be
+    // slow, and telling someone their payment failed when it went through is the
+    // worst outcome here.
+    setIsSubmitting(false);
+    Alert.alert(
+      'Still confirming your payment',
+      'If you completed payment it will appear in your schedule shortly. Check there before paying again.',
+      [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+    );
+  }, [navigation]);
+
+  // The customer leaves the app to pay, so resume is the only signal we get.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pendingOrderId.current) void checkPendingPayment();
+    });
+    return () => sub.remove();
+  }, [checkPendingPayment]);
 
   // Format date for display
   const formatDate = (dateStr: string | null) => {
@@ -75,20 +137,50 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // Through the store: the created booking is merged into the cache, so
-      // Orders and Care History show it without refetching.
-      const result = await createBooking({
+      // What the customer picked. The server prices it against its own catalog —
+      // we never send an amount, so a modified client cannot name its own price.
+      // The pricing model comes from the catalog, not the draft — the draft
+      // carries the chosen values but not which kind of pricing they belong to,
+      // and inferring it from whichever field happens to be filled in is how you
+      // charge someone for the wrong thing.
+      const service = getServiceById(bookingDraft.serviceId);
+      const selection = selectionFromDraft({
+        pricingModel: service?.pricing?.type ?? null,
+        selectedPackageId: bookingDraft.selectedPackageId,
+        hours: bookingDraft.hours,
+        days: bookingDraft.days,
+      });
+
+      if (!selection) {
+        Alert.alert(
+          'Choose an option first',
+          'Pick a package or duration before continuing to payment.'
+        );
+        return;
+      }
+
+      const order = await paymentsApi.createBookingOrder({
         serviceId: bookingDraft.serviceId,
         profileId: backendProfileId,
         scheduledAt,
         notes: noteParts.join(' · ') || undefined,
+        selection,
+        hosted: true,
+        callbackUrl: 'carebow://checkout/return',
       });
-      if (!result.ok) throw new Error(result.error);
-      Alert.alert(
-        'Booking requested',
-        'Your request was saved to CareBow. The care team will confirm the provider and time.',
-        [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
-      );
+
+      if (!order.success || !order.paymentUrl || !order.orderId) {
+        throw new Error(order.error || 'Could not start payment');
+      }
+
+      // Remember before leaving: on resume we ask the server what happened
+      // rather than assuming anything about the outcome.
+      pendingOrderId.current = order.orderId;
+
+      const opened = await Linking.canOpenURL(order.paymentUrl);
+      if (!opened) throw new Error('No browser available to complete payment');
+      await Linking.openURL(order.paymentUrl);
+      // isSubmitting stays true until the resume handler resolves the payment.
     } catch (error) {
       Alert.alert(
         'Could not submit booking',
@@ -269,9 +361,9 @@ export default function CheckoutScreen() {
             <View style={styles.paymentMethodLeft}>
               <Icon name="card" size={24} color={colors.accent} />
               <View>
-                <Text style={styles.paymentMethodText}>No charge at this step</Text>
+                <Text style={styles.paymentMethodText}>Secure payment via Razorpay</Text>
                 <Text style={styles.paymentMethodSubtext}>
-                  This submits a pending booking request
+                  You'll finish payment in your browser, then come back here
                 </Text>
               </View>
             </View>
@@ -280,7 +372,7 @@ export default function CheckoutScreen() {
           <View style={styles.securityNote}>
             <Icon name="shield-checkmark" size={14} color={colors.success} />
             <Text style={styles.securityNoteText}>
-              The provider, final availability, and payment instructions are confirmed by CareBow
+              Payment is handled by Razorpay. CareBow confirms the provider and final timing
             </Text>
           </View>
         </View>
@@ -309,7 +401,7 @@ export default function CheckoutScreen() {
         >
           <Icon name="calendar" size={18} color={colors.white} />
           <Text style={styles.payButtonText}>
-            {isSubmitting ? 'Submitting…' : 'Request booking'}
+            {isSubmitting ? 'Opening payment…' : 'Pay and book'}
           </Text>
         </TouchableOpacity>
       </View>
