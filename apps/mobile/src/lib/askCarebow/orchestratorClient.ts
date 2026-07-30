@@ -16,6 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { askCarebowOrchestratorApi } from '../../services/api/endpoints/askCarebowOrchestrator';
 import { ApiClient } from '../../services/api/ApiClient';
 import { postSSE } from '../../services/api/sseClient';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('OrchestratorClient');
 
 const SESSION_CACHE_PREFIX = '@carebow/orchestrator_session/';
 
@@ -94,6 +97,12 @@ export async function streamOrchestratorReply(params: {
       assistantMessage?: { content?: string };
       isEmergency?: boolean;
       urgencyLevel?: string;
+      // E10: false means this profile is outside the backend's rollout
+      // bucket for this turn — the orchestrator still ran and was
+      // shadow-logged server-side, but was never meant to be shown. Falling
+      // back to the rewrite-only path (below, via the null return) is the
+      // intended UX here, not an error condition.
+      rolledOut?: boolean;
     }
     let doneEvent: DoneEvent | null = null;
 
@@ -119,7 +128,12 @@ export async function streamOrchestratorReply(params: {
     // carry that reassignment back into this scope, so it (wrongly) treats
     // doneEvent as still null here without this.
     const finalEvent = doneEvent as DoneEvent | null;
-    if (!finalEvent?.assistantMessage?.content) return null;
+    if (!finalEvent?.assistantMessage?.content) {
+      if (finalEvent?.rolledOut === false) {
+        logger.debug('Shadowed by E10 rollout gate; using the rewrite-only fallback for this turn');
+      }
+      return null;
+    }
 
     return {
       text: finalEvent.assistantMessage.content,

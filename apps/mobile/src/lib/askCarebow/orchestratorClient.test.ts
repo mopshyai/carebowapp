@@ -207,6 +207,26 @@ describe('streamOrchestratorReply', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null without forwarding any deltas when E10 shadows this turn (rolledOut: false)', async () => {
+    mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
+    mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
+      // No 'delta' events at all — the backend buffers instead of streaming
+      // live when a profile is outside the rollout bucket (see rollout.ts).
+      onEvent({ type: 'done', rolledOut: false });
+    });
+
+    const deltas: string[] = [];
+    const result = await streamOrchestratorReply({
+      localSessionId: 'local-6',
+      profileId: 'profile-1',
+      text: 'sore throat',
+      onTextDelta: (d) => deltas.push(d),
+    });
+
+    expect(result).toBeNull();
+    expect(deltas).toEqual([]);
+  });
+
   it('returns null when postSSE rejects', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockRejectedValueOnce(new Error('connection failed'));
