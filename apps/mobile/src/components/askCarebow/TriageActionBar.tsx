@@ -4,15 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Linking,
-  Platform,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -34,10 +26,18 @@ interface TriageActionBarProps {
   episodeId?: string;
   /** Symptoms for home remedies recommendations */
   symptoms?: string[];
+  /** Profile the remedies request is filtered for (pregnancy, diabetes, age, allergies) */
+  profileId?: string;
   onAction?: (action: string) => void;
 }
 
-export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onAction }: TriageActionBarProps) {
+export function TriageActionBar({
+  triageLevel,
+  episodeId,
+  symptoms = [],
+  profileId,
+  onAction,
+}: TriageActionBarProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonAction, setComingSoonAction] = useState('');
@@ -85,25 +85,21 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
   };
 
   const handleSetReminder = () => {
-    Alert.alert(
-      'Set Reminder',
-      'When would you like to be reminded to check your symptoms?',
-      [
-        {
-          text: 'In 1 hour',
-          onPress: () => scheduleReminderWithDelay(60),
-        },
-        {
-          text: 'In 4 hours',
-          onPress: () => scheduleReminderWithDelay(240),
-        },
-        {
-          text: 'Tomorrow',
-          onPress: () => scheduleReminderWithDelay(24 * 60),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Set Reminder', 'When would you like to be reminded to check your symptoms?', [
+      {
+        text: 'In 1 hour',
+        onPress: () => scheduleReminderWithDelay(60),
+      },
+      {
+        text: 'In 4 hours',
+        onPress: () => scheduleReminderWithDelay(240),
+      },
+      {
+        text: 'Tomorrow',
+        onPress: () => scheduleReminderWithDelay(24 * 60),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const scheduleReminderWithDelay = async (minutes: number) => {
@@ -113,9 +109,15 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
         'Symptom Check-in',
         new Date(Date.now() + minutes * 60 * 1000)
       );
-      Alert.alert('Reminder Set', `We'll remind you in ${minutes >= 60 ? Math.round(minutes / 60) + ' hour(s)' : minutes + ' minutes'}.`);
+      Alert.alert(
+        'Reminder Set',
+        `We'll remind you in ${minutes >= 60 ? Math.round(minutes / 60) + ' hour(s)' : minutes + ' minutes'}.`
+      );
     } catch {
-      Alert.alert('Unable to Set Reminder', 'Please ensure notifications are enabled in your settings.');
+      Alert.alert(
+        'Unable to Set Reminder',
+        'Please ensure notifications are enabled in your settings.'
+      );
     }
   };
 
@@ -148,10 +150,7 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
 
   const handleFindER = () => {
     const query = encodeURIComponent('emergency room near me');
-    const url =
-      Platform.OS === 'ios'
-        ? `maps://?q=${query}`
-        : `geo:0,0?q=${query}`;
+    const url = Platform.OS === 'ios' ? `maps://?q=${query}` : `geo:0,0?q=${query}`;
 
     Linking.canOpenURL(url)
       .then((supported) => {
@@ -254,7 +253,11 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
         // Default layout: row with icon-only secondary
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[styles.button, getButtonStyle(config.primary.variant), styles.primaryButtonFlex]}
+            style={[
+              styles.button,
+              getButtonStyle(config.primary.variant),
+              styles.primaryButtonFlex,
+            ]}
             onPress={() => handleAction(config.primary.action)}
             activeOpacity={0.8}
           >
@@ -285,10 +288,7 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
       )}
 
       {/* Tertiary link */}
-      <TouchableOpacity
-        style={styles.tertiaryButton}
-        onPress={() => handleAction(tertiary.action)}
-      >
+      <TouchableOpacity style={styles.tertiaryButton} onPress={() => handleAction(tertiary.action)}>
         <Icon name={tertiary.icon} size={14} color={colors.textTertiary} />
         <Text style={styles.tertiaryText}>{tertiary.label}</Text>
       </TouchableOpacity>
@@ -306,6 +306,7 @@ export function TriageActionBar({ triageLevel, episodeId, symptoms = [], onActio
         onClose={() => setShowHomeRemedies(false)}
         symptoms={symptoms}
         triageLevel={triageLevel}
+        profileId={profileId}
       />
     </View>
   );

@@ -431,6 +431,11 @@ export default function ConversationScreen() {
             <TriageActionBar
               triageLevel={triageLevel}
               episodeId={currentEpisodeId || undefined}
+              symptoms={[
+                currentSession?.healthContext.primarySymptom,
+                ...(currentSession?.healthContext.associatedSymptoms ?? []),
+              ].filter((s): s is string => Boolean(s))}
+              profileId={currentSession?.memberId}
               onAction={(action) => {
                 if (action === 'connect_doctor' || action === 'schedule_teleconsult') {
                   navigation.navigate('Services' as never, { category: 'video-consult' });

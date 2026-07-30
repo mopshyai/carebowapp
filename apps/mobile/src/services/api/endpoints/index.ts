@@ -14,6 +14,7 @@ export { vitalsApi } from './vitals';
 export { paymentsApi, selectionFromDraft } from './payments';
 export { preferencesApi } from './preferences';
 export { deviceTokenApi } from './deviceToken';
+export { remediesApi } from './remedies';
 
 export type {
   MemberOverview,
@@ -46,3 +47,4 @@ export type {
 } from './payments';
 export type { AppPreferences, PreferencesResponse } from './preferences';
 export type { DeviceTokenResponse } from './deviceToken';
+export type { Remedy, RemediesResponse } from './remedies';
