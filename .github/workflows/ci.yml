@@ -68,7 +68,7 @@ jobs:
         run: pnpm test -- --passWithNoTests --ci
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
