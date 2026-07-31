@@ -118,6 +118,7 @@ jest.mock('@/services/api/endpoints/auth', () => {
 });
 
 import { useAuthStore } from './useAuthStore';
+import { ApiClient } from '@/services/api/ApiClient';
 
 // Reset store before each test
 beforeEach(async () => {
@@ -193,6 +194,12 @@ describe('AuthStore Login', () => {
     expect(state.accessToken).toBe('mock_access_token');
     expect(state.refreshToken).toBe('mock_refresh_token');
     expect(state.isLoading).toBe(false);
+
+    // Regression: login used to only update this store + SecureStorage,
+    // leaving ApiClient (what every actual API call reads its token from)
+    // on whatever it hydrated at boot — every authenticated request 401'd
+    // after a real login while the UI still showed the user as signed in.
+    expect(ApiClient.getAccessToken()).toBe('mock_access_token');
   });
 
   it('failed login sets error', async () => {

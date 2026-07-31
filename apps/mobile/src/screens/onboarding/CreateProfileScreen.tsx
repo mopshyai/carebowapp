@@ -26,6 +26,16 @@ import { createEmptyMemberHealthInfo, createEmptyCarePreferences } from '@/types
 import { COUNTRY_LIST, type CountryCode } from '@/data/countries';
 import type { OnboardingStackParamList } from '@/navigation/types';
 import { createLogger } from '@/utils/logger';
+import { profilesApi } from '@/services/api/endpoints/profiles';
+
+const GENDER_TO_BACKEND: Record<GenderType, 'MALE' | 'FEMALE' | 'OTHER'> = {
+  male: 'MALE',
+  female: 'FEMALE',
+  other: 'OTHER',
+  // The backend profile schema only has three gender values; there's no
+  // direct equivalent, and 'OTHER' is a closer fallback than guessing.
+  prefer_not_to_say: 'OTHER',
+};
 
 const logger = createLogger('CreateProfile');
 
@@ -122,6 +132,25 @@ export default function CreateProfileScreen() {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
+      // Real backend Profile row — required for any feature that checks
+      // profile ownership server-side (e.g. the Ask CareBow orchestrator,
+      // which 404s with "Profile not found" otherwise). Best-effort: a
+      // failure here (offline, backend hiccup) still lets onboarding finish
+      // locally rather than stranding a new user on this screen — those
+      // backend-only features just won't work until the profile syncs.
+      let backendId: string | undefined;
+      try {
+        const profile = await profilesApi.createProfile({
+          name: name.trim(),
+          dateOfBirth,
+          gender: GENDER_TO_BACKEND[gender as GenderType],
+          relationship: relationship.charAt(0).toUpperCase() + relationship.slice(1),
+        });
+        backendId = profile.id;
+      } catch (syncError) {
+        logger.warn('Backend profile sync failed; continuing with local-only profile', syncError);
+      }
+
       addMember({
         firstName,
         lastName,
@@ -129,6 +158,7 @@ export default function CreateProfileScreen() {
         dateOfBirth,
         gender: gender || undefined,
         isDefault: true,
+        backendId,
         healthInfo: createEmptyMemberHealthInfo(),
         carePreferences: createEmptyCarePreferences(),
       });
