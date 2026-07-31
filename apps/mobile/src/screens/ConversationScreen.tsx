@@ -381,9 +381,13 @@ export default function ConversationScreen() {
     [saveCandidate, currentSession?.id]
   );
 
-  // Handle quick option selection
+  // Handle quick option selection — send the human-readable label (what the
+  // user sees on the chip), not the internal value key. option.value is an
+  // enum-like id ('just_now', '1_2_weeks') meant for the parser, not display;
+  // parseUserResponse() already classifies natural-language labels back into
+  // these same canonical values, so sending the label is fully round-trippable.
   const handleQuickOptionSelect = (option: QuickOption) => {
-    handleSendMessage(option.value);
+    handleSendMessage(option.label);
   };
 
   // Handle follow-up scheduling
