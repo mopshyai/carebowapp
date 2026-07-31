@@ -28,6 +28,8 @@ import { colors, spacing, radius, typography, shadows } from '../theme';
 // Store & Types
 import { useAskCarebowStore } from '../store/askCarebowStore';
 import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { useProfileStore } from '../store/useProfileStore';
 import { Message, QuickOption } from '../types/askCarebow';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
@@ -78,6 +80,14 @@ export default function ConversationScreen() {
   // arrived yet.
   const [streamingText, setStreamingText] = useState<string | null>(null);
 
+  // Real backend user/profile IDs — the orchestrator (E7) checks profile
+  // ownership server-side, so hardcoded placeholders 404 with "Profile not
+  // found" for every user. Self is whichever member has isDefault set
+  // (onboarding always marks the first/self profile that way); backendId is
+  // only present once CreateProfileScreen's sync to /v1/profiles succeeded.
+  const authUserId = useAuthStore((state) => state.user?.id);
+  const selfMember = useProfileStore((state) => state.members.find((m) => m.isDefault));
+
   // Episode store
   const {
     startEpisode,
@@ -119,6 +129,17 @@ export default function ConversationScreen() {
   const { saveCandidate, dismissCandidate, clearPendingCandidates } = useHealthMemoryStore();
   const pendingCandidates = usePendingCandidates();
 
+  // Holds the initial symptom (if any) until currentSession has actually
+  // re-rendered into this component. handleSendMessage's `!currentSession`
+  // guard closes over the render it was created in — calling it via
+  // setTimeout(fn, 0) right after startNewSession() still invokes the stale
+  // pre-session closure (currentSession still null there), so the very
+  // first message was silently dropped (no request, no error) every time.
+  // Stashing it in a ref and sending it from an effect keyed on
+  // currentSession guarantees handleSendMessage runs only once the session
+  // it depends on is actually in scope.
+  const pendingInitialSymptomRef = useRef<string | null>(null);
+
   // Initialize session on mount
   useEffect(() => {
     if (!currentSession) {
@@ -126,7 +147,11 @@ export default function ConversationScreen() {
       resetShownExplanations();
 
       // Start a new session with the initial symptom
-      startNewSession('user_1', 'member_1', params.memberName as string);
+      startNewSession(
+        authUserId ?? 'user_1',
+        selfMember?.backendId ?? 'member_1',
+        params.memberName as string
+      );
 
       // If initial symptom provided, process it
       const initialSymptom = params.symptom as string;
@@ -144,10 +169,7 @@ export default function ConversationScreen() {
           setCurrentEpisodeId(episode.id);
         }
 
-        // Defer message sending to avoid setState during render
-        setTimeout(() => {
-          handleSendMessage(initialSymptom);
-        }, 0);
+        pendingInitialSymptomRef.current = initialSymptom;
       }
     }
   }, []);
@@ -328,6 +350,18 @@ export default function ConversationScreen() {
     },
     [currentSession, isProcessing, params, trial, startTrial]
   );
+
+  // Fires once currentSession is populated, sending whatever initial
+  // symptom the mount effect above stashed. The ref guard (cleared
+  // immediately) ensures this sends exactly once even though
+  // handleSendMessage's identity changes on every subsequent render.
+  useEffect(() => {
+    if (currentSession && pendingInitialSymptomRef.current) {
+      const symptom = pendingInitialSymptomRef.current;
+      pendingInitialSymptomRef.current = null;
+      handleSendMessage(symptom);
+    }
+  }, [currentSession, handleSendMessage]);
 
   // Handle memory candidate save
   const handleSaveMemoryCandidate = useCallback(

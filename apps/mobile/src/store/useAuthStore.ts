@@ -283,6 +283,12 @@ export const useAuthStore = create<AuthStore>()(
           if (tokens) {
             // SECURITY: Store tokens in secure storage (Keychain/Keystore)
             await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            // ApiClient (used by every actual API call — bookings, chat/sessions,
+            // ask-carebow/message, etc.) keeps its own token copy in plain
+            // AsyncStorage and never reads SecureStorage. Without this, every
+            // authenticated request after a fresh login 401s while the UI still
+            // shows the user as logged in.
+            await ApiClient.setTokens(tokens);
           }
 
           set({
@@ -365,6 +371,7 @@ export const useAuthStore = create<AuthStore>()(
           const tokens = extractTokens(envelope);
           if (tokens) {
             await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            await ApiClient.setTokens(tokens);
             const su = normalizeUser(extractUser(envelope), data.email);
             set({
               user: su,
@@ -488,6 +495,7 @@ export const useAuthStore = create<AuthStore>()(
           if (tokens) {
             // SECURITY: Store tokens in secure storage (Keychain/Keystore)
             await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            await ApiClient.setTokens(tokens);
             const vu = normalizeUser(user, pendingEmail || '');
             set({
               user: vu,
@@ -562,6 +570,7 @@ export const useAuthStore = create<AuthStore>()(
 
           if (tokens) {
             await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+            await ApiClient.setTokens(tokens);
           }
 
           pendingSignupPassword = null;
@@ -741,6 +750,18 @@ export const useAuthStore = create<AuthStore>()(
               refreshToken,
               // Only set authenticated if we have a user from AsyncStorage
               isAuthenticated: hydratedUser !== null,
+            });
+            // SecureStorage doesn't persist expiresAt, so this is an estimate
+            // (matches the backend's actual 7-day access-token lifetime) —
+            // ApiClient's own 401-triggered refresh is the real safety net if
+            // it's ever wrong. Without this call, ApiClient stays on whatever
+            // it hydrated from its own AsyncStorage keys (often nothing),
+            // so every request 401s after an app restart even though the UI
+            // shows the user as still logged in.
+            await ApiClient.setTokens({
+              accessToken,
+              refreshToken,
+              expiresAt: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
             });
             // Overwrite any stale local profile data with the real account.
             if (hydratedUser) syncProfileStore(hydratedUser);
