@@ -59,6 +59,12 @@ const menuSections = [
         title: 'Insurance',
         screen: 'Insurance',
       },
+      {
+        id: 'payments' as const,
+        icon: 'receipt-outline',
+        title: 'Payments & Receipts',
+        screen: 'Payments',
+      },
     ],
   },
   {

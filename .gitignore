@@ -45,3 +45,4 @@ apps/mobile/android/app/*.keystore
 apps/mobile/android/app/*.jks
 apps/mobile/android/app/*.keystore.b64
 !apps/mobile/android/app/debug.keystore
+.gstack/

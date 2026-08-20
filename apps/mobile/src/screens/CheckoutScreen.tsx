@@ -3,7 +3,7 @@
  * Professional checkout with order summary and payment
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  AppState,
-  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -26,6 +24,7 @@ import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatMoney } from '../data/countries';
 import { ensureBackendProfile } from '../lib/profileSync';
 import { paymentsApi, selectionFromDraft } from '../services/api/endpoints/payments';
+import { useHostedCheckout } from '../hooks/useHostedCheckout';
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -39,65 +38,11 @@ export default function CheckoutScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   /**
-   * Order id of a hosted payment the customer has been sent away to complete.
-   * A ref, not state: the AppState listener below reads it on resume, and a
-   * stale closure would silently stop us checking whether they actually paid.
+   * Paying means leaving the app for Razorpay's page, so the outcome comes from
+   * asking the server on resume — never from anything this screen observed. The
+   * mechanics of that are shared with the other paid flows.
    */
-  const pendingOrderId = useRef<string | null>(null);
-
-  /**
-   * Ask the server what happened. The app is not present when payment
-   * completes — Razorpay's page is — so the webhook is what creates the
-   * booking, and this only ever reads the result. PENDING for a few seconds is
-   * normal while the webhook lands.
-   */
-  const checkPendingPayment = useCallback(async () => {
-    const orderId = pendingOrderId.current;
-    if (!orderId) return;
-
-    for (let attempt = 0; attempt < 6; attempt++) {
-      try {
-        const res = await paymentsApi.getPaymentStatus(orderId);
-        if (res.status === 'SUCCESS' && res.booking) {
-          pendingOrderId.current = null;
-          setIsSubmitting(false);
-          Alert.alert(
-            'Payment received',
-            'Your booking is confirmed. The care team will be in touch with provider details.',
-            [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
-          );
-          return;
-        }
-        if (res.status === 'FAILED') {
-          pendingOrderId.current = null;
-          setIsSubmitting(false);
-          Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
-          return;
-        }
-      } catch {
-        // Network blip on resume; the next attempt covers it.
-      }
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-
-    // Still pending after ~12s. Do NOT claim failure — the webhook may simply be
-    // slow, and telling someone their payment failed when it went through is the
-    // worst outcome here.
-    setIsSubmitting(false);
-    Alert.alert(
-      'Still confirming your payment',
-      'If you completed payment it will appear in your schedule shortly. Check there before paying again.',
-      [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
-    );
-  }, [navigation]);
-
-  // The customer leaves the app to pay, so resume is the only signal we get.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && pendingOrderId.current) void checkPendingPayment();
-    });
-    return () => sub.remove();
-  }, [checkPendingPayment]);
+  const checkout = useHostedCheckout();
 
   // Format date for display
   const formatDate = (dateStr: string | null) => {
@@ -173,20 +118,38 @@ export default function CheckoutScreen() {
         throw new Error(order.error || 'Could not start payment');
       }
 
-      // Remember before leaving: on resume we ask the server what happened
-      // rather than assuming anything about the outcome.
-      pendingOrderId.current = order.orderId;
+      const outcome = await checkout.start({
+        orderId: order.orderId,
+        paymentUrl: order.paymentUrl,
+      });
 
-      const opened = await Linking.canOpenURL(order.paymentUrl);
-      if (!opened) throw new Error('No browser available to complete payment');
-      await Linking.openURL(order.paymentUrl);
-      // isSubmitting stays true until the resume handler resolves the payment.
+      if (outcome.status === 'paid') {
+        Alert.alert(
+          'Payment received',
+          'Your booking is confirmed. The care team will be in touch with provider details.',
+          [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+        );
+      } else if (outcome.status === 'failed') {
+        Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
+      } else {
+        // Still pending. Never call this a failure — the webhook may just be
+        // slow, and "your payment failed" after it went through is worse than
+        // asking someone to look.
+        Alert.alert(
+          'Still confirming your payment',
+          'If you completed payment it will appear in your schedule shortly. Check there before paying again.',
+          [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+        );
+      }
     } catch (error) {
       Alert.alert(
         'Could not submit booking',
         error instanceof Error ? error.message : 'Check your connection and try again.'
       );
     } finally {
+      // Safe now that start() resolves only once the outcome is known. It used
+      // to clear the moment the browser opened, which re-enabled the pay button
+      // while a payment was in flight.
       setIsSubmitting(false);
     }
   };
@@ -394,14 +357,14 @@ export default function CheckoutScreen() {
           <Text style={styles.footerPriceValue}>{formatMoney(bookingDraft.total, country)}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.payButton, isSubmitting && styles.buttonDisabled]}
+          style={[styles.payButton, (isSubmitting || checkout.busy) && styles.buttonDisabled]}
           onPress={handleBooking}
           activeOpacity={0.8}
-          disabled={isSubmitting}
+          disabled={isSubmitting || checkout.busy}
         >
           <Icon name="calendar" size={18} color={colors.white} />
           <Text style={styles.payButtonText}>
-            {isSubmitting ? 'Opening payment…' : 'Pay and book'}
+            {isSubmitting || checkout.busy ? 'Opening payment…' : 'Pay and book'}
           </Text>
         </TouchableOpacity>
       </View>

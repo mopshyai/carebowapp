@@ -25,7 +25,14 @@
  */
 
 import { create } from 'zustand';
-import { memberApi, type V1Booking, type BookingStatus } from '../services/api/endpoints/member';
+import {
+  memberApi,
+  type V1Booking,
+  type BookingStatus,
+  type V1CancelResponse,
+} from '../services/api/endpoints/member';
+
+type RefundOutcome = NonNullable<V1CancelResponse['refund']>;
 
 /** Treat cached bookings as fresh for this long before a background refetch. */
 const STALE_AFTER_MS = 30_000;
@@ -46,8 +53,14 @@ export interface BookingsState {
   create: (
     input: Parameters<typeof memberApi.createBooking>[0]
   ) => Promise<{ ok: true; booking: V1Booking } | { ok: false; error: string }>;
-  /** No reason parameter: the v1 cancel endpoint does not accept one today. */
-  cancel: (bookingId: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /**
+   * No reason parameter: the v1 cancel endpoint does not accept one today.
+   * Reports the refund the server issued, so the screen can say what happened
+   * to the customer's money instead of silently succeeding.
+   */
+  cancel: (
+    bookingId: string
+  ) => Promise<{ ok: true; refund?: RefundOutcome } | { ok: false; error: string }>;
   reset: () => void;
 }
 
@@ -133,7 +146,7 @@ export const useBookingsStore = create<BookingsState>((set, get) => ({
         // the resulting status locally.
         await get().fetch({ force: true });
       }
-      return { ok: true as const };
+      return { ok: true as const, refund: res.refund };
     } catch {
       return { ok: false as const, error: 'No connection. Please try again.' };
     }

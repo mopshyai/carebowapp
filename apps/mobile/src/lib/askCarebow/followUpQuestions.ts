@@ -844,11 +844,27 @@ function parseDuration(text: string): Duration {
   if (text.includes('today') || text.includes('this morning') || text.includes('tonight')) {
     return 'today';
   }
+  // Week-phrasing is checked before the day-range checks below: a bare
+  // "1-2" (as in "1-2 weeks") would otherwise be caught by the "1-2 days"
+  // check, and a bare "week" would be caught by the "3-7 days" digit check —
+  // both branches used to sit above these and silently swallowed every
+  // "week"-mentioning answer, including the "1-2 weeks" quick-reply option.
+  if (text.includes('1-2 week') || text.includes('couple week') || text.includes('two week')) {
+    return '1_2_weeks';
+  }
+  if (
+    text.includes('month') ||
+    text.includes('long time') ||
+    text.includes('longer') ||
+    text.includes('more than')
+  ) {
+    return 'more_than_2_weeks';
+  }
   if (
     text.includes('yesterday') ||
     text.includes('1 day') ||
     text.includes('2 day') ||
-    text.includes('1-2')
+    text.includes('1-2 day')
   ) {
     return '1_2_days';
   }
@@ -862,17 +878,6 @@ function parseDuration(text: string): Duration {
     text.includes('3-7')
   ) {
     return '3_7_days';
-  }
-  if (text.includes('1-2 week') || text.includes('couple week')) {
-    return '1_2_weeks';
-  }
-  if (
-    text.includes('month') ||
-    text.includes('long time') ||
-    text.includes('longer') ||
-    text.includes('more than')
-  ) {
-    return 'more_than_2_weeks';
   }
   if (text.includes('chronic') || text.includes('always') || text.includes('ongoing')) {
     return 'chronic';

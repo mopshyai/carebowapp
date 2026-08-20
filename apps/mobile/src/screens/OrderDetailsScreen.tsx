@@ -3,6 +3,8 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useBookingsStore, selectBookingById } from '../store';
+import { paymentsApi } from '../services/api/endpoints/payments';
+import { useHostedCheckout } from '../hooks/useHostedCheckout';
 import { colors, radius, spacing, typography } from '../theme';
 
 const money = (paise: number) =>
@@ -24,6 +26,11 @@ export default function OrderDetailsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+
+  // Same hosted flow as the booking checkout: Razorpay's page collects, the
+  // webhook records, and this screen only asks what happened.
+  const checkout = useHostedCheckout();
 
   const load = useCallback(async () => {
     if (!id) {
@@ -49,6 +56,64 @@ export default function OrderDetailsScreen() {
     const result = await cancelBooking(id);
     if (!result.ok) {
       Alert.alert('Could not cancel', result.error);
+      return;
+    }
+
+    // Say what happened to the money. Silence after cancelling something the
+    // customer paid for reads as "they kept it".
+    if (result.refund?.status === 'ISSUED') {
+      Alert.alert(
+        'Booking cancelled',
+        'Your refund is on its way and usually reaches your account within 5–7 working days.'
+      );
+    } else if (result.refund?.status === 'PENDING') {
+      Alert.alert(
+        'Booking cancelled',
+        'Your refund could not be processed automatically. Our team has been alerted and will complete it.'
+      );
+    }
+  };
+
+  /**
+   * Pay for a booking that already exists — a quote priced after assessment, one
+   * raised on the customer's behalf, or a checkout they abandoned. The amount is
+   * never sent: the server charges what the booking was quoted at.
+   */
+  const payNow = async () => {
+    if (!id) return;
+    setPaying(true);
+    try {
+      const order = await paymentsApi.createSettleOrder({
+        bookingId: id,
+        hosted: true,
+        callbackUrl: 'carebow://checkout/return',
+      });
+
+      if (!order.success || !order.paymentUrl || !order.orderId) {
+        Alert.alert('Could not start payment', order.error || 'Please try again.');
+        return;
+      }
+
+      const outcome = await checkout.start({
+        orderId: order.orderId,
+        paymentUrl: order.paymentUrl,
+      });
+
+      if (outcome.status === 'paid') {
+        await fetchOne(id);
+        Alert.alert('Payment received', 'This booking is now paid in full.');
+      } else if (outcome.status === 'failed') {
+        Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
+      } else {
+        // Not a failure — the webhook may still be on its way.
+        await fetchOne(id);
+        Alert.alert(
+          'Still confirming your payment',
+          'If you completed payment this booking will show as paid shortly. Check here before paying again.'
+        );
+      }
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -73,6 +138,15 @@ export default function OrderDetailsScreen() {
 
   const when = new Date(booking.scheduledAt);
   const cancellable = booking.status === 'PENDING' || booking.status === 'CONFIRMED';
+  const paid = booking.paymentStatus === 'PAID';
+  const refunded =
+    booking.paymentStatus === 'REFUNDED' || booking.paymentStatus === 'REFUND_PENDING';
+  const payable =
+    !paid &&
+    !refunded &&
+    booking.amount > 0 &&
+    ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(booking.status);
+  const busy = paying || checkout.busy;
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
@@ -86,10 +160,27 @@ export default function OrderDetailsScreen() {
         <Text style={styles.label}>Preferred time</Text>
         <Text style={styles.value}>{when.toLocaleString()}</Text>
         <Text style={styles.label}>Amount</Text>
-        <Text style={styles.value}>{money(booking.amount)}</Text>
+        <Text style={styles.value}>
+          {money(booking.amount)}
+          {paid ? ' · Paid' : ''}
+          {booking.paymentStatus === 'REFUNDED' ? ' · Refunded' : ''}
+          {booking.paymentStatus === 'REFUND_PENDING' ? ' · Refund on the way' : ''}
+        </Text>
         <Text style={styles.label}>Provider</Text>
         <Text style={styles.value}>{booking.provider?.name || 'Not assigned yet'}</Text>
       </View>
+      {payable && (
+        <TouchableOpacity
+          style={[styles.payButton, busy && styles.disabled]}
+          onPress={payNow}
+          disabled={busy}
+        >
+          <Icon name="card-outline" size={18} color={colors.textInverse} />
+          <Text style={styles.payText}>
+            {busy ? 'Opening payment…' : `Pay ${money(booking.amount)}`}
+          </Text>
+        </TouchableOpacity>
+      )}
       {cancellable && (
         <TouchableOpacity
           style={styles.cancelButton}
@@ -142,8 +233,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   buttonText: { ...typography.labelLarge, color: colors.textInverse },
-  cancelButton: {
+  payButton: {
     marginTop: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  payText: { ...typography.labelLarge, color: colors.textInverse },
+  disabled: { opacity: 0.6 },
+  cancelButton: {
+    marginTop: spacing.md,
     borderWidth: 1,
     borderColor: colors.error,
     borderRadius: radius.md,
