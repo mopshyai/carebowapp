@@ -161,3 +161,23 @@ describe("the server's currency wins", () => {
     expect(formatMoney(20, 'US')).toContain('$');
   });
 });
+
+describe('display never disagrees with the charge', () => {
+  afterEach(() => setServerCurrency(null));
+
+  it('shows the cents on a converted price', () => {
+    // ₹1,800 converted is 1880 cents. Rounding to "$19" advertises 20¢ more
+    // than the server charges.
+    expect(formatMinor(1880, 'USD')).toBe('$18.80');
+    expect(formatMinor(940, 'USD')).toBe('$9.40');
+  });
+
+  it('keeps whole amounts clean', () => {
+    expect(formatMinor(5000, 'USD')).toBe('$50');
+    expect(formatMinor(0, 'USD')).toBe('$0');
+  });
+
+  it('does not round paise away either', () => {
+    expect(formatMinor(335135, 'INR')).toContain('3,351.35');
+  });
+});
