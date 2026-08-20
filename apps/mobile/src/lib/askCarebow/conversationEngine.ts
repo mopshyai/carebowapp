@@ -298,7 +298,27 @@ function handlePostGuidanceInput(
   normalizedText: string,
   healthContext: HealthContext
 ): ConversationResponse {
-  // User is asking follow-up questions after guidance
+  // A message after guidance is not always a follow-up about the SAME
+  // complaint. The user may now want a doctor or a test, may just want to
+  // talk, or may ask who we are — re-read intent first so we don't answer
+  // everything with the same canned "better or worse?" question (which
+  // otherwise repeats forever, ignoring whatever they actually typed).
+  const intent = classifyIntent(originalText);
+  if (intent === 'want_doctor') return handleWantDoctorIntent();
+  if (intent === 'want_test') return handleWantTestIntent();
+  if (intent === 'talk') return handleTalkIntent();
+
+  // Identity / meta questions ("who are you?", "are you a bot?") — answer them
+  // instead of repeating a symptom question at the user.
+  const metaAnswer = detectMetaQuestion(normalizedText);
+  if (metaAnswer) {
+    return {
+      messages: [{ role: 'assistant', contentType: 'text', text: metaAnswer }],
+      intent: 'symptom_help',
+    };
+  }
+
+  // Genuine follow-up about the same complaint.
   const followUpResponse = generateFollowUpResponse(normalizedText, healthContext);
 
   return {
@@ -311,6 +331,24 @@ function handlePostGuidanceInput(
     ],
     intent: 'symptom_help',
   };
+}
+
+/**
+ * Recognizes "who/what are you" style meta questions so the post-guidance
+ * handler can answer them instead of looping a symptom question. Returns null
+ * when the message isn't one, so the caller falls through to normal handling.
+ */
+function detectMetaQuestion(normalizedText: string): string | null {
+  if (
+    /\b(who|what)\s+are\s+you\b/.test(normalizedText) ||
+    /\bare\s+you\s+(a\s+)?(bot|robot|human|real|a\s+person|an?\s+ai|a\s+doctor)\b/.test(
+      normalizedText
+    ) ||
+    /\byour\s+name\b/.test(normalizedText)
+  ) {
+    return "I'm Ask CareBow — an AI health assistant, not a doctor. I can help you make sense of your symptoms and point you to the right care. What would you like help with?";
+  }
+  return null;
 }
 
 // ============================================
@@ -631,6 +669,9 @@ function generateFollowUpResponse(text: string, _healthContext: HealthContext): 
     return "I understand your concern. Based on what you've shared, the situation doesn't appear to be immediately dangerous, but professional confirmation can give you peace of mind. Would you like to connect with a doctor?";
   }
 
-  // P1-2 FIX: Replace generic default with specific follow-up question
-  return 'Are your symptoms staying the same, getting better, or getting worse?';
+  // Anything else after guidance: offer a concrete next step rather than
+  // re-asking the same "better or worse?" question. Repeating one fixed
+  // question is what made this path loop when the reply didn't match a
+  // keyword above (e.g. the user just says "no").
+  return "I've shared what I can for now. Would you like me to connect you with a doctor, suggest some home-care steps, or is there a specific worry I can help with?";
 }
