@@ -108,6 +108,7 @@ export type ProfileStackParamList = {
   HealthInfo: undefined;
   NotificationInbox: undefined;
   Vitals: undefined;
+  Payments: undefined;
 };
 
 // Safety Stack Navigator

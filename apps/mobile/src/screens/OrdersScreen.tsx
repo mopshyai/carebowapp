@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useBookingsStore } from '../store';
+import type { AppNavigationProp } from '../navigation/types';
 import { colors, layout, radius, shadows, space, typography } from '../theme/tokens';
 
 const formatMoney = (paise: number) =>
@@ -24,7 +25,7 @@ const formatMoney = (paise: number) =>
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   // Booking data lives in the store, not in screen state, so the details and
   // history screens see the same rows after a cancel instead of each holding
   // their own copy.
@@ -97,8 +98,22 @@ export default function OrdersScreen() {
         ) : (
           bookings.map((booking) => {
             const date = new Date(booking.scheduledAt);
+            // Unpaid is an ordinary state here — a quote priced after
+            // assessment, a booking raised for the customer — and until there
+            // was somewhere to pay it, the list gave no hint money was owed.
+            const due =
+              booking.amount > 0 &&
+              booking.paymentStatus !== 'PAID' &&
+              booking.paymentStatus !== 'REFUNDED' &&
+              booking.paymentStatus !== 'REFUND_PENDING' &&
+              ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(booking.status);
             return (
-              <View key={booking.id} style={styles.card}>
+              <TouchableOpacity
+                key={booking.id}
+                style={styles.card}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('OrderDetails', { id: booking.id })}
+              >
                 <View style={styles.cardHeader}>
                   <View style={styles.cardTitleWrap}>
                     <Text style={styles.serviceName}>
@@ -132,9 +147,18 @@ export default function OrdersScreen() {
                 </View>
                 <View style={styles.cardFooter}>
                   <Text style={styles.amount}>{formatMoney(booking.amount)}</Text>
-                  <Text style={styles.confirmation}>Status comes directly from CareBow</Text>
+                  {due ? (
+                    <View style={styles.payChip}>
+                      <Icon name="card-outline" size={14} color={colors.text.inverse} />
+                      <Text style={styles.payChipText}>Pay now</Text>
+                    </View>
+                  ) : booking.paymentStatus === 'PAID' ? (
+                    <Text style={styles.confirmation}>Paid</Text>
+                  ) : (
+                    <Text style={styles.confirmation}>Status comes directly from CareBow</Text>
+                  )}
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -158,6 +182,16 @@ const styles = StyleSheet.create({
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { ...typography.sectionHeader, color: colors.text.primary },
   content: { flexGrow: 1, padding: space.lg, gap: space.md },
+  payChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    backgroundColor: colors.primary.default,
+    borderRadius: radius.full,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+  },
+  payChipText: { ...typography.caption, color: colors.text.inverse, fontWeight: '600' },
   state: {
     flex: 1,
     minHeight: 420,

@@ -19,10 +19,32 @@ export interface V1Booking {
   scheduledAt: string;
   status: BookingStatus;
   amount: number; // paise
+  /**
+   * PENDING | PAID | REFUNDED | REFUND_PENDING. A booking can be unpaid for
+   * ordinary reasons — a quote billed after assessment, one an organisation
+   * raised — so this is what decides whether to offer a Pay button.
+   */
+  paymentStatus?: string;
   service?: { name: string; category: string } | null;
   profile?: { name: string } | null;
   provider?: { name: string; image?: string | null } | null;
   user?: { name?: string; email?: string } | null;
+}
+
+/**
+ * What cancelling did to the money. A cancelled booking that was paid for is
+ * refunded in full by the server, and the customer should be told so rather
+ * than left wondering.
+ *
+ *   ISSUED  — refund sent
+ *   NONE    — nothing was ever captured
+ *   PENDING — refund owed, the processor call failed; ops completes it
+ */
+export interface V1CancelResponse {
+  success: boolean;
+  error?: string;
+  booking?: V1Booking;
+  refund?: { status: 'ISSUED' | 'NONE' | 'PENDING'; amount?: number };
 }
 
 export interface V1BookingsResponse {
@@ -108,14 +130,8 @@ export const memberApi = {
     return response.data;
   },
 
-  cancelBooking: async (
-    bookingId: string
-  ): Promise<{ success: boolean; error?: string; booking?: V1Booking }> => {
-    const response = await ApiClient.post<{
-      success: boolean;
-      error?: string;
-      booking?: V1Booking;
-    }>(`/v1/bookings/${bookingId}/cancel`, {});
+  cancelBooking: async (bookingId: string): Promise<V1CancelResponse> => {
+    const response = await ApiClient.post<V1CancelResponse>(`/v1/bookings/${bookingId}/cancel`, {});
     return response.data;
   },
 
