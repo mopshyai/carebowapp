@@ -95,8 +95,12 @@ export type PlanOrderResponse = {
 export type Plan = {
   id: string;
   title: string;
-  /** Major units, as authored in the plan config. */
-  price: number;
+  /**
+   * Minor units of `currency`, priced by the server for THIS account. Not the
+   * config's list price: an account charged in USD is quoted in USD, and
+   * converting on the device would disagree with the Razorpay page.
+   */
+  amount: number;
   currency: string;
   period?: string | null;
   features: string[];

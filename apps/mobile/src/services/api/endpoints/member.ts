@@ -18,7 +18,13 @@ export interface V1Booking {
   id: string;
   scheduledAt: string;
   status: BookingStatus;
-  amount: number; // paise
+  /** Minor units of `currency` — paise for INR, cents for USD. */
+  amount: number;
+  /**
+   * What `amount` is denominated in. Absent on rows created before
+   * dual-currency pricing, which were all INR.
+   */
+  currency?: 'INR' | 'USD';
   /**
    * PENDING | PAID | REFUNDED | REFUND_PENDING. A booking can be unpaid for
    * ordinary reasons — a quote billed after assessment, one an organisation

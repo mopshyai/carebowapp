@@ -1,18 +1,28 @@
 /**
  * Country & currency configuration for country-aware pricing.
  *
- * Catalog prices in `data/services.ts` are authored in a USD base. Each country
- * maps that base to a local currency via `fxRate` (USD → local). The user's
- * country is chosen during profile building (see CreateProfileScreen) and stored
- * in the profile store; every price is displayed with `formatMoney(usd, code)`.
+ * Catalog prices in `data/services.ts` are authored in a USD base. Prices are
+ * shown — and charged — in one of exactly TWO currencies:
  *
- * The fxRate on each country is a BUNDLED FALLBACK, used only until live rates
- * arrive from GET /api/v1/fx (see services/fx). Hardcoded rates drift: these
- * were last 83/0.79/1.37/1.53 for INR/GBP/CAD/AUD against real values of
- * 96.6/0.75/1.41/1.43 — AUD alone was 7% out.
+ *   India         -> INR, converted from the USD base at the live rate
+ *   Anywhere else -> USD, the catalog figure itself, no conversion
  *
- * Display only. What a booking costs is decided server-side at order time and
- * snapshotted onto the payment; nothing here can influence a charge.
+ * It used to be six: GBP, AED, CAD and AUD each had their own rate. That was
+ * display-only fiction, because the server has always settled in one currency
+ * per customer — so a customer in Canada was shown CA$41 and charged something
+ * else entirely. Two currencies is what the backend can actually collect, so two
+ * is what the app is allowed to promise. The country list below survives for
+ * identity (name, flag) and for telling the server where someone is.
+ *
+ * The INR rate here is a BUNDLED FALLBACK, used only until live rates arrive
+ * from GET /api/v1/fx (see services/fx). Hardcoded rates drift: it was last 83
+ * against a real 96.6. USD needs no rate and so cannot drift at all, which is
+ * the reason non-Indian customers are quoted in dollars rather than locally.
+ *
+ * Display only, still. What a booking costs is decided server-side at order
+ * time from the country on the user's account, and snapshotted onto the payment;
+ * nothing here can influence a charge. Keeping the two in step is what
+ * services/api/endpoints/region.ts is for.
  */
 
 export type CountryCode = 'US' | 'IN' | 'GB' | 'AE' | 'CA' | 'AU';
@@ -98,6 +108,67 @@ export const COUNTRIES: Record<CountryCode, CountryConfig> = {
 
 export const COUNTRY_LIST: CountryConfig[] = Object.values(COUNTRIES);
 
+/** The only two currencies the backend can collect. */
+export type SettlementCurrency = 'INR' | 'USD';
+
+type SettlementConfig = {
+  currency: SettlementCurrency;
+  symbol: string;
+  locale: string;
+  /** Round displayed amounts to this increment, in major units. */
+  roundTo: number;
+  /** Bundled USD -> currency fallback, replaced by live rates when they land. */
+  fallbackRate: number;
+};
+
+export const SETTLEMENT: Record<SettlementCurrency, SettlementConfig> = {
+  INR: { currency: 'INR', symbol: '₹', locale: 'en-IN', roundTo: 10, fallbackRate: 96.62 },
+  // Rate 1 by definition: the catalog is authored in USD.
+  USD: { currency: 'USD', symbol: '$', locale: 'en-US', roundTo: 1, fallbackRate: 1 },
+};
+
+/**
+ * What a customer in this country is quoted and charged in.
+ *
+ * Must agree with currencyForCountry() in the backend's src/lib/currency.ts. If
+ * these two ever disagree, the app shows one price and the Razorpay page shows
+ * another.
+ *
+ * Pure and per-country: the country picker asks this about every country, not
+ * about the current user. For "what does THIS customer pay in", the server's
+ * answer wins — see setServerCurrency below.
+ */
+export function settlementCurrencyFor(code: CountryCode | null | undefined): SettlementCurrency {
+  return code === 'IN' ? 'INR' : 'USD';
+}
+
+/**
+ * The currency the SERVER says this account is charged in, once known.
+ *
+ * The rule above is duplicated on both sides, and duplicated rules drift. The
+ * server also has a lever the app cannot see: if International Payments is not
+ * live on the Razorpay account, it quotes everyone in INR regardless of country.
+ * An app that worked that out for itself would display dollars against a rupee
+ * checkout.
+ *
+ * So GET /v1/region is fetched at launch and its answer parked here, exactly as
+ * live FX rates are. Null until it arrives, and the local rule covers that.
+ */
+let serverCurrency: SettlementCurrency | null = null;
+
+export function setServerCurrency(currency: string | null | undefined): void {
+  serverCurrency = currency === 'INR' ? 'INR' : currency === 'USD' ? 'USD' : null;
+}
+
+export function getServerCurrency(): SettlementCurrency | null {
+  return serverCurrency;
+}
+
+/** What the current customer pays in: the server's answer, else the local rule. */
+export function activeSettlementCurrency(code: CountryCode | null | undefined): SettlementCurrency {
+  return serverCurrency ?? settlementCurrencyFor(code);
+}
+
 export const DEFAULT_COUNTRY: CountryCode = 'US';
 
 export function getCountryConfig(code: CountryCode | null | undefined): CountryConfig {
@@ -125,33 +196,57 @@ export function getLiveRates(): Record<string, number> {
 
 /** The rate actually used: live if hydrated, else the bundled fallback. */
 export function getEffectiveRate(code: CountryCode): number {
-  const config = getCountryConfig(code);
-  const live = liveRates[config.currency];
-  return typeof live === 'number' && Number.isFinite(live) && live > 0 ? live : config.fxRate;
+  const settlement = SETTLEMENT[activeSettlementCurrency(code)];
+  // USD is never converted, so a stray live rate for it cannot move a price.
+  if (settlement.currency === 'USD') return 1;
+  const live = liveRates[settlement.currency];
+  return typeof live === 'number' && Number.isFinite(live) && live > 0
+    ? live
+    : settlement.fallbackRate;
 }
 
-/** Convert a USD-base amount to the country's local currency (rounded). */
+/** Convert a USD-base amount into what this country settles in (rounded). */
 export function convertFromUsd(usd: number, code: CountryCode): number {
-  const { roundTo } = getCountryConfig(code);
+  const { roundTo } = SETTLEMENT[activeSettlementCurrency(code)];
   const local = usd * getEffectiveRate(code);
   return Math.round(local / roundTo) * roundTo;
 }
 
 /**
- * Format a USD-base amount as a localized currency string for the given country.
- * e.g. formatMoney(20, 'IN') -> "₹1,660", formatMoney(20, 'US') -> "$20".
+ * Format a USD-base amount in the currency this country settles in.
+ * e.g. formatMoney(20, 'IN') -> "₹1,930", formatMoney(20, 'GB') -> "$20".
  */
 export function formatMoney(usd: number, code: CountryCode): string {
-  const config = getCountryConfig(code);
+  const settlement = SETTLEMENT[activeSettlementCurrency(code)];
   const amount = convertFromUsd(usd, code);
   try {
-    return new Intl.NumberFormat(config.locale, {
+    return new Intl.NumberFormat(settlement.locale, {
       style: 'currency',
-      currency: config.currency,
+      currency: settlement.currency,
       maximumFractionDigits: 0,
     }).format(amount);
   } catch {
     // Fallback if the runtime's Intl lacks the locale/currency.
-    return `${config.symbol}${amount.toLocaleString()}`;
+    return `${settlement.symbol}${amount.toLocaleString()}`;
+  }
+}
+
+/**
+ * Format an amount that is already in minor units of a known currency — a
+ * booking, a payment, a plan. Distinct from formatMoney on purpose: that one
+ * takes a USD catalog price and converts, this one takes a figure the server has
+ * already decided and must not touch. Conflating them is how a ₹4,830 charge
+ * gets converted a second time and displayed as ₹466,578.
+ */
+export function formatMinor(amountMinor: number, currency: string): string {
+  const settlement = SETTLEMENT[currency === 'INR' ? 'INR' : 'USD'];
+  try {
+    return new Intl.NumberFormat(settlement.locale, {
+      style: 'currency',
+      currency: settlement.currency,
+      maximumFractionDigits: 0,
+    }).format((amountMinor || 0) / 100);
+  } catch {
+    return `${settlement.symbol}${((amountMinor || 0) / 100).toLocaleString()}`;
   }
 }

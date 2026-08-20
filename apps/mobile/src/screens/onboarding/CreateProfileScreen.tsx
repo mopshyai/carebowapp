@@ -23,7 +23,12 @@ import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfileStore } from '@/store/useProfileStore';
 import { createEmptyMemberHealthInfo, createEmptyCarePreferences } from '@/types/profile';
-import { COUNTRY_LIST, type CountryCode } from '@/data/countries';
+import {
+  COUNTRY_LIST,
+  SETTLEMENT,
+  settlementCurrencyFor,
+  type CountryCode,
+} from '@/data/countries';
 import type { OnboardingStackParamList } from '@/navigation/types';
 import { createLogger } from '@/utils/logger';
 import { profilesApi } from '@/services/api/endpoints/profiles';
@@ -333,7 +338,11 @@ export default function CreateProfileScreen() {
                     <Text
                       style={[styles.chipText, country === option.code && styles.chipTextSelected]}
                     >
-                      {option.name} ({option.symbol})
+                      {/* The symbol shown is the one this country is CHARGED
+                          in — two currencies, not six. Showing "£" to a UK
+                          customer who pays in dollars is a promise we break at
+                          checkout. */}
+                      {option.name} ({SETTLEMENT[settlementCurrencyFor(option.code)].symbol})
                     </Text>
                   </Pressable>
                 ))}

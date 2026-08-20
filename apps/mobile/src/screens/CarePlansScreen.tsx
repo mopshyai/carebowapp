@@ -29,14 +29,12 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { paymentsApi, type Plan } from '../services/api/endpoints/payments';
 import { useHostedCheckout } from '../hooks/useHostedCheckout';
 import { useAuthStore } from '../store/useAuthStore';
+import { formatMinor } from '../data/countries';
 import { colors, radius, spacing, typography } from '../theme';
 
-const money = (major: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(major || 0);
+// Plans arrive priced in the currency this account is charged in — INR for
+// India, USD elsewhere — so the card and the Razorpay page agree.
+const money = (amountMinor: number, currency: string) => formatMinor(amountMinor, currency);
 
 export default function CarePlansScreen() {
   const insets = useSafeAreaInsets();
@@ -158,7 +156,7 @@ export default function CarePlansScreen() {
                 </View>
 
                 <Text style={styles.price}>
-                  {plan.price === 0 ? 'Free' : money(plan.price)}
+                  {plan.amount === 0 ? 'Free' : money(plan.amount, plan.currency)}
                   {plan.period ? <Text style={styles.period}> / {plan.period}</Text> : null}
                 </Text>
 
@@ -175,14 +173,16 @@ export default function CarePlansScreen() {
                   <View style={[styles.button, styles.buttonMuted]}>
                     <Text style={styles.buttonMutedText}>Your current plan</Text>
                   </View>
-                ) : plan.price === 0 ? null : (
+                ) : plan.amount === 0 ? null : (
                   <TouchableOpacity
                     style={[styles.button, busy(plan.id) && styles.disabled]}
                     onPress={() => buy(plan)}
                     disabled={busy(plan.id)}
                   >
                     <Text style={styles.buttonText}>
-                      {busy(plan.id) ? 'Opening payment…' : `Subscribe · ${money(plan.price)}`}
+                      {busy(plan.id)
+                        ? 'Opening payment…'
+                        : `Subscribe · ${money(plan.amount, plan.currency)}`}
                     </Text>
                   </TouchableOpacity>
                 )}

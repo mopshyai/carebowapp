@@ -8,7 +8,8 @@ import React from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CountryCode, DEFAULT_COUNTRY } from '../data/countries';
+import { CountryCode, DEFAULT_COUNTRY, setServerCurrency } from '../data/countries';
+import { regionApi } from '../services/api/endpoints/region';
 import {
   UserProfile,
   FamilyMember,
@@ -649,6 +650,16 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
       // ========== COUNTRY ==========
       setCountry: (code) => {
         set({ country: code });
+
+        // The server prices from User.country, not from anything the app sends
+        // at order time, so a country that stays on the device means the app
+        // displays one currency and Razorpay collects another. Fire-and-forget:
+        // the local choice still stands if the network is down, and the next
+        // successful call reconciles it.
+        void regionApi
+          .set(code)
+          .then((region) => setServerCurrency(region.currency ?? null))
+          .catch(() => {});
       },
 
       // ========== UTILS ==========

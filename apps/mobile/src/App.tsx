@@ -34,6 +34,8 @@ import { NetworkProvider } from './utils/NetworkProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { initializeSentry } from './services/monitoring/SentryService';
 import { hydrateExchangeRates } from './services/fx';
+import { regionApi } from './services/api/endpoints/region';
+import { setServerCurrency } from './data/countries';
 import { useAuthStore } from './store/useAuthStore';
 import { ThemeProvider, useTheme } from './theme';
 import { createLogger } from './utils/logger';
@@ -185,6 +187,19 @@ function AppContent() {
           .then((source) => logger.debug('Exchange rates hydrated from', source))
           .catch(() => {
             /* hydrateExchangeRates already degrades internally */
+          });
+
+        // Which currency this account is actually charged in. The app can work
+        // it out from the chosen country, but the server has the final say — it
+        // also knows whether the payment processor can collect dollars at all.
+        // Asking means the price on a card and the price on the Razorpay page
+        // cannot disagree. Same treatment as rates: never blocks launch, and the
+        // local rule covers us until it lands.
+        regionApi
+          .get()
+          .then((region) => setServerCurrency(region.currency ?? null))
+          .catch(() => {
+            /* Not signed in yet, or offline. The local rule applies. */
           });
 
         // Add any other initialization logic here
