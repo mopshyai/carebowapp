@@ -5,14 +5,13 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useBookingsStore, selectBookingById } from '../store';
 import { paymentsApi } from '../services/api/endpoints/payments';
 import { useHostedCheckout } from '../hooks/useHostedCheckout';
+import { formatMinor } from '../data/countries';
 import { colors, radius, spacing, typography } from '../theme';
 
-const money = (paise: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format((paise || 0) / 100);
+// The booking's own currency, not the device's guess: a booking quoted in
+// dollars stays quoted in dollars.
+const money = (amountMinor: number, currency?: string) =>
+  formatMinor(amountMinor, currency ?? 'INR');
 
 export default function OrderDetailsScreen() {
   const navigation = useNavigation();
@@ -161,7 +160,7 @@ export default function OrderDetailsScreen() {
         <Text style={styles.value}>{when.toLocaleString()}</Text>
         <Text style={styles.label}>Amount</Text>
         <Text style={styles.value}>
-          {money(booking.amount)}
+          {money(booking.amount, booking.currency)}
           {paid ? ' · Paid' : ''}
           {booking.paymentStatus === 'REFUNDED' ? ' · Refunded' : ''}
           {booking.paymentStatus === 'REFUND_PENDING' ? ' · Refund on the way' : ''}
@@ -177,7 +176,7 @@ export default function OrderDetailsScreen() {
         >
           <Icon name="card-outline" size={18} color={colors.textInverse} />
           <Text style={styles.payText}>
-            {busy ? 'Opening payment…' : `Pay ${money(booking.amount)}`}
+            {busy ? 'Opening payment…' : `Pay ${money(booking.amount, booking.currency)}`}
           </Text>
         </TouchableOpacity>
       )}

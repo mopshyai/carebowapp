@@ -16,12 +16,12 @@ import { useBookingsStore } from '../store';
 import type { AppNavigationProp } from '../navigation/types';
 import { colors, layout, radius, shadows, space, typography } from '../theme/tokens';
 
-const formatMoney = (paise: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format((paise || 0) / 100);
+import { formatMinor } from '../data/countries';
+
+// Formats what the server charged, in the currency it charged. Hardcoding INR
+// here displayed a $270 booking as ₹270.
+const formatMoney = (amountMinor: number, currency?: string) =>
+  formatMinor(amountMinor, currency ?? 'INR');
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
@@ -146,7 +146,7 @@ export default function OrdersScreen() {
                   </Text>
                 </View>
                 <View style={styles.cardFooter}>
-                  <Text style={styles.amount}>{formatMoney(booking.amount)}</Text>
+                  <Text style={styles.amount}>{formatMoney(booking.amount, booking.currency)}</Text>
                   {due ? (
                     <View style={styles.payChip}>
                       <Icon name="card-outline" size={14} color={colors.text.inverse} />
