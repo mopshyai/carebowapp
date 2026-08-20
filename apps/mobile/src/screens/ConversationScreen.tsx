@@ -73,6 +73,11 @@ export default function ConversationScreen() {
 
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
+  // Whether the orchestrator (E7) drove the most recent turn. When it did, the
+  // orchestrator runs its own intake and asks its own follow-ups, so the local
+  // engine's "we still need info about X" nag (StillNeedCard) just contradicts
+  // it — suppress that local scaffolding on orchestrator-driven turns.
+  const [lastTurnUsedOrchestrator, setLastTurnUsedOrchestrator] = useState(false);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
   // E4: the medical agent's answer as it streams in, token by token. null
   // when nothing is streaming (including the rewrite-only fallback path,
@@ -250,9 +255,24 @@ export default function ConversationScreen() {
           });
           setStreamingText(null);
           if (orchestratorReply) {
-            displayMessages = response.messages.map((message, index) =>
-              index === 0 ? { ...message, text: orchestratorReply.text } : message
-            );
+            // The orchestrator (E7) already ran the full multi-agent,
+            // RAG-grounded reasoning and returned ONE conversational answer
+            // that contains whatever reflection, guidance, and next step it
+            // wants to offer this turn — and it asks its own follow-up
+            // questions. Show exactly that, as a single message, and drop the
+            // local engine's parallel scaffolding for the same turn: the
+            // collapsible GuidanceCard, the ServiceRecommendationCard, and the
+            // "would you like me to book…" prompt (response.messages[1..]).
+            // Stacking all of those on top of the orchestrator's own answer is
+            // the "why is it popping up this many things" clutter, and the
+            // local scripted follow-ups just compete with the orchestrator's.
+            displayMessages = [
+              {
+                role: 'assistant',
+                contentType: 'text',
+                text: orchestratorReply.text,
+              },
+            ];
             usedOrchestrator = true;
           }
         }
@@ -274,6 +294,10 @@ export default function ConversationScreen() {
             logger.warn('Ask CareBow rewrite unavailable; using safety response', apiError);
           }
         }
+
+        // Record who drove this turn so the render below can suppress the
+        // local "still need info" nag while the orchestrator runs intake.
+        setLastTurnUsedOrchestrator(usedOrchestrator);
 
         // Hide typing indicator
         setIsTyping(false);
@@ -530,8 +554,11 @@ export default function ConversationScreen() {
                 }
               }}
             />
-            {/* Still Need Card - shows missing info */}
-            {currentSession?.healthContext &&
+            {/* Still Need Card - shows missing info. Suppressed on
+                orchestrator-driven turns: it runs its own intake, so a local
+                "we still need X" prompt only contradicts what it just asked. */}
+            {!lastTurnUsedOrchestrator &&
+              currentSession?.healthContext &&
               (() => {
                 const missingField = detectMissingInfo(currentSession.healthContext);
                 return missingField ? <StillNeedCard missingField={missingField} /> : null;
