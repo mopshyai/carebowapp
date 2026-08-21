@@ -1,12 +1,17 @@
 /**
  * Notification Service
- * Handles local notifications for safety check-ins
+ * Handles safety check-in scheduling.
  *
- * Note: This is a simplified implementation for RN CLI.
- * For production, consider using @notifee/react-native for full notification features.
+ * Native background reminder notifications are still not connected in this RN
+ * build. The important safety behavior is now server-authoritative: CareBow
+ * stores the daily schedule and can escalate a missed check-in even when the
+ * app is closed. This module never claims the feature is active unless that
+ * server schedule was accepted.
  */
 
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { safetyApi, getDeviceTimeZone } from '@/services/api/endpoints/safety';
+import { useSafetyStore } from '../store/useSafetyStore';
 import { PermissionStatus } from '../types';
 
 // ============================================
@@ -15,7 +20,6 @@ import { PermissionStatus } from '../types';
 
 export async function requestNotificationPermission(): Promise<PermissionStatus> {
   if (Platform.OS === 'android') {
-    // Android 13+ requires notification permission
     if (Platform.Version >= 33) {
       try {
         const granted = await PermissionsAndroid.request(
@@ -27,9 +31,8 @@ export async function requestNotificationPermission(): Promise<PermissionStatus>
         return 'denied';
       }
     }
-    return 'granted'; // Pre-Android 13 doesn't need permission
+    return 'granted';
   }
-  // iOS - permissions handled via native configuration
   return 'granted';
 }
 
@@ -44,76 +47,114 @@ export async function getNotificationPermissionStatus(): Promise<PermissionStatu
 }
 
 // ============================================
-// NOTIFICATION SCHEDULING (Simplified)
+// CHECK-IN SCHEDULING
 // ============================================
 
 export type CheckInNotificationConfig = {
-  checkInTime: string; // HH:mm format
+  checkInTime: string;
   gracePeriodMinutes: number;
 };
 
-// Storage for scheduled notification IDs
 const scheduledNotifications: Map<string, NodeJS.Timeout> = new Map();
 
-/**
- * Schedule the daily check-in reminder notification
- * Fails closed until native background notification scheduling is connected.
- */
-export async function scheduleCheckInReminder(
-  _config: CheckInNotificationConfig
-): Promise<string | null> {
-  try {
-    // Cancel any existing check-in notifications
-    await cancelCheckInNotifications();
-
-    Alert.alert(
-      'Reminder not enabled',
-      'Background safety reminders are not connected on this build. No reminder was scheduled.'
-    );
-    return null;
-  } catch (error) {
-    console.error('Failed to schedule check-in reminder:', error);
-    return null;
-  }
+function clearLocalCheckInTimers(): void {
+  scheduledNotifications.forEach((timeout, id) => {
+    if (id.includes('checkin') || id.includes('grace_period')) {
+      clearTimeout(timeout);
+      scheduledNotifications.delete(id);
+    }
+  });
 }
 
 /**
- * Schedule the grace period warning notification
+ * Persist the schedule that powers automatic missed-check-in escalation.
+ *
+ * Native reminder delivery is intentionally not faked. If the backend rejects
+ * the schedule, local state is rolled back to the last server value so the UI
+ * cannot promise a safety feature the server does not know about.
+ */
+export async function scheduleCheckInReminder(
+  config: CheckInNotificationConfig
+): Promise<string | null> {
+  const previous = await safetyApi.getDailyCheckIn();
+  const response = await safetyApi.updateDailyCheckIn({
+    enabled: true,
+    time: config.checkInTime,
+    gracePeriodMinutes: config.gracePeriodMinutes,
+    timezone: getDeviceTimeZone(),
+  });
+
+  if (!response?.success) {
+    const fallback = previous?.settings;
+    useSafetyStore.getState().updateSettings({
+      dailyCheckInEnabled: fallback?.enabled ?? false,
+      dailyCheckInTime: fallback?.time ?? config.checkInTime,
+      gracePeriodMinutes: fallback?.gracePeriodMinutes ?? config.gracePeriodMinutes,
+    });
+    Alert.alert(
+      'Daily check-in not enabled',
+      'CareBow could not save the safety schedule on the server. Automatic family alerts are not active. Please try again when you are online.'
+    );
+    return null;
+  }
+
+  clearLocalCheckInTimers();
+
+  // Be explicit about the current boundary: automatic missed-check-in
+  // escalation is live, but this build does not yet have a native background
+  // reminder scheduler. Do not pretend an OS notification was scheduled.
+  if (!previous?.settings?.enabled) {
+    Alert.alert(
+      'Daily check-in enabled',
+      'CareBow will track the check-in on the server and alert your saved safety contacts if you miss the grace period. Background reminder notifications are not yet available in this build.'
+    );
+  }
+
+  return response.checkIn?.id ?? `server_checkin_${Date.now()}`;
+}
+
+/**
+ * Grace-period escalation is server-side now; no fake local warning timer.
  */
 export async function scheduleGracePeriodWarning(
   _config: CheckInNotificationConfig
 ): Promise<string | null> {
-  try {
-    Alert.alert(
-      'Missed check-in alerts not enabled',
-      'This build cannot send a background alert or notify contacts. No alert was scheduled.'
-    );
-    return null;
-  } catch (error) {
-    console.error('Failed to schedule grace period warning:', error);
-    return null;
-  }
+  return null;
 }
 
 /**
- * Cancel all check-in related notifications
+ * Disable both local placeholder timers and the server schedule. If the server
+ * cannot confirm disablement, restore the previous server state locally so the
+ * UI does not falsely tell the user automatic escalation has stopped.
  */
 export async function cancelCheckInNotifications(): Promise<void> {
-  try {
-    scheduledNotifications.forEach((timeout, id) => {
-      if (id.includes('checkin') || id.includes('grace_period')) {
-        clearTimeout(timeout);
-        scheduledNotifications.delete(id);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to cancel check-in notifications:', error);
+  clearLocalCheckInTimers();
+
+  const previous = await safetyApi.getDailyCheckIn();
+  const current = useSafetyStore.getState().settings;
+  const response = await safetyApi.updateDailyCheckIn({
+    enabled: false,
+    time: current.dailyCheckInTime,
+    gracePeriodMinutes: current.gracePeriodMinutes,
+    timezone: getDeviceTimeZone(),
+  });
+
+  if (!response?.success) {
+    const fallback = previous?.settings;
+    if (fallback) {
+      useSafetyStore.getState().updateSettings({
+        dailyCheckInEnabled: fallback.enabled,
+        dailyCheckInTime: fallback.time,
+        gracePeriodMinutes: fallback.gracePeriodMinutes,
+      });
+    }
+    Alert.alert(
+      'Could not disable daily check-in',
+      'CareBow could not confirm the change with the server. Your previous safety schedule may still be active. Please try again when you are online.'
+    );
   }
 }
 
-/**
- * Cancel a specific notification by ID
- */
 export async function cancelNotification(identifier: string): Promise<void> {
   try {
     const timeout = scheduledNotifications.get(identifier);
@@ -126,9 +167,6 @@ export async function cancelNotification(identifier: string): Promise<void> {
   }
 }
 
-/**
- * Show an immediate local notification
- */
 export async function showImmediateNotification(
   title: string,
   body: string,
@@ -144,17 +182,13 @@ export async function showImmediateNotification(
 }
 
 // ============================================
-// NOTIFICATION CATEGORIES (Placeholder)
+// NOTIFICATION CATEGORIES / LISTENERS
 // ============================================
 
 export async function setupNotificationCategories(): Promise<void> {
-  // For RN CLI, notification channels need to be configured in native code
-  // or using @notifee/react-native
+  // Native notification channels still need @notifee/react-native or an
+  // equivalent native integration. Server escalation does not depend on this.
 }
-
-// ============================================
-// NOTIFICATION LISTENERS (Placeholder types)
-// ============================================
 
 export type NotificationResponse = {
   notification: {
@@ -175,19 +209,12 @@ export type EventSubscription = {
   remove: () => void;
 };
 
-/**
- * Subscribe to notification responses (placeholder)
- */
 export function addNotificationResponseListener(
   _callback: NotificationResponseCallback
 ): EventSubscription {
-  // In RN CLI, implement with @notifee/react-native
   return { remove: () => {} };
 }
 
-/**
- * Subscribe to received notifications (placeholder)
- */
 export function addNotificationReceivedListener(
   _callback: (notification: { request: { content: { title: string; body: string } } }) => void
 ): EventSubscription {
