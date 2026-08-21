@@ -1,8 +1,10 @@
-import { ApiClient } from './ApiClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ApiClient, MAX_ACCESS_TOKEN_HORIZON_SECONDS } from './ApiClient';
 import { ApiError } from './types';
 import { SecureStorage } from '@/services/storage/SecureStorage';
 
 const secureStorageMock = SecureStorage as jest.Mocked<typeof SecureStorage>;
+const asyncStorageMock = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 
 describe('ApiClient retry policy', () => {
   const originalFetch = global.fetch;
@@ -42,6 +44,7 @@ describe('ApiClient token lifecycle', () => {
     jest.clearAllMocks();
     secureStorageMock.clearAuthTokens.mockResolvedValue(true);
     await ApiClient.clearTokens({ revokeRemote: false });
+    jest.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -77,5 +80,25 @@ describe('ApiClient token lifecycle', () => {
     expect(ApiClient.isAuthenticated()).toBe(true);
     expect(ApiClient.getAccessToken()).toBe('access-ok');
     expect(ApiClient.getRefreshToken()).toBe('refresh-ok');
+  });
+
+  it('caps old seven-day expiry metadata to the 15-minute bearer horizon', async () => {
+    secureStorageMock.setAuthTokens.mockResolvedValueOnce(true);
+    const now = Math.floor(Date.now() / 1000);
+
+    await ApiClient.setTokens({
+      accessToken: 'old-long-lived-access',
+      refreshToken: 'refresh-ok',
+      expiresAt: now + 7 * 24 * 60 * 60,
+    });
+
+    expect(MAX_ACCESS_TOKEN_HORIZON_SECONDS).toBe(15 * 60);
+    const expiryWrite = asyncStorageMock.setItem.mock.calls.find(
+      ([key]) => key === '@carebow/token_expiry'
+    );
+    expect(expiryWrite).toBeDefined();
+    const writtenExpiry = Number(expiryWrite?.[1]);
+    expect(writtenExpiry).toBeGreaterThanOrEqual(now + MAX_ACCESS_TOKEN_HORIZON_SECONDS - 1);
+    expect(writtenExpiry).toBeLessThanOrEqual(now + MAX_ACCESS_TOKEN_HORIZON_SECONDS + 1);
   });
 });
