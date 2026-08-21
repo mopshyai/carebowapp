@@ -24,7 +24,6 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Tts from 'react-native-tts';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ImageThumbnailRow } from '../../components/askCarebow/ImageThumbnailRow';
 import {
@@ -33,6 +32,7 @@ import {
 } from '../../components/askCarebow/ImageUploadBottomSheet';
 import { RedFlagWarning, detectRedFlags } from '../../components/askCarebow/RedFlagWarning';
 import { TrialBanner, TrialSignupCard } from '../../components/askCarebow/TrialSignupCard';
+import { resolveAskInputText } from '../../lib/askCarebow/askInput';
 import type { AppNavigationProp } from '../../navigation/types';
 import { useAskCarebowStore, useIsTrialActive, useTrialState } from '../../store/askCarebowStore';
 import { useMemoryCount } from '../../store/healthMemoryStore';
@@ -119,10 +119,12 @@ export default function AskCareBowScreen() {
   const onSpeechEnd = (e: any) => {
     console.log('onSpeechEnd:', e);
     setIsListening(false);
-    setRecognizedText('');
     setBaseText('');
-    // Don't clear baseTextRef here — onSpeechResults may fire after onSpeechEnd,
-    // and it needs baseTextRef to append correctly. It gets overwritten on next start.
+    // Do not clear recognizedText here. Native speech callbacks are not
+    // guaranteed to deliver onSpeechResults after onSpeechEnd; clearing here
+    // can erase a valid final transcript and disable the safety checks/CTA.
+    // baseTextRef is intentionally kept until the next speech start because a
+    // final result may still arrive after this callback in text-input mode.
   };
 
   const onSpeechResults = (e: any) => {
@@ -136,9 +138,10 @@ export default function AskCareBowScreen() {
         const newText = base ? `${base} ${trimmedNew}` : trimmedNew;
         setSymptomInput(newText);
       } else {
-        // Voice mode: update recognized text only (for "You said" display)
+        // Voice mode is speech-to-text input for the real Ask CareBow flow.
+        // Never answer with canned testing TTS here: doing so can audibly
+        // dismiss a genuine symptom before the safety engine sees it.
         setRecognizedText(trimmedNew);
-        handleVoice(text);
       }
     }
   };
@@ -197,18 +200,7 @@ export default function AskCareBowScreen() {
     // iOS permissions are handled via Info.plist
     return true;
   };
-  const handleVoice = (text: any) => {
-    const normalizedText = text.toLowerCase().trim();
-    if (normalizedText === 'what is your name') {
-      Tts.speak('I am Carebow');
-    } else if (normalizedText === 'how are you') {
-      Tts.speak('I am functioning normally.');
-    } else if (normalizedText === 'what can you do') {
-      Tts.speak('I can answer all your questions for testing.');
-    } else {
-      Tts.speak('Sorry, I did not understand that.');
-    }
-  };
+
   const startRecognizing = async () => {
     try {
       setRecognizedText('');
@@ -243,10 +235,14 @@ export default function AskCareBowScreen() {
   // Health memory
   const memoryCount = useMemoryCount();
 
+  // One canonical patient utterance drives safety checks, emotional context,
+  // CTA enablement and the actual conversation request.
+  const effectiveSymptom = resolveAskInputText(inputMode, symptomInput, recognizedText);
+
   // Red flag detection
   const showRedFlagWarning = useMemo(() => {
-    return detectRedFlags(symptomInput);
-  }, [symptomInput]);
+    return detectRedFlags(effectiveSymptom);
+  }, [effectiveSymptom]);
 
   // Emotional keyword detection for reassurance message
   const EMOTIONAL_KEYWORDS = [
@@ -262,9 +258,9 @@ export default function AskCareBowScreen() {
     'terrified',
   ];
   const showEmotionalReassurance = useMemo(() => {
-    const lowerInput = symptomInput.toLowerCase();
+    const lowerInput = effectiveSymptom.toLowerCase();
     return EMOTIONAL_KEYWORDS.some((keyword) => lowerInput.includes(keyword));
-  }, [symptomInput]);
+  }, [effectiveSymptom]);
 
   // Image handlers
   const handleImagesSelected = useCallback((images: ImageAttachment[]) => {
@@ -276,15 +272,14 @@ export default function AskCareBowScreen() {
   }, []);
 
   const handleStart = () => {
-    const symptom = inputMode === 'voice' ? recognizedText : symptomInput;
-    if (!symptom.trim()) return;
+    if (!effectiveSymptom) return;
 
     // Clear any existing session before starting a new one
     clearCurrentSession();
 
     // Navigate with all context including images
     navigation.navigate('Conversation' as never, {
-      symptom,
+      symptom: effectiveSymptom,
       context: contextType,
       relation: familyRelation,
       age: familyAge,
@@ -301,9 +296,8 @@ export default function AskCareBowScreen() {
     navigation.navigate('HealthMemory' as never);
   };
 
-  const effectiveSymptom = inputMode === 'voice' ? recognizedText : symptomInput;
   const canStart =
-    effectiveSymptom.trim().length > 0 && (contextType === 'me' || (familyRelation && familyAge));
+    effectiveSymptom.length > 0 && (contextType === 'me' || (familyRelation && familyAge));
 
   return (
     <View style={styles.container}>
@@ -616,9 +610,6 @@ export default function AskCareBowScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Red Flag Warning (inline, below input) */}
-              <RedFlagWarning visible={showRedFlagWarning} />
-
               {/* Consolidated helper: privacy/memory + specificity + photo sharing */}
               <Text style={styles.safeSpaceSignal}>
                 Private • Judgment-free • Share photos if it helps, and be as specific as you can
@@ -665,6 +656,10 @@ export default function AskCareBowScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Safety warning must follow the effective input, regardless of
+              whether it came from the text field or speech recognition. */}
+          <RedFlagWarning visible={showRedFlagWarning} />
         </View>
 
         {/* Health Buddy Starter Prompts (improved) */}
@@ -675,7 +670,10 @@ export default function AskCareBowScreen() {
               <TouchableOpacity
                 key={index}
                 style={styles.exampleChip}
-                onPress={() => setSymptomInput(prompt.text)}
+                onPress={() => {
+                  setInputMode('text');
+                  setSymptomInput(prompt.text);
+                }}
               >
                 <Icon name={prompt.icon} size={12} color={colors.textTertiary} />
                 <Text style={styles.exampleChipText}>{prompt.text}</Text>
