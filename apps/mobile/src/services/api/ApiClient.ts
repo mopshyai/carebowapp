@@ -9,23 +9,33 @@ import { SecureStorage } from '@/services/storage/SecureStorage';
 import { HttpMethod, RequestConfig, ApiResponse, ApiError, AuthTokens } from './types';
 
 const API_CONFIG = {
-  // The live backend uses www. The bare domain redirects, and React Native can
-  // lose POST bodies while following that redirect.
   baseUrl: API_BASE_URL || 'https://www.carebow.com/api',
   timeout: Number(API_TIMEOUT) || 30000,
   retries: 2,
 };
 
+/**
+ * The server now issues 15-minute access JWTs and keeps long sessions through
+ * rotating refresh tokens. Cap the client's scheduling horizon too so an older
+ * app/session carrying stale seven-day expiry metadata is proactively rotated
+ * into the short-lived policy without a visible 401.
+ */
+export const MAX_ACCESS_TOKEN_HORIZON_SECONDS = 15 * 60;
+
 const STORAGE_KEYS = {
-  // Legacy keys are deletion-only. Raw tokens belong in Keychain/Keystore.
   LEGACY_ACCESS_TOKEN: '@carebow/access_token',
   LEGACY_REFRESH_TOKEN: '@carebow/refresh_token',
   TOKEN_EXPIRY: '@carebow/token_expiry',
 };
 
 interface ClearTokenOptions {
-  /** Best-effort revoke the current refresh token before deleting local credentials. */
   revokeRemote?: boolean;
+}
+
+function capAccessTokenExpiry(expiresAt: number): number {
+  const now = Math.floor(Date.now() / 1000);
+  const max = now + MAX_ACCESS_TOKEN_HORIZON_SECONDS;
+  return Number.isFinite(expiresAt) && expiresAt > 0 ? Math.min(expiresAt, max) : max;
 }
 
 class ApiClientImpl {
@@ -61,9 +71,13 @@ class ApiClientImpl {
 
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
-      this.tokenExpiry = expiry ? parseInt(expiry, 10) : 0;
+      const parsedExpiry = expiry ? parseInt(expiry, 10) : 0;
+      this.tokenExpiry = accessToken ? capAccessTokenExpiry(parsedExpiry) : 0;
 
       await Promise.all([
+        this.tokenExpiry > 0
+          ? AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, this.tokenExpiry.toString())
+          : AsyncStorage.removeItem(STORAGE_KEYS.TOKEN_EXPIRY),
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
       ]);
@@ -82,13 +96,6 @@ class ApiClientImpl {
     }
   }
 
-  /**
-   * Persist a token pair before making it active in memory.
-   *
-   * Previously the new bearer tokens were assigned first and secure persistence
-   * happened second. A failed Keychain/Keystore write could therefore make login
-   * report failure while the HTTP client remained authenticated in memory.
-   */
   async setTokens(tokens: AuthTokens): Promise<void> {
     try {
       const storedSecurely = await SecureStorage.setAuthTokens(
@@ -99,18 +106,18 @@ class ApiClientImpl {
         throw new Error('Failed to persist authentication tokens securely');
       }
 
+      const effectiveExpiry = capAccessTokenExpiry(tokens.expiresAt);
+
       await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, tokens.expiresAt.toString()),
+        AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, effectiveExpiry.toString()),
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
       ]);
 
-      // Commit to the live client only after durable persistence succeeds.
       this.accessToken = tokens.accessToken;
       this.refreshToken = tokens.refreshToken;
-      this.tokenExpiry = tokens.expiresAt;
+      this.tokenExpiry = effectiveExpiry;
     } catch (error) {
-      // Never retain either a previous identity or a half-committed new one.
       this.accessToken = null;
       this.refreshToken = null;
       this.tokenExpiry = 0;
@@ -124,18 +131,10 @@ class ApiClientImpl {
     }
   }
 
-  /**
-   * Clear the local session and, by default, make a best-effort server logout.
-   *
-   * Local deletion must always happen even when the device is offline. A failed
-   * remote revoke is intentionally non-fatal; password reset/change provides the
-   * stronger all-device recovery path.
-   */
   async clearTokens(options: ClearTokenOptions = {}): Promise<void> {
     const accessToken = this.accessToken;
     const refreshToken = this.refreshToken;
 
-    // Disable authenticated requests immediately, before any network wait.
     this.accessToken = null;
     this.refreshToken = null;
     this.tokenExpiry = 0;
@@ -242,7 +241,7 @@ class ApiClientImpl {
         data.tokens?.expiresAt ??
         (data.expiresIn
           ? Math.floor(Date.now() / 1000) + data.expiresIn
-          : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+          : Math.floor(Date.now() / 1000) + MAX_ACCESS_TOKEN_HORIZON_SECONDS);
 
       await this.setTokens({ accessToken, refreshToken, expiresAt });
       return true;
