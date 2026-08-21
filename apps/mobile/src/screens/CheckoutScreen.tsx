@@ -119,7 +119,9 @@ export default function CheckoutScreen() {
   };
 
   const handleBooking = async () => {
-    if (!bookingDraft?.memberId || !bookingDraft.date || !bookingDraft.startTime) return;
+    // A date-only service is valid without a visible time. The live service
+    // contract below decides whether a preferred time is actually required.
+    if (!bookingDraft?.memberId || !bookingDraft.date) return;
     setIsSubmitting(true);
 
     try {
@@ -127,10 +129,6 @@ export default function CheckoutScreen() {
         await recheckUnconfirmedOrder(unconfirmedOrderId);
         return;
       }
-
-      const scheduledAt = new Date(
-        `${bookingDraft.date}T${bookingDraft.startTime}:00`
-      ).toISOString();
 
       const noteParts = [
         `Requested: ${bookingDraft.serviceTitle}`,
@@ -160,6 +158,18 @@ export default function CheckoutScreen() {
         );
         return;
       }
+
+      if (liveService.booking.requiresTime && !bookingDraft.startTime) {
+        Alert.alert('Choose a time', 'Select a preferred appointment time before continuing.');
+        return;
+      }
+
+      // Booking rows store a timestamp even for date-only services. Noon is a
+      // neutral internal anchor for those services; it is never shown as a
+      // customer-selected appointment time and provider confirmation still owns
+      // the final timing.
+      const bookingTime = bookingDraft.startTime || '12:00';
+      const scheduledAt = new Date(`${bookingDraft.date}T${bookingTime}:00`).toISOString();
 
       // A quote with no booking fee has nothing to charge today. Create the
       // real PENDING booking through the server's direct-booking gate instead
