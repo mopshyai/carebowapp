@@ -25,6 +25,11 @@ export interface V1ProfileShareResponse {
   message?: string;
 }
 
+export interface V1ProfileDeleteResponse {
+  success: boolean;
+  error?: string;
+}
+
 export const profilesApi = {
   createProfile: async (data: {
     name: string;
@@ -71,6 +76,11 @@ export const profilesApi = {
     }>
   ): Promise<V1ProfileResponse> => {
     const response = await ApiClient.put<V1ProfileResponse>(`/v1/profiles/${profileId}`, data);
+    return response.data;
+  },
+
+  deleteProfile: async (profileId: string): Promise<V1ProfileDeleteResponse> => {
+    const response = await ApiClient.delete<V1ProfileDeleteResponse>(`/v1/profiles/${profileId}`);
     return response.data;
   },
 
