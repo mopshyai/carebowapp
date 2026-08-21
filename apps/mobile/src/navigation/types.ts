@@ -36,16 +36,11 @@ export type OnboardingStackParamList = {
 // ROOT STACK
 // ============================================
 
-// Root Stack Navigator
 export type RootStackParamList = {
-  // Auth & Onboarding
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;
-
-  // Main App
   MainTabs: NavigatorScreenParams<MainTabParamList>;
 
-  // Symptom Entry (PRD V1)
   NewEntry: undefined;
   AssessmentResult: { entryId: string };
 
@@ -56,9 +51,9 @@ export type RootStackParamList = {
         relation: string;
         age: string;
         memberName: string;
-        memberId?: string; // Exact saved local/backend patient selected for this conversation
+        memberId?: string;
         caregiverPresent?: string;
-        attachedImages?: string; // JSON string of ImageAttachment[]
+        attachedImages?: string;
       }
     | undefined;
   Assessment: undefined;
@@ -73,26 +68,23 @@ export type RootStackParamList = {
   OrderSuccess: { orderId?: string } | undefined;
   Orders: undefined;
   OrderDetails: { id: string };
+  MemberBookingDetails: { id: string };
   Requests: undefined;
   RequestDetails: { id: string };
   Safety: NavigatorScreenParams<SafetyStackParamList>;
   Modal: undefined;
-  // New screens
   HealthMemory: undefined;
   EpisodeSummary: { episodeId: string };
-  // Telemedicine
   TelemedicineBooking: { doctorId?: string } | undefined;
   VideoCall: { appointmentId: string; doctorName: string; doctorSpecialty?: string };
 };
 
-// Main Tab Navigator
 export type MainTabParamList = {
   Home: undefined;
   Ask: undefined;
   Messages: undefined;
 };
 
-// Profile Stack Navigator
 export type ProfileStackParamList = {
   ProfileIndex: undefined;
   PersonalInfo: undefined;
@@ -113,14 +105,12 @@ export type ProfileStackParamList = {
   Payments: undefined;
 };
 
-// Safety Stack Navigator
 export type SafetyStackParamList = {
   SafetyIndex: undefined;
   SafetySettings: undefined;
   SafetyContacts: undefined;
 };
 
-// Screen Props Types
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
   RootStackParamList,
   T
@@ -149,9 +139,6 @@ export type SafetyStackScreenProps<T extends keyof SafetyStackParamList> = Compo
   RootStackScreenProps<keyof RootStackParamList>
 >;
 
-// Declaration merging for useNavigation hook.
-// A namespace is required here — this is React Navigation's documented way to
-// type the global param list, and ES module syntax cannot express it.
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace ReactNavigation {
@@ -159,7 +146,6 @@ declare global {
   }
 }
 
-// Helper type for dynamic navigation
 export type AppNavigationProp = {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
   goBack: () => void;

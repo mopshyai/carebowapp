@@ -1,6 +1,13 @@
 /**
- * TriageActionBar Component
- * Shows triage-based CTAs after AI assessment response
+ * Triage Result Action Bar
+ * Shows triage-based CTAs after AI assessment response.
+ *
+ * Navigation ownership rule:
+ * - ConversationScreen owns care-orchestration navigation when it supplies onAction.
+ * - This component only falls back to local navigation when used standalone.
+ *
+ * This prevents the previous double-navigation bug where the action bar navigated
+ * and then the parent navigated again for the same clinical recommendation.
  */
 
 import React, { useState } from 'react';
@@ -20,6 +27,7 @@ import { ComingSoonSheet } from './ComingSoonSheet';
 import { HomeRemediesSheet } from './HomeRemediesSheet';
 import type { RootStackParamList } from '../../navigation/types';
 import { scheduleFollowUpReminder } from '../../services/notifications';
+import { useCartStore } from '../../store/useCartStore';
 
 interface TriageActionBarProps {
   triageLevel: TriageLevel;
@@ -28,6 +36,11 @@ interface TriageActionBarProps {
   symptoms?: string[];
   /** Profile the remedies request is filtered for (pregnancy, diabetes, age, allergies) */
   profileId?: string;
+  /**
+   * When present, the parent owns service navigation so the clinical episode can
+   * be carried into the booking flow. Local navigation is only a fallback for
+   * standalone usages of this component.
+   */
   onAction?: (action: string) => void;
 }
 
@@ -39,6 +52,7 @@ export function TriageActionBar({
   onAction,
 }: TriageActionBarProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const setCareReferralContext = useCartStore((state) => state.setCareReferralContext);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonAction, setComingSoonAction] = useState('');
   const [showHomeRemedies, setShowHomeRemedies] = useState(false);
@@ -46,38 +60,71 @@ export function TriageActionBar({
   const config = getCTAConfig(triageLevel);
   const tertiary = getTertiaryAction();
 
+  const captureCareReferral = (action: string) => {
+    const careIntent =
+      action === 'connect_doctor' || action === 'schedule_teleconsult'
+        ? 'teleconsult'
+        : action === 'book_home_visit' || action === 'home_visit_options'
+          ? 'home_visit'
+          : null;
+
+    if (!careIntent) return;
+
+    setCareReferralContext({
+      source: 'ask_carebow',
+      episodeId,
+      profileId,
+      triageLevel,
+      symptoms: symptoms.map((symptom) => symptom.trim()).filter(Boolean).slice(0, 8),
+      careIntent,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  const delegateCareAction = (action: string, fallback: () => void) => {
+    captureCareReferral(action);
+    if (onAction) {
+      onAction(action);
+      return;
+    }
+    fallback();
+  };
+
   const handleAction = (action: string) => {
     switch (action) {
       case 'emergency_call':
         handleEmergencyCall();
-        break;
+        onAction?.(action);
+        return;
       case 'find_er':
         handleFindER();
-        break;
+        onAction?.(action);
+        return;
       case 'save_share':
         handleSaveShare();
-        break;
+        onAction?.(action);
+        return;
       case 'connect_doctor':
       case 'schedule_teleconsult':
-        handleScheduleTeleconsult();
-        break;
+        delegateCareAction(action, handleScheduleTeleconsult);
+        return;
       case 'set_reminder':
         handleSetReminder();
-        break;
+        onAction?.(action);
+        return;
       case 'book_home_visit':
       case 'home_visit_options':
-        handleBookHomeVisit();
-        break;
+        delegateCareAction(action, handleBookHomeVisit);
+        return;
       case 'home_remedies':
         setShowHomeRemedies(true);
-        break;
+        onAction?.(action);
+        return;
       default:
-        // Show coming soon sheet for remaining stub actions
         setComingSoonAction(action);
         setShowComingSoon(true);
+        onAction?.(action);
     }
-
-    onAction?.(action);
   };
 
   const handleScheduleTeleconsult = () => {
@@ -157,7 +204,6 @@ export function TriageActionBar({
         if (supported) {
           Linking.openURL(url);
         } else {
-          // Fallback to Google Maps web
           Linking.openURL(`https://www.google.com/maps/search/${query}`);
         }
       })
@@ -205,7 +251,6 @@ export function TriageActionBar({
 
   return (
     <View style={[styles.container, isEmergency && styles.emergencyContainer]}>
-      {/* Emergency note - calm, clear guidance */}
       {isEmergency && (
         <View style={styles.emergencyNoteContainer}>
           <Icon name="alert-circle" size={16} color={colors.error} />
@@ -213,7 +258,6 @@ export function TriageActionBar({
         </View>
       )}
 
-      {/* Hint text (non-emergency) */}
       {!isEmergency && (
         <View style={styles.hintRow}>
           <Icon name="time-outline" size={12} color={colors.textTertiary} />
@@ -221,9 +265,7 @@ export function TriageActionBar({
         </View>
       )}
 
-      {/* Primary & Secondary buttons */}
       {isEmergency ? (
-        // Emergency layout: stacked full-width buttons
         <View style={styles.emergencyButtonColumn}>
           <TouchableOpacity
             style={[styles.button, styles.emergencyButton, styles.fullWidthButton]}
@@ -250,7 +292,6 @@ export function TriageActionBar({
           )}
         </View>
       ) : (
-        // Default layout: row with icon-only secondary
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={[
@@ -287,20 +328,17 @@ export function TriageActionBar({
         </View>
       )}
 
-      {/* Tertiary link */}
       <TouchableOpacity style={styles.tertiaryButton} onPress={() => handleAction(tertiary.action)}>
         <Icon name={tertiary.icon} size={14} color={colors.textTertiary} />
         <Text style={styles.tertiaryText}>{tertiary.label}</Text>
       </TouchableOpacity>
 
-      {/* Coming Soon Sheet */}
       <ComingSoonSheet
         visible={showComingSoon}
         onClose={() => setShowComingSoon(false)}
         action={comingSoonAction}
       />
 
-      {/* Home Remedies Sheet */}
       <HomeRemediesSheet
         visible={showHomeRemedies}
         onClose={() => setShowHomeRemedies(false)}

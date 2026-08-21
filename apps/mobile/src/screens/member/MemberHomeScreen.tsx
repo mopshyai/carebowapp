@@ -1,10 +1,6 @@
 /**
  * Member Home Screen — shared home for the 3 non-customer user types
  * (healthcare_provider, service_provider, service_partner).
- *
- * All three are `orgMember`s on the backend and share GET /member/overview.
- * Copy/terminology and the quick-action row adapt to the user type; the
- * underlying data + layout are identical.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -24,7 +20,6 @@ import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { useAuthStore, UserTypeSlug } from '@/store/useAuthStore';
 import { memberApi, MemberOverview } from '@/services/api/endpoints/member';
 
-// Per-type copy so one screen serves all three member types.
 const TYPE_COPY: Record<
   Exclude<UserTypeSlug, 'customer'>,
   { title: string; peopleLabel: string; workLabel: string }
@@ -81,7 +76,7 @@ export default function MemberHomeScreen() {
       } else {
         setError(res.error || 'Could not load your dashboard.');
       }
-    } catch (e) {
+    } catch {
       setError('Cannot reach CareBow servers. Pull to retry.');
     } finally {
       setLoading(false);
@@ -90,13 +85,18 @@ export default function MemberHomeScreen() {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    load();
+    void load();
   }, [load]);
+
+  const openBooking = useCallback(
+    (id: string) => navigation.navigate('MemberBookingDetails', { id }),
+    [navigation]
+  );
 
   const firstName = (user?.firstName || user?.email?.split('@')[0] || 'there').trim();
 
@@ -141,7 +141,6 @@ export default function MemberHomeScreen() {
             </View>
           )}
 
-          {/* Stat grid */}
           <View style={styles.statGrid}>
             <StatCard
               label={`Today's ${copy.workLabel}`}
@@ -165,12 +164,16 @@ export default function MemberHomeScreen() {
             />
           </View>
 
-          {/* Next appointment */}
           <Text style={styles.blockTitle}>Up next</Text>
           {overview?.nextAppointment ? (
-            <View style={styles.nextCard}>
+            <Pressable
+              style={styles.nextCard}
+              onPress={() => openBooking(overview.nextAppointment!.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${overview.nextAppointment.patientName} care details`}
+            >
               <View style={styles.nextIcon}>
-                <Icon name="videocam-outline" size={20} color={colors.accent} />
+                <Icon name="clipboard-outline" size={20} color={colors.accent} />
               </View>
               <View style={styles.nextInfo}>
                 <Text style={styles.nextName}>{overview.nextAppointment.patientName}</Text>
@@ -183,18 +186,24 @@ export default function MemberHomeScreen() {
                   })}
                 </Text>
               </View>
-            </View>
+              <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
           ) : (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>Nothing scheduled next. Enjoy the breather.</Text>
+              <Text style={styles.emptyText}>Nothing scheduled next.</Text>
             </View>
           )}
 
-          {/* Recent activity */}
           <Text style={styles.blockTitle}>Recent activity</Text>
           {overview && overview.recentActivity.length > 0 ? (
             overview.recentActivity.map((a) => (
-              <View key={a.id} style={styles.activityRow}>
+              <Pressable
+                key={a.id}
+                style={styles.activityRow}
+                onPress={() => openBooking(a.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${a.patientName} care details`}
+              >
                 <View style={styles.activityDot} />
                 <View style={styles.activityInfo}>
                   <Text style={styles.activityName}>{a.patientName}</Text>
@@ -204,7 +213,8 @@ export default function MemberHomeScreen() {
                   <Text style={styles.activityAmount}>{rupees(a.amount)}</Text>
                   <Text style={styles.activityStatus}>{a.status.toLowerCase()}</Text>
                 </View>
-              </View>
+                <Icon name="chevron-forward" size={16} color={colors.textTertiary} />
+              </Pressable>
             ))
           ) : (
             <View style={styles.emptyCard}>

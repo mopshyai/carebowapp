@@ -9,11 +9,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { colors } from '@/theme';
 
-// Auth Store
 import { useAuthStore, isProviderUserType } from '@/store/useAuthStore';
 import { hydrateOwnedProfilesFromServer } from '@/lib/profileRepository';
 
-// Navigators
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
 import TabNavigator from './TabNavigator';
@@ -21,7 +19,6 @@ import MemberTabNavigator from './MemberTabNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SafetyStackNavigator from './SafetyStackNavigator';
 
-// Screen imports
 import ConversationScreen from '../screens/ConversationScreen';
 import AssessmentScreen from '../screens/AssessmentScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
@@ -41,19 +38,13 @@ import HealthMemoryScreen from '../screens/HealthMemoryScreen';
 import EpisodeSummaryScreen from '../screens/EpisodeSummaryScreen';
 import TelemedicineBookingScreen from '../screens/TelemedicineBookingScreen';
 import VideoCallScreen from '../screens/VideoCallScreen';
+import MemberBookingDetailsScreen from '../screens/member/MemberBookingDetailsScreen';
 
-// Symptom Entry Screens (PRD V1)
 import NewEntryScreen from '../screens/entries/NewEntryScreen';
 import AssessmentResultScreen from '../screens/entries/AssessmentResultScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-/**
- * MainTabs router — picks the tab experience by authenticated user type.
- * Customers get the original consumer TabNavigator (route name kept stable so
- * existing navigate('MainTabs') calls still land correctly). The 3 provider
- * types get the shared MemberTabNavigator.
- */
 function MainTabsRouter() {
   const userType = useAuthStore((state) => state.userType);
   if (
@@ -66,9 +57,6 @@ function MainTabsRouter() {
   return <TabNavigator />;
 }
 
-/**
- * Loading screen shown during hydration
- */
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -84,250 +72,163 @@ export default function RootNavigator() {
   const userId = useAuthStore((state) => state.user?.id);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
 
-  // Patient profiles are account data, not screen-local data. Hydrate once at
-  // the authenticated app boundary so Ask CareBow, bookings, and Profile all
-  // see the same server roster even on a fresh install/new phone. Logout already
-  // clears useProfileStore, so data cannot bleed into the next account.
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !userId || isProviderUserType(userType)) return;
 
     void hydrateOwnedProfilesFromServer(userId).catch((error) => {
-      // Offline startup must not brick navigation; features that require a real
-      // profile still validate/sync again at their server boundary.
       console.warn('[RootNavigator] Patient profile hydration failed', error);
     });
   }, [hasHydrated, isAuthenticated, userId, userType]);
 
-  // Show loading while store is hydrating
   if (!hasHydrated) {
     return <LoadingScreen />;
   }
 
-  // Providers (healthcare_provider / service_provider / service_partner) skip
-  // the customer onboarding flow (symptom slides, role selection, care recipient).
   const isProvider = isProviderUserType(userType);
   const showOnboarding = isAuthenticated && !hasCompletedOnboarding && !isProvider;
 
-  // Determine initial route based on auth state
   const getInitialRoute = (): keyof RootStackParamList => {
-    if (!isAuthenticated) {
-      return 'Auth';
-    }
-    if (showOnboarding) {
-      return 'Onboarding';
-    }
+    if (!isAuthenticated) return 'Auth';
+    if (showOnboarding) return 'Onboarding';
     return 'MainTabs';
   };
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={getInitialRoute()}>
-      {/* Auth Flow - shown when not authenticated */}
       {!isAuthenticated ? (
         <Stack.Screen
           name="Auth"
           component={AuthNavigator}
-          options={{
-            animationTypeForReplace: !isAuthenticated ? 'pop' : 'push',
-          }}
+          options={{ animationTypeForReplace: !isAuthenticated ? 'pop' : 'push' }}
         />
       ) : (
         <>
-          {/* Onboarding Flow - shown after auth but before completing onboarding.
-              Skipped entirely for provider user types. */}
           {showOnboarding && (
             <Stack.Screen
               name="Onboarding"
               component={OnboardingNavigator}
-              options={{
-                gestureEnabled: false,
-              }}
+              options={{ gestureEnabled: false }}
             />
           )}
 
-          {/* Main App - shown when authenticated and onboarding complete.
-              Routes to customer tabs or provider tabs based on user type. */}
           <Stack.Screen name="MainTabs" component={MainTabsRouter} />
 
-          {/* Symptom Entry Flow (PRD V1) */}
           <Stack.Screen
             name="NewEntry"
             component={NewEntryScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
+            options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
             name="AssessmentResult"
             component={AssessmentResultScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
+            options={{ animation: 'slide_from_right' }}
           />
 
-          {/* Conversation Flow */}
           <Stack.Screen
             name="Conversation"
             component={ConversationScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="Assessment"
             component={AssessmentScreen}
-            options={{
-              presentation: 'modal',
-            }}
+            options={{ presentation: 'modal' }}
           />
 
-          {/* Profile Stack */}
           <Stack.Screen
             name="Profile"
             component={ProfileStackNavigator}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
-
-          {/* Schedule */}
           <Stack.Screen
             name="Schedule"
             component={ScheduleScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
-
-          {/* Thread */}
           <Stack.Screen
             name="Thread"
             component={ThreadScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
 
-          {/* Services Flow */}
           <Stack.Screen
             name="Services"
             component={ServicesScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="ServiceDetails"
             component={ServiceDetailsScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="CarePlans"
             component={CarePlansScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="PlanDetails"
             component={PlanDetailsScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="Checkout"
             component={CheckoutScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="OrderSuccess"
             component={OrderSuccessScreen}
-            options={{
-              presentation: 'modal',
-              gestureEnabled: false,
-            }}
+            options={{ presentation: 'modal', gestureEnabled: false }}
           />
 
-          {/* Orders */}
-          <Stack.Screen
-            name="Orders"
-            component={OrdersScreen}
-            options={{
-              animation: 'default',
-            }}
-          />
+          <Stack.Screen name="Orders" component={OrdersScreen} options={{ animation: 'default' }} />
           <Stack.Screen
             name="OrderDetails"
             component={OrderDetailsScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
+          />
+          <Stack.Screen
+            name="MemberBookingDetails"
+            component={MemberBookingDetailsScreen}
+            options={{ animation: 'slide_from_right' }}
           />
 
-          {/* Requests */}
           <Stack.Screen
             name="Requests"
             component={RequestsScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
           <Stack.Screen
             name="RequestDetails"
             component={RequestDetailsScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
 
-          {/* Safety Stack */}
           <Stack.Screen
             name="Safety"
             component={SafetyStackNavigator}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
-
-          {/* Modal */}
           <Stack.Screen
             name="Modal"
             component={ModalScreen}
-            options={{
-              presentation: 'modal',
-              title: 'Modal',
-            }}
+            options={{ presentation: 'modal', title: 'Modal' }}
           />
-
-          {/* Health Memory */}
           <Stack.Screen
             name="HealthMemory"
             component={HealthMemoryScreen}
-            options={{
-              animation: 'default',
-            }}
+            options={{ animation: 'default' }}
           />
-
-          {/* Episode Summary */}
           <Stack.Screen
             name="EpisodeSummary"
             component={EpisodeSummaryScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
+            options={{ animation: 'slide_from_right' }}
           />
-
-          {/* Telemedicine */}
           <Stack.Screen
             name="TelemedicineBooking"
             component={TelemedicineBookingScreen}
-            options={{
-              animation: 'slide_from_right',
-            }}
+            options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
             name="VideoCall"
