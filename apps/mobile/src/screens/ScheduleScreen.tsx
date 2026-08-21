@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  RefreshControl,
   View,
   Text,
   ScrollView,
@@ -14,50 +15,43 @@ import type { RootStackParamList } from '@/navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '@/constants/Colors';
 import { Spacing, BorderRadius, Shadow } from '@/constants/Spacing';
-import { memberApi, V1Booking } from '@/services/api/endpoints/member';
+import { useBookingsStore } from '@/store';
 
 export default function ScheduleScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const [bookings, setBookings] = useState<V1Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Schedule, Orders and Booking Details now read the same server-state cache.
+  // A cancel/payment/provider update cannot live in three independent copies.
+  const bookings = useBookingsStore((state) => state.bookings);
+  const bookingStatus = useBookingsStore((state) => state.status);
+  const bookingError = useBookingsStore((state) => state.error);
+  const fetchBookings = useBookingsStore((state) => state.fetch);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      setLoading(true);
-      setLoadError(false);
-
-      memberApi
-        .getBookings()
-        .then((response) => {
-          if (!active) return;
-          if (response.success) setBookings(response.bookings ?? []);
-          else setLoadError(true);
-        })
-        .catch(() => {
-          if (active) setLoadError(true);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
-        });
-
-      return () => {
-        active = false;
-      };
-    }, [])
+      void fetchBookings();
+    }, [fetchBookings])
   );
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchBookings({ force: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchBookings]);
 
   const appointments = useMemo(() => {
     const now = Date.now();
     return bookings
       .filter((booking) => {
-        const isPast =
-          new Date(booking.scheduledAt).getTime() < now ||
-          booking.status === 'COMPLETED' ||
-          booking.status === 'CANCELLED';
+        const scheduledTime = new Date(booking.scheduledAt).getTime();
+        const terminal = booking.status === 'COMPLETED' || booking.status === 'CANCELLED';
+        const isPast = terminal || scheduledTime < now;
         return activeTab === 'past' ? isPast : !isPast;
       })
       .sort((a, b) => {
@@ -66,13 +60,17 @@ export default function ScheduleScreen() {
       });
   }, [activeTab, bookings]);
 
+  const loading = bookingStatus === 'loading' && bookings.length === 0;
+  const loadError = bookingStatus === 'error' && bookings.length === 0;
+
   const handleBookAppointment = () => {
-    navigation.navigate('Services', { category: 'healthcare' });
+    // This is the actual catalog id. The previous "healthcare" alias missed
+    // `health_care` and could fall through to the entire catalog.
+    navigation.navigate('Services', { category: 'health_care' });
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing[3] }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={Colors.gray[900]} />
@@ -83,7 +81,6 @@ export default function ScheduleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
@@ -105,8 +102,8 @@ export default function ScheduleScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        {/* Info Banner */}
         {activeTab === 'upcoming' && (
           <View style={styles.infoBanner}>
             <View style={styles.infoBannerIcon}>
@@ -115,13 +112,13 @@ export default function ScheduleScreen() {
             <View style={styles.infoBannerContent}>
               <Text style={styles.infoBannerTitle}>Need care guidance?</Text>
               <Text style={styles.infoBannerText}>
-                Use Ask CareBow to describe your symptoms and get personalized recommendations.
+                Use Ask CareBow to describe symptoms, then carry the recommendation into a real
+                booking without starting over.
               </Text>
             </View>
           </View>
         )}
 
-        {/* Appointments List */}
         {loading ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="large" color={Colors.primary[600]} />
@@ -131,27 +128,48 @@ export default function ScheduleScreen() {
           <View style={styles.emptyState}>
             <Icon name="cloud-offline-outline" size={48} color={Colors.gray[400]} />
             <Text style={styles.emptyStateTitle}>Could not load appointments</Text>
-            <Text style={styles.emptyStateText}>Check your connection and try again.</Text>
+            <Text style={styles.emptyStateText}>
+              {bookingError || 'Check your connection and pull down to try again.'}
+            </Text>
           </View>
         ) : appointments.length > 0 ? (
           <View style={styles.appointmentsList}>
             {appointments.map((appointment) => {
-              const providerName = appointment.provider?.name || 'Care provider';
+              const providerAssigned = Boolean(appointment.provider?.name);
               const scheduledAt = new Date(appointment.scheduledAt);
+              const paymentDue =
+                appointment.amount > 0 &&
+                appointment.paymentStatus !== 'PAID' &&
+                appointment.paymentStatus !== 'REFUNDED' &&
+                appointment.paymentStatus !== 'REFUND_PENDING' &&
+                ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(appointment.status);
+
               return (
-                <View key={appointment.id} style={styles.appointmentCard}>
+                <TouchableOpacity
+                  key={appointment.id}
+                  style={styles.appointmentCard}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('OrderDetails', { id: appointment.id })}
+                >
                   <View style={styles.appointmentHeader}>
                     <View style={styles.doctorAvatar}>
-                      <Icon name="person" size={24} color={Colors.primary[600]} />
+                      <Icon
+                        name={providerAssigned ? 'person' : 'people-outline'}
+                        size={24}
+                        color={Colors.primary[600]}
+                      />
                     </View>
                     <View style={styles.doctorInfo}>
-                      <Text style={styles.doctorName}>{providerName}</Text>
+                      <Text style={styles.doctorName}>
+                        {appointment.provider?.name || 'Provider assignment pending'}
+                      </Text>
                       <Text style={styles.doctorSpecialty}>
                         {appointment.service?.name || 'Care appointment'}
+                        {appointment.profile?.name ? ` · ${appointment.profile.name}` : ''}
                       </Text>
                     </View>
-                    <View style={[styles.typeBadge, styles.typeBadgeVideo]}>
-                      <Text style={[styles.typeBadgeText, styles.typeBadgeTextVideo]}>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>
                         {appointment.status.toLowerCase().replace(/_/g, ' ')}
                       </Text>
                     </View>
@@ -175,7 +193,18 @@ export default function ScheduleScreen() {
                       </Text>
                     </View>
                   </View>
-                </View>
+
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.cardFooterText}>
+                      {paymentDue
+                        ? 'Payment due · Open booking'
+                        : appointment.paymentStatus === 'PAID'
+                          ? 'Paid · Open booking'
+                          : 'Open booking details'}
+                    </Text>
+                    <Icon name="chevron-forward" size={18} color={Colors.gray[400]} />
+                  </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -187,14 +216,13 @@ export default function ScheduleScreen() {
             <Text style={styles.emptyStateTitle}>No {activeTab} appointments</Text>
             <Text style={styles.emptyStateText}>
               {activeTab === 'upcoming'
-                ? 'Schedule a consultation with a doctor to get started.'
-                : 'Your past appointments will appear here.'}
+                ? 'Book a care service or start with Ask CareBow.'
+                : 'Completed and cancelled bookings will appear here.'}
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Book Appointment Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity style={styles.bookButton} onPress={handleBookAppointment}>
           <Icon name="add-circle" size={20} color={Colors.white} />
@@ -325,9 +353,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  doctorEmoji: {
-    fontSize: 24,
-  },
   doctorInfo: {
     flex: 1,
   },
@@ -341,34 +366,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.gray[500],
   },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[1],
+  statusBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing[2],
     paddingVertical: Spacing[1],
-    borderRadius: BorderRadius.full,
-  },
-  typeBadgeVideo: {
     backgroundColor: Colors.primary[50],
   },
-  typeBadgeInPerson: {
-    backgroundColor: Colors.blue[50],
-  },
-  typeBadgeText: {
+  statusBadgeText: {
     fontSize: 11,
     fontWeight: '500',
-  },
-  typeBadgeTextVideo: {
     color: Colors.primary[700],
-  },
-  typeBadgeTextInPerson: {
-    color: Colors.blue[700],
+    textTransform: 'capitalize',
   },
   appointmentDetails: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing[4],
-    marginBottom: Spacing[4],
     paddingBottom: Spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[100],
@@ -382,62 +396,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.gray[600],
   },
-  appointmentActions: {
-    flexDirection: 'row',
-    gap: Spacing[3],
-  },
-  rescheduleButton: {
-    flex: 1,
-    paddingVertical: Spacing[3],
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    alignItems: 'center',
-  },
-  rescheduleButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.gray[700],
-  },
-  joinButton: {
-    flex: 1,
+  cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     gap: Spacing[2],
-    paddingVertical: Spacing[3],
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.primary[600],
+    paddingTop: Spacing[4],
   },
-  joinButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.white,
-  },
-  viewNotesButton: {
+  cardFooterText: {
     flex: 1,
-    paddingVertical: Spacing[3],
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    alignItems: 'center',
-  },
-  viewNotesButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
-    color: Colors.gray[700],
-  },
-  bookAgainButton: {
-    flex: 1,
-    paddingVertical: Spacing[3],
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.primary[100],
-    alignItems: 'center',
-  },
-  bookAgainButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.primary[700],
+    color: Colors.gray[600],
   },
   emptyState: {
     alignItems: 'center',
@@ -477,13 +447,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing[2],
-    backgroundColor: Colors.primary[600],
-    borderRadius: BorderRadius['2xl'],
     paddingVertical: Spacing[4],
-    ...Shadow.md,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.primary[600],
+    ...Shadow.sm,
   },
   bookButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.white,
   },
