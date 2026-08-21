@@ -298,7 +298,22 @@ function handlePostGuidanceInput(
   normalizedText: string,
   healthContext: HealthContext
 ): ConversationResponse {
-  // User is asking follow-up questions after guidance
+  // A turn after guidance can be a new intent, not a follow-up about the same
+  // complaint. Re-route it before falling back to symptom follow-up handling.
+  const intent = classifyIntent(originalText);
+  if (intent === 'want_doctor') return handleWantDoctorIntent();
+  if (intent === 'want_test') return handleWantTestIntent();
+  if (intent === 'talk') return handleTalkIntent();
+
+  const metaAnswer = detectMetaQuestion(normalizedText);
+  if (metaAnswer) {
+    return {
+      messages: [{ role: 'assistant', contentType: 'text', text: metaAnswer }],
+      intent: 'symptom_help',
+    };
+  }
+
+  // Genuine follow-up about the same complaint.
   const followUpResponse = generateFollowUpResponse(normalizedText, healthContext);
 
   return {
@@ -311,6 +326,19 @@ function handlePostGuidanceInput(
     ],
     intent: 'symptom_help',
   };
+}
+
+function detectMetaQuestion(normalizedText: string): string | null {
+  if (
+    /\b(who|what)\s+are\s+you\b/.test(normalizedText) ||
+    /\bare\s+you\s+(a\s+)?(bot|robot|human|real|a\s+person|an?\s+ai|a\s+doctor)\b/.test(
+      normalizedText
+    ) ||
+    /\byour\s+name\b/.test(normalizedText)
+  ) {
+    return "I'm Ask CareBow — an AI health assistant, not a doctor. I can help you make sense of your symptoms and point you to the right care. What would you like help with?";
+  }
+  return null;
 }
 
 // ============================================
@@ -631,6 +659,6 @@ function generateFollowUpResponse(text: string, _healthContext: HealthContext): 
     return "I understand your concern. Based on what you've shared, the situation doesn't appear to be immediately dangerous, but professional confirmation can give you peace of mind. Would you like to connect with a doctor?";
   }
 
-  // P1-2 FIX: Replace generic default with specific follow-up question
-  return 'Are your symptoms staying the same, getting better, or getting worse?';
+  // Do not trap the user in the same fixed question on every unmatched reply.
+  return "I've shared what I can for now. Would you like me to connect you with a doctor, suggest some home-care steps, or is there a specific worry I can help with?";
 }
