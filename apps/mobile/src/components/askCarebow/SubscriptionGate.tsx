@@ -1,76 +1,51 @@
 /**
- * SubscriptionGate Component
- * Shows when user has exceeded free questions and needs to subscribe
+ * Ask CareBow access gate.
+ *
+ * Pricing and allowance come from the backend. This component deliberately does
+ * not quote a hardcoded price or claim recurring billing; CarePlans owns the
+ * live plan catalog and Razorpay checkout.
  */
-
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
+import type { AskCarebowEntitlement } from '../../services/api/endpoints/askCarebowEntitlement';
 
 interface SubscriptionGateProps {
-  freeQuestionsUsed: number;
-  maxFreeQuestions: number;
-  onSubscribe: () => void;
+  entitlement: AskCarebowEntitlement;
   onViewPlans: () => void;
 }
 
-export function SubscriptionGate({
-  freeQuestionsUsed,
-  maxFreeQuestions,
-  onSubscribe,
-  onViewPlans,
-}: SubscriptionGateProps) {
+export function SubscriptionGate({ entitlement, onViewPlans }: SubscriptionGateProps) {
+  const usageText =
+    entitlement.limit === null
+      ? 'Your current Ask CareBow access is not available.'
+      : `You've used ${entitlement.used} of ${entitlement.limit} Ask CareBow messages on ${entitlement.planTitle}.`;
+
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Icon name="sparkles" size={32} color={colors.accent} />
+        <Icon name="lock-closed" size={30} color={colors.accent} />
       </View>
 
-      <Text style={styles.title}>Unlock Unlimited Health Guidance</Text>
+      <Text style={styles.title}>Ask CareBow limit reached</Text>
+      <Text style={styles.description}>{usageText}</Text>
 
-      <Text style={styles.description}>
-        You've used {freeQuestionsUsed} of {maxFreeQuestions} free questions. Subscribe to Ask
-        CareBow for unlimited personalized health guidance.
+      <View style={styles.safetyNote}>
+        <Icon name="medical" size={16} color={colors.error} />
+        <Text style={styles.safetyText}>
+          Emergency and urgent safety guidance remains available even when your normal Ask CareBow allowance is used.
+        </Text>
+      </View>
+
+      <TouchableOpacity style={styles.plansButton} onPress={onViewPlans} activeOpacity={0.8}>
+        <Text style={styles.plansButtonText}>View Care Plans</Text>
+        <Icon name="arrow-forward" size={18} color={colors.textInverse} />
+      </TouchableOpacity>
+
+      <Text style={styles.note}>
+        Plan prices, limits and access dates are shown from your CareBow account before payment.
       </Text>
-
-      <View style={styles.features}>
-        <FeatureItem icon="chatbubbles" text="Unlimited health consultations" />
-        <FeatureItem icon="time" text="24/7 AI health assistant" />
-        <FeatureItem icon="shield-checkmark" text="Personalized guidance" />
-        <FeatureItem icon="medkit" text="Service recommendations" />
-      </View>
-
-      <View style={styles.pricing}>
-        <Text style={styles.price}>$20</Text>
-        <Text style={styles.pricePeriod}>/month</Text>
-      </View>
-      <Text style={styles.freeTrialText}>7-day free trial included</Text>
-
-      <TouchableOpacity style={styles.subscribeButton} onPress={onSubscribe} activeOpacity={0.8}>
-        <Icon name="sparkles" size={20} color={colors.textInverse} />
-        <Text style={styles.subscribeButtonText}>Start Free Trial</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.viewPlansButton} onPress={onViewPlans} activeOpacity={0.7}>
-        <Text style={styles.viewPlansButtonText}>View All Plans</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-interface FeatureItemProps {
-  icon: string;
-  text: string;
-}
-
-function FeatureItem({ icon, text }: FeatureItemProps) {
-  return (
-    <View style={styles.featureItem}>
-      <View style={styles.featureIcon}>
-        <Icon name={icon} size={16} color={colors.accent} />
-      </View>
-      <Text style={styles.featureText}>{text}</Text>
     </View>
   );
 }
@@ -87,8 +62,8 @@ const styles = StyleSheet.create({
     ...shadows.cardElevated,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
+    width: 60,
+    height: 60,
     borderRadius: radius.full,
     backgroundColor: colors.accentSoft,
     justifyContent: 'center',
@@ -107,71 +82,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
-  features: {
-    alignSelf: 'stretch',
-    marginBottom: spacing.lg,
-  },
-  featureItem: {
+  safetyNote: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    backgroundColor: colors.errorSoft,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.lg,
+    alignSelf: 'stretch',
   },
-  featureIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.xs,
-    backgroundColor: colors.accentMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  featureText: {
-    ...typography.body,
-    color: colors.textPrimary,
+  safetyText: {
+    ...typography.caption,
+    color: colors.textSecondary,
     flex: 1,
   },
-  pricing: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: spacing.md,
-  },
-  price: {
-    ...typography.displayMedium,
-    color: colors.accent,
-  },
-  pricePeriod: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginLeft: spacing.xxs,
-  },
-  freeTrialText: {
-    ...typography.bodySmall,
-    color: colors.accent,
-    fontWeight: '600',
-    marginBottom: spacing.md,
-  },
-  subscribeButton: {
+  plansButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     alignSelf: 'stretch',
-    gap: spacing.xs,
     ...shadows.button,
   },
-  subscribeButtonText: {
+  plansButtonText: {
     ...typography.labelLarge,
     color: colors.textInverse,
   },
-  viewPlansButton: {
+  note: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
     marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  viewPlansButtonText: {
-    ...typography.label,
-    color: colors.accent,
   },
 });

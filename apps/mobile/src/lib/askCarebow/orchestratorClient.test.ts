@@ -22,6 +22,8 @@ const mockedGetBaseUrl = ApiClient.getBaseUrl as jest.Mock;
 const mockedGetAccessToken = ApiClient.getAccessToken as jest.Mock;
 const mockedPostSSE = postSSE as jest.Mock;
 
+const REQUEST_ID = 'ask_test_turn_123';
+
 describe('getOrchestratorReply', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
@@ -29,7 +31,7 @@ describe('getOrchestratorReply', () => {
     mockedSendMessage.mockReset();
   });
 
-  it('creates a session, sends the message, and returns the assistant reply', async () => {
+  it('creates a session, sends the message with request id, and returns the reply', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedSendMessage.mockResolvedValueOnce({
       assistantMessage: { id: 'm1', content: 'Sore throats are usually viral...' },
@@ -41,6 +43,7 @@ describe('getOrchestratorReply', () => {
       localSessionId: 'local-1',
       profileId: 'profile-1',
       text: 'I have a sore throat',
+      requestId: REQUEST_ID,
     });
 
     expect(result).toEqual({
@@ -49,10 +52,14 @@ describe('getOrchestratorReply', () => {
       urgencyLevel: 'P4',
     });
     expect(mockedCreateSession).toHaveBeenCalledWith('profile-1');
-    expect(mockedSendMessage).toHaveBeenCalledWith('session-1', 'I have a sore throat');
+    expect(mockedSendMessage).toHaveBeenCalledWith(
+      'session-1',
+      'I have a sore throat',
+      REQUEST_ID
+    );
   });
 
-  it('reuses the cached backend session for a second turn instead of creating a new one', async () => {
+  it('reuses the cached backend session for a second turn', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedSendMessage.mockResolvedValue({
       assistantMessage: { id: 'm1', content: 'ok' },
@@ -64,15 +71,22 @@ describe('getOrchestratorReply', () => {
       localSessionId: 'local-1',
       profileId: 'profile-1',
       text: 'first',
+      requestId: 'ask_first_123',
     });
     await getOrchestratorReply({
       localSessionId: 'local-1',
       profileId: 'profile-1',
       text: 'second',
+      requestId: 'ask_second_123',
     });
 
     expect(mockedCreateSession).toHaveBeenCalledTimes(1);
-    expect(mockedSendMessage).toHaveBeenNthCalledWith(2, 'session-1', 'second');
+    expect(mockedSendMessage).toHaveBeenNthCalledWith(
+      2,
+      'session-1',
+      'second',
+      'ask_second_123'
+    );
   });
 
   it('returns null when session creation fails', async () => {
@@ -82,6 +96,7 @@ describe('getOrchestratorReply', () => {
       localSessionId: 'local-2',
       profileId: 'profile-1',
       text: 'hello',
+      requestId: REQUEST_ID,
     });
 
     expect(result).toBeNull();
@@ -96,6 +111,7 @@ describe('getOrchestratorReply', () => {
       localSessionId: 'local-3',
       profileId: 'profile-1',
       text: 'hello',
+      requestId: REQUEST_ID,
     });
 
     expect(result).toBeNull();
@@ -113,6 +129,7 @@ describe('getOrchestratorReply', () => {
       localSessionId: 'local-4',
       profileId: 'profile-1',
       text: 'hello',
+      requestId: REQUEST_ID,
     });
 
     expect(result).toBeNull();
@@ -128,7 +145,7 @@ describe('streamOrchestratorReply', () => {
     mockedGetAccessToken.mockReset().mockReturnValue('tok_123');
   });
 
-  it('emits each delta and resolves with the final assistant reply', async () => {
+  it('sends request id, emits deltas and resolves with the final reply', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
       onEvent({ type: 'delta', text: 'Sore ' });
@@ -146,6 +163,7 @@ describe('streamOrchestratorReply', () => {
       localSessionId: 'local-1',
       profileId: 'profile-1',
       text: 'sore throat',
+      requestId: REQUEST_ID,
       onTextDelta: (d) => deltas.push(d),
     });
 
@@ -157,7 +175,7 @@ describe('streamOrchestratorReply', () => {
     });
     expect(mockedPostSSE).toHaveBeenCalledWith(
       'https://api.example.com/chat/sessions/session-1/messages',
-      { content: 'sore throat', stream: true },
+      { content: 'sore throat', stream: true, requestId: REQUEST_ID },
       { 'Content-Type': 'application/json', Authorization: 'Bearer tok_123' },
       expect.any(Function)
     );
@@ -179,12 +197,13 @@ describe('streamOrchestratorReply', () => {
       localSessionId: 'local-2',
       profileId: 'profile-1',
       text: 'hi',
+      requestId: REQUEST_ID,
       onTextDelta: () => {},
     });
 
     expect(mockedPostSSE).toHaveBeenCalledWith(
       expect.any(String),
-      expect.any(Object),
+      expect.objectContaining({ requestId: REQUEST_ID }),
       { 'Content-Type': 'application/json' },
       expect.any(Function)
     );
@@ -194,24 +213,22 @@ describe('streamOrchestratorReply', () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
       onEvent({ type: 'delta', text: 'partial' });
-      // connection drops before a 'done' event
     });
 
     const result = await streamOrchestratorReply({
       localSessionId: 'local-3',
       profileId: 'profile-1',
       text: 'hi',
+      requestId: REQUEST_ID,
       onTextDelta: () => {},
     });
 
     expect(result).toBeNull();
   });
 
-  it('returns null without forwarding any deltas when E10 shadows this turn (rolledOut: false)', async () => {
+  it('returns null without forwarding deltas when rollout shadows this turn', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
-      // No 'delta' events at all — the backend buffers instead of streaming
-      // live when a profile is outside the rollout bucket (see rollout.ts).
       onEvent({ type: 'done', rolledOut: false });
     });
 
@@ -220,6 +237,7 @@ describe('streamOrchestratorReply', () => {
       localSessionId: 'local-6',
       profileId: 'profile-1',
       text: 'sore throat',
+      requestId: REQUEST_ID,
       onTextDelta: (d) => deltas.push(d),
     });
 
@@ -235,6 +253,7 @@ describe('streamOrchestratorReply', () => {
       localSessionId: 'local-4',
       profileId: 'profile-1',
       text: 'hi',
+      requestId: REQUEST_ID,
       onTextDelta: () => {},
     });
 
@@ -248,6 +267,7 @@ describe('streamOrchestratorReply', () => {
       localSessionId: 'local-5',
       profileId: 'profile-1',
       text: 'hi',
+      requestId: REQUEST_ID,
       onTextDelta: () => {},
     });
 
