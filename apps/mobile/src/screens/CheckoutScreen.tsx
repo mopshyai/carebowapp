@@ -17,13 +17,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { formatTime, formatDuration, getServiceById } from '../data/services';
+import { formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
 import { useProfileStore } from '../store/useProfileStore';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatMoney } from '../data/countries';
 import { ensureBackendProfile } from '../lib/profileSync';
 import { paymentsApi, selectionFromDraft } from '../services/api/endpoints/payments';
+import { servicesApi } from '../services/api/endpoints/services';
+import { toBookingService } from '../lib/liveServiceCatalog';
 import { useHostedCheckout } from '../hooks/useHostedCheckout';
 
 export default function CheckoutScreen() {
@@ -84,13 +86,23 @@ export default function CheckoutScreen() {
 
       // What the customer picked. The server prices it against its own catalog —
       // we never send an amount, so a modified client cannot name its own price.
-      // The pricing model comes from the catalog, not the draft — the draft
-      // carries the chosen values but not which kind of pricing they belong to,
-      // and inferring it from whichever field happens to be filled in is how you
-      // charge someone for the wrong thing.
-      const service = getServiceById(bookingDraft.serviceId);
+      // Re-read the exact service at the payment boundary so the pricing model
+      // comes from the live backend catalog too. A valid backend-only service
+      // must not be rejected because it is absent from the bundled local catalog.
+      let liveService;
+      try {
+        const v1Service = await servicesApi.getServiceDetails(bookingDraft.serviceId);
+        liveService = toBookingService(v1Service);
+      } catch {
+        Alert.alert(
+          'Service changed',
+          'CareBow could not verify this service with the live catalog. Please go back and choose it again.'
+        );
+        return;
+      }
+
       const selection = selectionFromDraft({
-        pricingModel: service?.pricing?.type ?? null,
+        pricingModel: liveService.pricing.type,
         selectedPackageId: bookingDraft.selectedPackageId,
         hours: bookingDraft.hours,
         days: bookingDraft.days,
