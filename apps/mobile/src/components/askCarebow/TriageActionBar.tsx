@@ -27,6 +27,7 @@ import { ComingSoonSheet } from './ComingSoonSheet';
 import { HomeRemediesSheet } from './HomeRemediesSheet';
 import type { RootStackParamList } from '../../navigation/types';
 import { scheduleFollowUpReminder } from '../../services/notifications';
+import { useCartStore } from '../../store/useCartStore';
 
 interface TriageActionBarProps {
   triageLevel: TriageLevel;
@@ -51,6 +52,7 @@ export function TriageActionBar({
   onAction,
 }: TriageActionBarProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const setCareReferralContext = useCartStore((state) => state.setCareReferralContext);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonAction, setComingSoonAction] = useState('');
   const [showHomeRemedies, setShowHomeRemedies] = useState(false);
@@ -58,7 +60,29 @@ export function TriageActionBar({
   const config = getCTAConfig(triageLevel);
   const tertiary = getTertiaryAction();
 
+  const captureCareReferral = (action: string) => {
+    const careIntent =
+      action === 'connect_doctor' || action === 'schedule_teleconsult'
+        ? 'teleconsult'
+        : action === 'book_home_visit' || action === 'home_visit_options'
+          ? 'home_visit'
+          : null;
+
+    if (!careIntent) return;
+
+    setCareReferralContext({
+      source: 'ask_carebow',
+      episodeId,
+      profileId,
+      triageLevel,
+      symptoms: symptoms.map((symptom) => symptom.trim()).filter(Boolean).slice(0, 8),
+      careIntent,
+      createdAt: new Date().toISOString(),
+    });
+  };
+
   const delegateCareAction = (action: string, fallback: () => void) => {
+    captureCareReferral(action);
     if (onAction) {
       onAction(action);
       return;
