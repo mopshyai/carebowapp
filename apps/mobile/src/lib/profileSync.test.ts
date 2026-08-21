@@ -78,4 +78,17 @@ describe('profileSync patient identity integrity', () => {
       medications: 'Metformin · 500 mg · twice daily',
     });
   });
+
+  it('sends explicit empty values so removed clinical facts are cleared server-side', () => {
+    expect(buildBackendProfilePayload(member())).toEqual({
+      name: 'Maya Kumar',
+      dateOfBirth: '1958-04-12T00:00:00.000Z',
+      gender: 'FEMALE',
+      relationship: 'Parent',
+      bloodGroup: '',
+      allergies: '',
+      conditions: '',
+      medications: '',
+    });
+  });
 });
