@@ -37,6 +37,11 @@ import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottom
 import { processUserInput } from '../lib/askCarebow';
 import { askCareBowApi } from '../services/api/endpoints/askCareBow';
 import { streamOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
+import {
+  resolveConversationAgeGroup,
+  resolveConversationMemberId,
+} from '../lib/askCarebow/patientContext';
+import { ensureBackendProfile } from '../lib/profileSync';
 import { ASK_CAREBOW_ORCHESTRATOR_ENABLED } from '../config/featureFlags';
 import { createLogger } from '../utils/logger';
 
@@ -69,6 +74,7 @@ export default function ConversationScreen() {
   const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute();
   const params = (route.params as Record<string, string>) || {};
+  const conversationContext = params.context === 'family' ? 'family' : 'me';
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [showActionButtons, setShowActionButtons] = useState(false);
@@ -80,11 +86,9 @@ export default function ConversationScreen() {
   // arrived yet.
   const [streamingText, setStreamingText] = useState<string | null>(null);
 
-  // Real backend user/profile IDs — the orchestrator (E7) checks profile
-  // ownership server-side, so hardcoded placeholders 404 with "Profile not
-  // found" for every user. Self is whichever member has isDefault set
-  // (onboarding always marks the first/self profile that way); backendId is
-  // only present once CreateProfileScreen's sync to /v1/profiles succeeded.
+  // The default member represents the account holder/self profile. It is safe
+  // to use only for "me" conversations. An ad-hoc family intake has its own
+  // patient context and must never inherit this person's backend record.
   const authUserId = useAuthStore((state) => state.user?.id);
   const selfMember = useProfileStore((state) => state.members.find((m) => m.isDefault));
 
@@ -146,12 +150,25 @@ export default function ConversationScreen() {
       // Reset question explanations for new conversation
       resetShownExplanations();
 
-      // Start a new session with the initial symptom
-      startNewSession(
-        authUserId ?? 'user_1',
-        selfMember?.backendId ?? 'member_1',
-        params.memberName as string
+      // Never fabricate a backend profile id. For self, a local member id is
+      // enough because ensureBackendProfile() can repair the sync just before
+      // the orchestrator call. For ad-hoc family intake this intentionally
+      // returns an empty id: using the account holder's profile would attach
+      // the wrong age/conditions/medications/allergies to the patient's turn.
+      const memberId = resolveConversationMemberId(conversationContext, selfMember);
+      startNewSession(authUserId ?? '', memberId, params.memberName as string);
+
+      // Seed age before the first symptom is processed so the deterministic
+      // safety engine can apply pediatric/senior rules immediately. Family age
+      // comes from the intake form; self age comes from the saved DOB.
+      const ageGroup = resolveConversationAgeGroup(
+        conversationContext,
+        params.age,
+        selfMember?.dateOfBirth
       );
+      if (ageGroup) {
+        updateHealthContext({ ageGroup });
+      }
 
       // If initial symptom provided, process it
       const initialSymptom = params.symptom as string;
@@ -161,7 +178,7 @@ export default function ConversationScreen() {
         if (!episodeId) {
           const episode = startEpisode({
             symptomText: initialSymptom,
-            forWhom: (params.context as 'me' | 'family') || 'me',
+            forWhom: conversationContext,
             age: params.age,
             relationship: params.relation,
           });
@@ -232,28 +249,44 @@ export default function ConversationScreen() {
 
         // Symptom-help turns get the real LLM-reasoned, RAG-grounded
         // orchestrator response (E7) instead of the rewrite-only endpoint.
-        // Every other intent (talk / want_doctor / want_test / emergency)
-        // keeps using the rewrite-only call, unchanged.
+        // Family-mode intake is deliberately excluded until it is bound to a
+        // real saved family profile; using the self profile is medically wrong.
         let usedOrchestrator = false;
         if (
           ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
+          conversationContext === 'me' &&
           response.intent === 'symptom_help' &&
           draftResponse &&
-          currentSession?.memberId
+          currentSession.memberId
         ) {
-          setStreamingText('');
-          const orchestratorReply = await streamOrchestratorReply({
-            localSessionId: currentSession.id,
-            profileId: currentSession.memberId,
-            text,
-            onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
-          });
-          setStreamingText(null);
-          if (orchestratorReply) {
-            displayMessages = response.messages.map((message, index) =>
-              index === 0 ? { ...message, text: orchestratorReply.text } : message
+          try {
+            // Onboarding may have completed while offline. Repair that local-
+            // only self profile on demand instead of sending a fake id and
+            // silently taking a 404 from the orchestrator.
+            const backendProfileId = await ensureBackendProfile(currentSession.memberId);
+
+            setStreamingText('');
+            const orchestratorReply = await streamOrchestratorReply({
+              localSessionId: currentSession.id,
+              profileId: backendProfileId,
+              text,
+              onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
+            });
+            if (orchestratorReply) {
+              displayMessages = response.messages.map((message, index) =>
+                index === 0 ? { ...message, text: orchestratorReply.text } : message
+              );
+              usedOrchestrator = true;
+            }
+          } catch (profileOrOrchestratorError) {
+            // A profile-sync/backend failure must degrade to the deterministic
+            // safety response, never to a different patient's profile.
+            logger.warn(
+              'Ask CareBow orchestrator unavailable for the resolved self profile; using safety response',
+              profileOrOrchestratorError
             );
-            usedOrchestrator = true;
+          } finally {
+            setStreamingText(null);
           }
         }
 
@@ -262,7 +295,7 @@ export default function ConversationScreen() {
             const liveResponse = await askCareBowApi.rewrite({
               messageText: text,
               draftResponse,
-              forWhom: params.context === 'family' ? 'family' : 'me',
+              forWhom: conversationContext,
             });
             if (liveResponse.success && liveResponse.assistantMessage) {
               displayMessages = response.messages.map((message, index) =>
@@ -525,7 +558,7 @@ export default function ConversationScreen() {
                 currentSession?.healthContext.primarySymptom,
                 ...(currentSession?.healthContext.associatedSymptoms ?? []),
               ].filter((s): s is string => Boolean(s))}
-              profileId={currentSession?.memberId}
+              profileId={currentSession?.memberId || undefined}
               onAction={(action) => {
                 if (action === 'connect_doctor' || action === 'schedule_teleconsult') {
                   navigation.navigate('Services' as never, { category: 'video-consult' });
