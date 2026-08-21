@@ -1,11 +1,8 @@
 /**
- * Hosted checkout.
+ * Hosted checkout tests.
  *
- * The app is not present when a payment completes — Razorpay's page is — so
- * every claim this hook makes about money is a claim about what the SERVER
- * said. These cover the three ways that goes wrong: reporting success the
- * server never confirmed, reporting failure for a payment that is merely slow,
- * and losing track of a payment because the app was resumed.
+ * Every claim about money comes from the server. These tests also lock down the
+ * concurrency boundary so rapid taps cannot replace an in-flight order.
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
@@ -28,7 +25,6 @@ jest.mock('react-native/Libraries/AppState/AppState', () => ({
   },
 }));
 
-/** Bring the app back from the browser, as the OS would. */
 const resume = async () => {
   await act(async () => {
     appStateListener?.('active');
@@ -73,8 +69,6 @@ test('a payment the server rejected is reported as failed', async () => {
 });
 
 test('a payment still pending is unconfirmed, never failed', async () => {
-  // The webhook has not landed yet. Calling this a failure is the one outcome
-  // that can tell a customer their money vanished when it did not.
   status.mockResolvedValue({ success: true, status: 'PENDING' });
   const { result } = renderHook(() => useHostedCheckout());
 
@@ -125,3 +119,37 @@ test('a network blip on resume does not decide the outcome', async () => {
   await resume();
   await waitFor(() => expect(outcome?.status).toBe('paid'), { timeout: 10000 });
 }, 15000);
+
+test('two rapid starts for the same order share one browser launch and one promise', async () => {
+  status.mockResolvedValue({ success: true, status: 'SUCCESS', kind: 'booking' });
+  const { result } = renderHook(() => useHostedCheckout());
+
+  let first!: Promise<any>;
+  let second!: Promise<any>;
+  act(() => {
+    first = result.current.start({ orderId: 'order_rapid', paymentUrl: 'https://rzp.io/i/x' });
+    second = result.current.start({ orderId: 'order_rapid', paymentUrl: 'https://rzp.io/i/x' });
+  });
+
+  expect(first).toBe(second);
+  await waitFor(() => expect(Linking.openURL).toHaveBeenCalledTimes(1));
+
+  await resume();
+  await expect(first).resolves.toMatchObject({ status: 'paid' });
+  await expect(second).resolves.toMatchObject({ status: 'paid' });
+});
+
+test('unmounting an in-flight checkout resolves conservatively instead of hanging forever', async () => {
+  const { result, unmount } = renderHook(() => useHostedCheckout());
+
+  let pending!: Promise<any>;
+  act(() => {
+    pending = result.current.start({
+      orderId: 'order_unmount',
+      paymentUrl: 'https://rzp.io/i/x',
+    });
+  });
+
+  unmount();
+  await expect(pending).resolves.toEqual({ status: 'unconfirmed' });
+});
