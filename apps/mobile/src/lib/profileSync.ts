@@ -70,16 +70,15 @@ export function normalizeDateOfBirth(value?: string): string {
   return parsed.toISOString();
 }
 
-function joinNames(items: Array<{ name: string }>): string | undefined {
-  const value = items
+function joinNames(items: Array<{ name: string }>): string {
+  return items
     .map((item) => item.name.trim())
     .filter(Boolean)
     .join(', ');
-  return value || undefined;
 }
 
-function joinMedications(member: FamilyMember): string | undefined {
-  const value = member.healthInfo.medications
+function joinMedications(member: FamilyMember): string {
+  return member.healthInfo.medications
     .map((medication) =>
       [medication.name.trim(), medication.dosage.trim(), medication.frequency.trim()]
         .filter(Boolean)
@@ -87,10 +86,17 @@ function joinMedications(member: FamilyMember): string | undefined {
     )
     .filter(Boolean)
     .join(', ');
-  return value || undefined;
 }
 
-/** The exact patient fields that may be sent to the backend. */
+/**
+ * The exact patient fields that may be sent to the backend.
+ *
+ * Clinical text fields are deliberately sent even when empty. Omitting an empty
+ * field on PUT means Prisma leaves the previous value untouched, so removing
+ * "Penicillin" locally could leave "Penicillin" on the server forever. Empty
+ * strings are the current API's explicit clear value until those columns/API
+ * accept null.
+ */
 export function buildBackendProfilePayload(member: FamilyMember) {
   const name = `${member.firstName} ${member.lastName}`.trim();
   if (!name) throw new Error('Please add the patient name before continuing.');
@@ -102,14 +108,10 @@ export function buildBackendProfilePayload(member: FamilyMember) {
     dateOfBirth: normalizeDateOfBirth(member.dateOfBirth),
     gender: mapGender(member.gender),
     relationship: relationshipForBackend(member.relationship),
-    ...(bloodType && bloodType !== 'unknown' ? { bloodGroup: bloodType } : {}),
-    ...(joinNames(member.healthInfo.allergies)
-      ? { allergies: joinNames(member.healthInfo.allergies) }
-      : {}),
-    ...(joinNames(member.healthInfo.conditions)
-      ? { conditions: joinNames(member.healthInfo.conditions) }
-      : {}),
-    ...(joinMedications(member) ? { medications: joinMedications(member) } : {}),
+    bloodGroup: bloodType && bloodType !== 'unknown' ? bloodType : '',
+    allergies: joinNames(member.healthInfo.allergies),
+    conditions: joinNames(member.healthInfo.conditions),
+    medications: joinMedications(member),
   };
 }
 
@@ -118,8 +120,8 @@ export function buildBackendProfilePayload(member: FamilyMember) {
  *
  * If the member already has a backend id we still push the latest local
  * demographics/health context before using it. That prevents Ask CareBow or a
- * booking from operating on a stale server profile after the user edited an
- * allergy, condition, medication, DOB, or name on-device.
+ * booking from operating on a stale server profile after the user edited or
+ * removed an allergy, condition, medication, DOB, or name on-device.
  *
  * If the id does not match a local member, it is already a backend Profile id
  * (for example one returned directly by GET /v1/profiles), so it is returned as
