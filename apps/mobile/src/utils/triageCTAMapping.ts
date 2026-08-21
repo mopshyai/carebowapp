@@ -27,23 +27,12 @@ interface AssessmentData {
   urgencyLevel?: string;
 }
 
-/**
- * Maps assessment data to triage level
- */
 export function getTriageLevel(data: AssessmentData): TriageLevel {
   const { recommendation, riskLevel, hasRedFlags, severity = 5, urgencyLevel } = data;
 
-  // Check urgency level first (from API response)
-  if (urgencyLevel === 'emergency' || urgencyLevel === 'critical') {
-    return 'emergency';
-  }
+  if (urgencyLevel === 'emergency' || urgencyLevel === 'critical') return 'emergency';
+  if (recommendation === 'emergency' || (hasRedFlags && severity >= 8)) return 'emergency';
 
-  // Emergency: explicit emergency recommendation or high risk with red flags
-  if (recommendation === 'emergency' || (hasRedFlags && severity >= 8)) {
-    return 'emergency';
-  }
-
-  // Urgent: high risk level or video recommendation with high severity
   if (
     riskLevel === 'high' ||
     urgencyLevel === 'urgent' ||
@@ -52,18 +41,13 @@ export function getTriageLevel(data: AssessmentData): TriageLevel {
     return 'urgent';
   }
 
-  // Soon: medium risk or video recommendation
   if (riskLevel === 'medium' || recommendation === 'video' || urgencyLevel === 'moderate') {
     return 'soon';
   }
 
-  // Self-care: low risk or self-care recommendation
   return 'self_care';
 }
 
-/**
- * Returns CTA configuration based on triage level
- */
 export function getCTAConfig(triageLevel: TriageLevel): CTAConfig {
   switch (triageLevel) {
     case 'emergency':
@@ -89,7 +73,7 @@ export function getCTAConfig(triageLevel: TriageLevel): CTAConfig {
       return {
         primary: {
           id: 'connect_doctor',
-          label: 'Talk to a doctor today',
+          label: 'Find a doctor today',
           icon: 'videocam',
           action: 'connect_doctor',
           variant: 'urgent',
@@ -101,14 +85,14 @@ export function getCTAConfig(triageLevel: TriageLevel): CTAConfig {
           action: 'book_home_visit',
           variant: 'secondary',
         },
-        hint: 'Same-day consultations available',
+        hint: 'Availability is confirmed during booking',
       };
 
     case 'soon':
       return {
         primary: {
           id: 'schedule_teleconsult',
-          label: 'Schedule teleconsult',
+          label: 'Find consultation options',
           icon: 'calendar',
           action: 'schedule_teleconsult',
           variant: 'primary',
@@ -120,7 +104,7 @@ export function getCTAConfig(triageLevel: TriageLevel): CTAConfig {
           action: 'home_visit_options',
           variant: 'secondary',
         },
-        hint: 'Book at your convenience',
+        hint: 'Choose a preferred time; CareBow confirms availability',
       };
 
     case 'self_care':
@@ -144,9 +128,6 @@ export function getCTAConfig(triageLevel: TriageLevel): CTAConfig {
   }
 }
 
-/**
- * Get tertiary action (always available)
- */
 export function getTertiaryAction(): CTAButton {
   return {
     id: 'save_share',
@@ -157,14 +138,8 @@ export function getTertiaryAction(): CTAButton {
   };
 }
 
-/**
- * Emergency note shown above action buttons
- */
 export const EMERGENCY_NOTE = "If you feel in danger or symptoms are severe, get help now.";
 
-/**
- * Get final message based on triage level
- */
 export function getTriageMessage(triageLevel: TriageLevel): string {
   switch (triageLevel) {
     case 'emergency':
