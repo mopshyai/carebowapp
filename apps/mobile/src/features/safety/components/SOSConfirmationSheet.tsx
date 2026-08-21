@@ -1,9 +1,9 @@
 /**
  * SOS Confirmation Sheet Component
- * Bottom sheet for confirming SOS trigger and selecting actions
+ * Bottom sheet for confirming SOS trigger and selecting direct emergency actions.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,6 @@ import {
   Modal,
   Pressable,
   Switch,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -25,23 +24,20 @@ import {
   sendSOSSMSToAll,
   executeSOSTrigger,
 } from '../services/sosService';
-import { LocationData, getAddressFromCoordinates } from '../services/locationService';
+import { LocationData } from '../services/locationService';
 import {
   EmergencyNumbers,
   DEFAULT_EMERGENCY,
   getEmergencyNumbersForCoordinates,
 } from '../services/emergencyNumbers';
 import { safetyApi } from '../../../services/api/endpoints/safety';
+import { toServerSafetyContacts } from '../services/contactSync';
 import { createLogger } from '../../../utils/logger';
 
 /** Seconds before the SOS auto-escalates to an emergency call (cancellable). */
 const AUTO_CALL_SECONDS = 10;
 
 const logger = createLogger('SOS');
-
-// ============================================
-// TYPES
-// ============================================
 
 interface SOSConfirmationSheetProps {
   visible: boolean;
@@ -53,11 +49,8 @@ interface SOSConfirmationSheetProps {
   userName: string;
 }
 
-type SOSPhase = 'confirm' | 'actions' | 'sending';
-
-// ============================================
-// COMPONENT
-// ============================================
+type SOSPhase = 'confirm' | 'actions';
+type ServerAlertStatus = 'idle' | 'pending' | 'accepted' | 'unconfirmed';
 
 export function SOSConfirmationSheet({
   visible,
@@ -69,15 +62,15 @@ export function SOSConfirmationSheet({
   userName,
 }: SOSConfirmationSheetProps) {
   const insets = useSafeAreaInsets();
+  const mounted = useRef(true);
   const [phase, setPhase] = useState<SOSPhase>('confirm');
   const [shareLocation, setShareLocation] = useState(shareLocationDefault);
-  const [isLoading, setIsLoading] = useState(false);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  // Region-resolved emergency numbers (911 US / 112 + 108 India); default until resolved.
   const [emergency, setEmergency] = useState<EmergencyNumbers>(DEFAULT_EMERGENCY);
-  // Countdown to auto-escalation; null = not counting (cancelled or not started).
   const [autoCallSeconds, setAutoCallSeconds] = useState<number | null>(null);
+  const [serverAlertStatus, setServerAlertStatus] = useState<ServerAlertStatus>('idle');
+  const [serverQueued, setServerQueued] = useState<number | null>(null);
 
   const stopAutoCall = useCallback(() => {
     setAutoCallSeconds(null);
@@ -87,89 +80,105 @@ export function SOSConfirmationSheet({
     stopAutoCall();
     setPhase('confirm');
     setShareLocation(shareLocationDefault);
-    setIsLoading(false);
     setLocation(null);
     setLocationError(null);
     setEmergency(DEFAULT_EMERGENCY);
+    setServerAlertStatus('idle');
+    setServerQueued(null);
   }, [shareLocationDefault, stopAutoCall]);
 
-  // Clean up the timer if the sheet unmounts mid-countdown.
-  useEffect(() => () => stopAutoCall(), [stopAutoCall]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stopAutoCall();
+    };
+  }, [stopAutoCall]);
 
   const handleClose = useCallback(() => {
     resetState();
     onClose();
   }, [resetState, onClose]);
 
-  const handleSendSOS = useCallback(async () => {
-    setIsLoading(true);
-    setPhase('sending');
+  /**
+   * Start the life-safety actions immediately. GPS is useful context, but it is
+   * never allowed to sit in front of the emergency call path or server alert.
+   */
+  const handleSendSOS = useCallback(() => {
+    const serverContacts = toServerSafetyContacts(contacts);
 
-    try {
-      const result = await executeSOSTrigger({
-        contacts,
+    setPhase('actions');
+    setAutoCallSeconds(AUTO_CALL_SECONDS);
+    setServerAlertStatus('pending');
+    setServerQueued(null);
+
+    // Server acceptance is independent of GPS. The contact list visible on the
+    // phone is included so old/local-only contact data cannot produce zero
+    // durable recipients on the backend.
+    void safetyApi
+      .reportSosEvent({
         userName,
-        shareLocation,
+        contacts: serverContacts,
+      })
+      .then((report) => {
+        if (!mounted.current) return;
+        if (report?.success && report.accepted && report.eventId) {
+          setServerAlertStatus('accepted');
+          setServerQueued(typeof report.queued === 'number' ? report.queued : null);
+        } else {
+          setServerAlertStatus('unconfirmed');
+        }
+      })
+      .catch(() => {
+        if (mounted.current) setServerAlertStatus('unconfirmed');
       });
 
-      setLocation(result.location);
-      if (result.locationError) {
-        setLocationError(result.locationError);
-      }
+    // Location, regional emergency numbers and local history resolve in
+    // parallel. They enhance the emergency flow; they do not gate it.
+    void executeSOSTrigger({ contacts, userName, shareLocation })
+      .then((result) => {
+        if (!mounted.current) return;
 
-      // Resolve the correct local emergency number from where the phone is.
-      if (result.location) {
-        getEmergencyNumbersForCoordinates(result.location.lat, result.location.lng)
-          .then(setEmergency)
-          .catch(() => setEmergency(DEFAULT_EMERGENCY));
-      }
+        setLocation(result.location);
+        setLocationError(result.locationError ?? null);
+        onSOSTriggered(result.location);
 
-      // Alert the on-call team (additive; never blocks the on-device SOS path).
-      void (async () => {
-        const loc = result.location;
-        const address =
-          loc && shareLocation ? await getAddressFromCoordinates(loc.lat, loc.lng) : null;
-        safetyApi.reportSosEvent({
-          lat: loc?.lat ?? null,
-          lng: loc?.lng ?? null,
-          address,
-          userName,
-        });
-      })();
-
-      // Record the SOS event
-      onSOSTriggered(result.location);
-
-      // Move to action selection phase and start the auto-call countdown so an
-      // unresponsive user still reaches emergency services (cancellable).
-      setPhase('actions');
-      setAutoCallSeconds(AUTO_CALL_SECONDS);
-    } catch (error) {
-      logger.error('SOS trigger failed', error);
-      setPhase('actions');
-    } finally {
-      setIsLoading(false);
-    }
+        if (result.location) {
+          void getEmergencyNumbersForCoordinates(result.location.lat, result.location.lng)
+            .then((numbers) => {
+              if (mounted.current) setEmergency(numbers);
+            })
+            .catch(() => {
+              if (mounted.current) setEmergency(DEFAULT_EMERGENCY);
+            });
+        }
+      })
+      .catch((error) => {
+        logger.error('SOS location enrichment failed', error);
+        if (!mounted.current) return;
+        setLocationError('Location unavailable');
+        onSOSTriggered(null);
+      });
   }, [contacts, userName, shareLocation, onSOSTriggered]);
 
-  // Drives the auto-escalation countdown. At zero, opens the dialer to the
-  // region's emergency number. Cancels cleanly if the user acts or closes.
+  // Starts the moment Send SOS is pressed — never after GPS/network work.
   useEffect(() => {
     if (autoCallSeconds === null) return;
     if (autoCallSeconds <= 0) {
       setAutoCallSeconds(null);
-      callEmergencyServices(emergency.call);
+      void callEmergencyServices(emergency.call);
       return;
     }
-    const id = setTimeout(() => setAutoCallSeconds((s) => (s === null ? null : s - 1)), 1000);
+    const id = setTimeout(
+      () => setAutoCallSeconds((seconds) => (seconds === null ? null : seconds - 1)),
+      1000
+    );
     return () => clearTimeout(id);
   }, [autoCallSeconds, emergency.call]);
 
   const handleCallPrimary = useCallback(async () => {
     stopAutoCall();
-    if (primaryContact) {
-      await callPrimaryContact(primaryContact);
-    }
+    if (primaryContact) await callPrimaryContact(primaryContact);
   }, [primaryContact, stopAutoCall]);
 
   const handleCallEmergency = useCallback(async () => {
@@ -179,9 +188,7 @@ export function SOSConfirmationSheet({
 
   const handleCallAmbulance = useCallback(async () => {
     stopAutoCall();
-    if (emergency.ambulance) {
-      await callEmergencyServices(emergency.ambulance);
-    }
+    if (emergency.ambulance) await callEmergencyServices(emergency.ambulance);
   }, [emergency.ambulance, stopAutoCall]);
 
   const handleSMSPrimary = useCallback(async () => {
@@ -197,19 +204,17 @@ export function SOSConfirmationSheet({
   }, [contacts, userName, location, shareLocation, stopAutoCall]);
 
   const hasContacts = contacts.length > 0;
-  const smsContacts = contacts.filter((c) => c.canReceiveSMS);
+  const smsContacts = contacts.filter((contact) => contact.canReceiveSMS);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <Pressable style={styles.overlay} onPress={handleClose}>
         <Pressable
           style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
-          onPress={(e) => e.stopPropagation()}
+          onPress={(event) => event.stopPropagation()}
         >
-          {/* Handle bar */}
           <View style={styles.handleBar} />
 
-          {/* Confirm Phase */}
           {phase === 'confirm' && (
             <>
               <View style={styles.header}>
@@ -218,11 +223,11 @@ export function SOSConfirmationSheet({
                 </View>
                 <Text style={styles.title}>Trigger Emergency Alert?</Text>
                 <Text style={styles.description}>
-                  This will notify your emergency contacts and optionally share your location.
+                  CareBow will try to queue alerts to your SMS emergency contacts. If you are in
+                  immediate danger, call emergency services — do not rely on messaging alone.
                 </Text>
               </View>
 
-              {/* Location toggle */}
               <View style={styles.toggleRow}>
                 <View style={styles.toggleInfo}>
                   <Icon name="location" size={20} color={colors.textSecondary} />
@@ -245,16 +250,11 @@ export function SOSConfirmationSheet({
                 </View>
               )}
 
-              {/* Action buttons */}
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sosButton, isLoading && styles.sosButtonDisabled]}
-                  onPress={handleSendSOS}
-                  disabled={isLoading}
-                >
+                <TouchableOpacity style={styles.sosButton} onPress={handleSendSOS}>
                   <Icon name="alert" size={20} color={colors.white} />
                   <Text style={styles.sosButtonText}>Send SOS</Text>
                 </TouchableOpacity>
@@ -262,39 +262,56 @@ export function SOSConfirmationSheet({
             </>
           )}
 
-          {/* Sending Phase */}
-          {phase === 'sending' && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.error} />
-              <Text style={styles.loadingText}>Triggering emergency alert...</Text>
-            </View>
-          )}
-
-          {/* Actions Phase */}
           {phase === 'actions' && (
             <>
               <View style={styles.header}>
-                <View style={styles.successIcon}>
-                  <Icon name="checkmark-circle" size={32} color={colors.success} />
+                <View style={styles.warningIcon}>
+                  <Icon name="alert-circle" size={32} color={colors.error} />
                 </View>
-                <Text style={styles.title}>SOS Alert Ready</Text>
+                <Text style={styles.title}>Emergency Actions</Text>
                 <Text style={styles.description}>
-                  {location
-                    ? 'Your location was captured. Choose how to reach out:'
-                    : 'Choose how to contact your emergency contacts:'}
+                  Call emergency services now if there is immediate danger. CareBow alert status is
+                  shown below and never replaces a direct emergency call.
                 </Text>
               </View>
+
+              {serverAlertStatus === 'pending' && (
+                <View style={styles.infoBanner}>
+                  <Icon name="cloud-upload-outline" size={16} color={colors.info} />
+                  <Text style={styles.infoText}>Contacting CareBow emergency dispatch...</Text>
+                </View>
+              )}
+
+              {serverAlertStatus === 'accepted' && (
+                <View style={styles.acceptedBanner}>
+                  <Icon name="checkmark-circle" size={16} color={colors.success} />
+                  <Text style={styles.acceptedText}>
+                    CareBow accepted the SOS
+                    {serverQueued !== null ? ` and queued ${serverQueued} alert${serverQueued === 1 ? '' : 's'}` : ''}.
+                    Delivery is still in progress.
+                  </Text>
+                </View>
+              )}
+
+              {serverAlertStatus === 'unconfirmed' && (
+                <View style={styles.warningBanner}>
+                  <Icon name="warning" size={18} color={colors.warning} />
+                  <Text style={styles.warningText}>
+                    CareBow could not confirm a server alert. Call emergency services or contact
+                    someone directly now.
+                  </Text>
+                </View>
+              )}
 
               {locationError && (
                 <View style={styles.infoBanner}>
                   <Icon name="information-circle" size={16} color={colors.info} />
                   <Text style={styles.infoText}>
-                    Location unavailable. Proceeding without location.
+                    Location unavailable. Emergency actions still work without it.
                   </Text>
                 </View>
               )}
 
-              {/* Auto-escalation countdown — reaches help if the user can't act */}
               {autoCallSeconds !== null && (
                 <View style={styles.countdownBanner}>
                   <View style={styles.countdownInfo}>
@@ -309,7 +326,6 @@ export function SOSConfirmationSheet({
                 </View>
               )}
 
-              {/* Quick action buttons */}
               <View style={styles.quickActions}>
                 {primaryContact && (
                   <TouchableOpacity style={styles.quickActionButton} onPress={handleCallPrimary}>
@@ -371,10 +387,6 @@ export function SOSConfirmationSheet({
   );
 }
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -405,15 +417,6 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: colors.errorSoft,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  successIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.successSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
@@ -472,6 +475,20 @@ const styles = StyleSheet.create({
   infoText: {
     ...typography.bodySmall,
     color: colors.info,
+    flex: 1,
+  },
+  acceptedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  acceptedText: {
+    ...typography.bodySmall,
+    color: colors.success,
     flex: 1,
   },
   countdownBanner: {
@@ -533,22 +550,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.error,
     ...shadows.button,
   },
-  sosButtonDisabled: {
-    opacity: 0.6,
-  },
   sosButtonText: {
     ...typography.label,
     color: colors.white,
     fontWeight: '600',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxxl,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.md,
   },
   quickActions: {
     flexDirection: 'row',
