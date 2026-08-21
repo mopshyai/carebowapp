@@ -1,6 +1,6 @@
 /**
  * Health Info Screen
- * Quick access to allergies, conditions, and medications for selected member
+ * Quick access to server-backed allergies, conditions, and medications for selected member.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,7 +19,15 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore, useSelectedMember } from '../../store/useProfileStore';
-import { WHY_WE_ASK, Allergy, Condition, Medication } from '../../types/profile';
+import {
+  WHY_WE_ASK,
+  Allergy,
+  Condition,
+  Medication,
+  generateId,
+  type MemberHealthInfo,
+} from '../../types/profile';
+import { persistMemberSnapshot } from '../../lib/profileRepository';
 
 type TabType = 'allergies' | 'conditions' | 'medications';
 
@@ -31,18 +39,14 @@ export default function HealthInfoScreen() {
 
   const selectedMember = useSelectedMember();
   const members = useProfileStore((state) => state.members);
-  const addAllergy = useProfileStore((state) => state.addAllergy);
-  const removeAllergy = useProfileStore((state) => state.removeAllergy);
-  const addCondition = useProfileStore((state) => state.addCondition);
-  const removeCondition = useProfileStore((state) => state.removeCondition);
-  const addMedication = useProfileStore((state) => state.addMedication);
-  const removeMedication = useProfileStore((state) => state.removeMedication);
+  const updateMember = useProfileStore((state) => state.updateMember);
 
   const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'allergies');
   const [showModal, setShowModal] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [secondInputValue, setSecondInputValue] = useState('');
   const [thirdInputValue, setThirdInputValue] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (tab && ['allergies', 'conditions', 'medications'].includes(tab)) {
@@ -73,38 +77,89 @@ export default function HealthInfoScreen() {
     setThirdInputValue('');
   };
 
-  const handleAdd = () => {
+  const persistHealthInfo = async (healthInfo: MemberHealthInfo): Promise<boolean> => {
+    if (isSaving) return false;
+    setIsSaving(true);
+
+    try {
+      const nextMember = { ...member, healthInfo };
+      const backendId = await persistMemberSnapshot(nextMember);
+      updateMember(member.id, { healthInfo, backendId });
+      return true;
+    } catch (error) {
+      Alert.alert(
+        'Could not save health information',
+        error instanceof Error
+          ? error.message
+          : 'CareBow could not save this change. Your profile was not changed.'
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAdd = async () => {
     if (!inputValue.trim()) {
-      Alert.alert('Error', 'Please enter a value');
+      Alert.alert('Missing information', 'Please enter a value.');
       return;
     }
 
+    let healthInfo: MemberHealthInfo;
+
     switch (activeTab) {
       case 'allergies':
-        addAllergy(member.id, {
-          name: inputValue.trim(),
-          severity: 'moderate',
-          notes: secondInputValue.trim(),
-        });
+        healthInfo = {
+          ...member.healthInfo,
+          allergies: [
+            ...member.healthInfo.allergies,
+            {
+              id: generateId(),
+              name: inputValue.trim(),
+              // This quick form does not ask severity, so keep it unknown.
+              severity: 'unknown',
+              notes: secondInputValue.trim() || undefined,
+            },
+          ],
+        };
         break;
       case 'conditions':
-        addCondition(member.id, {
-          name: inputValue.trim(),
-          status: 'active',
-          notes: secondInputValue.trim(),
-        });
+        healthInfo = {
+          ...member.healthInfo,
+          conditions: [
+            ...member.healthInfo.conditions,
+            {
+              id: generateId(),
+              name: inputValue.trim(),
+              // This quick form does not establish current disease status.
+              status: 'unknown',
+              notes: secondInputValue.trim() || undefined,
+            },
+          ],
+        };
         break;
       case 'medications':
-        addMedication(member.id, {
-          name: inputValue.trim(),
-          dosage: secondInputValue.trim(),
-          frequency: thirdInputValue.trim() || 'As directed',
-        });
+        healthInfo = {
+          ...member.healthInfo,
+          medications: [
+            ...member.healthInfo.medications,
+            {
+              id: generateId(),
+              name: inputValue.trim(),
+              dosage: secondInputValue.trim(),
+              // Blank means unknown; never invent "As directed" instructions.
+              frequency: thirdInputValue.trim(),
+            },
+          ],
+        };
         break;
     }
 
-    setShowModal(false);
-    resetForm();
+    const saved = await persistHealthInfo(healthInfo);
+    if (saved) {
+      setShowModal(false);
+      resetForm();
+    }
   };
 
   const handleRemove = (id: string, name: string) => {
@@ -113,18 +168,31 @@ export default function HealthInfoScreen() {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          let healthInfo: MemberHealthInfo;
+
           switch (activeTab) {
             case 'allergies':
-              removeAllergy(member.id, id);
+              healthInfo = {
+                ...member.healthInfo,
+                allergies: member.healthInfo.allergies.filter((item) => item.id !== id),
+              };
               break;
             case 'conditions':
-              removeCondition(member.id, id);
+              healthInfo = {
+                ...member.healthInfo,
+                conditions: member.healthInfo.conditions.filter((item) => item.id !== id),
+              };
               break;
             case 'medications':
-              removeMedication(member.id, id);
+              healthInfo = {
+                ...member.healthInfo,
+                medications: member.healthInfo.medications.filter((item) => item.id !== id),
+              };
               break;
           }
+
+          await persistHealthInfo(healthInfo);
         },
       },
     ]);
@@ -170,18 +238,20 @@ export default function HealthInfoScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Health Info</Text>
-        <TouchableOpacity style={styles.headerButton} onPress={() => setShowModal(true)}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => setShowModal(true)}
+          disabled={isSaving}
+        >
           <Icon name="add" size={24} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
-      {/* Member Badge */}
       <View style={styles.memberBadge}>
         <View style={styles.memberAvatar}>
           <Text style={styles.memberAvatarText}>{member.firstName.charAt(0)}</Text>
@@ -189,13 +259,13 @@ export default function HealthInfoScreen() {
         <Text style={styles.memberName}>{member.firstName}'s Health Info</Text>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabsContainer}>
         {(['allergies', 'conditions', 'medications'] as TabType[]).map((tabId) => (
           <TouchableOpacity
             key={tabId}
             style={[styles.tab, activeTab === tabId && styles.tabActive]}
             onPress={() => setActiveTab(tabId)}
+            disabled={isSaving}
           >
             <Icon
               name={tabConfig[tabId].icon as any}
@@ -213,7 +283,6 @@ export default function HealthInfoScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
       >
-        {/* Why We Ask */}
         <View style={[styles.whyCard, { backgroundColor: config.colorSoft }]}>
           <Icon name="help-circle" size={20} color={config.color} />
           <View style={styles.whyContent}>
@@ -222,7 +291,6 @@ export default function HealthInfoScreen() {
           </View>
         </View>
 
-        {/* Items List */}
         {config.items.length > 0 ? (
           <View style={styles.itemsList}>
             {config.items.map((item: Allergy | Condition | Medication) => (
@@ -239,7 +307,10 @@ export default function HealthInfoScreen() {
                     {'frequency' in item && item.frequency && ` - ${item.frequency}`}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => handleRemove(item.id, item.name)}>
+                <TouchableOpacity
+                  onPress={() => handleRemove(item.id, item.name)}
+                  disabled={isSaving}
+                >
                   <Icon name="close-circle" size={24} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
@@ -249,7 +320,11 @@ export default function HealthInfoScreen() {
           <View style={styles.emptyState}>
             <Icon name={config.icon as any} size={40} color={colors.textTertiary} />
             <Text style={styles.emptyText}>No {config.title.toLowerCase()} recorded</Text>
-            <TouchableOpacity style={styles.addButton} onPress={() => setShowModal(true)}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowModal(true)}
+              disabled={isSaving}
+            >
               <Icon name="add" size={20} color={colors.textInverse} />
               <Text style={styles.addButtonText}>Add {config.title.slice(0, -1)}</Text>
             </TouchableOpacity>
@@ -257,11 +332,11 @@ export default function HealthInfoScreen() {
         )}
       </ScrollView>
 
-      {/* Add Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
             <TouchableOpacity
+              disabled={isSaving}
               onPress={() => {
                 setShowModal(false);
                 resetForm();
@@ -270,12 +345,12 @@ export default function HealthInfoScreen() {
               <Text style={styles.modalCancel}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add {config.title.slice(0, -1)}</Text>
-            <TouchableOpacity onPress={handleAdd}>
-              <Text style={styles.modalSave}>Add</Text>
+            <TouchableOpacity disabled={isSaving} onPress={() => void handleAdd()}>
+              <Text style={styles.modalSave}>{isSaving ? 'Saving…' : 'Add'}</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={styles.modalForm}>
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>{config.title.slice(0, -1)} Name *</Text>
@@ -286,6 +361,7 @@ export default function HealthInfoScreen() {
                   placeholder={config.placeholder}
                   placeholderTextColor={colors.textTertiary}
                   autoFocus
+                  editable={!isSaving}
                 />
               </View>
 
@@ -297,6 +373,7 @@ export default function HealthInfoScreen() {
                   onChangeText={setSecondInputValue}
                   placeholder={config.secondPlaceholder}
                   placeholderTextColor={colors.textTertiary}
+                  editable={!isSaving}
                 />
               </View>
 
@@ -309,6 +386,7 @@ export default function HealthInfoScreen() {
                     onChangeText={setThirdInputValue}
                     placeholder="e.g., Once daily, Twice daily"
                     placeholderTextColor={colors.textTertiary}
+                    editable={!isSaving}
                   />
                 </View>
               )}
@@ -493,7 +571,6 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textInverse,
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: colors.surface2,
