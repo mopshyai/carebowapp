@@ -1,12 +1,6 @@
 /**
- * Chat-session orchestrator API (v1-auth'd via bearer JWT, see E5 —
- * carebow-main's getChatAuthedUser falls through cookie-session to the same
- * bearer check ApiClient already attaches to every request).
- *
- * This is the real multi-agent, RAG-backed medical reasoning pipeline
- * (src/lib/agents/orchestrator.ts in carebow-main) — distinct from
- * askCareBow.ts's `rewrite`, which only rewords a draft for tone and adds no
- * medical content.
+ * Chat-session orchestrator API (v1-auth'd via bearer JWT).
+ * This is the RAG-backed medical reasoning path; askCareBow.ts is rewrite-only.
  */
 
 import { ApiClient } from '../ApiClient';
@@ -32,11 +26,12 @@ export const askCarebowOrchestratorApi = {
 
   sendMessage: async (
     sessionId: string,
-    content: string
+    content: string,
+    requestId: string
   ): Promise<ChatOrchestratorMessageResponse> => {
     const response = await ApiClient.post<ChatOrchestratorMessageResponse>(
       `/chat/sessions/${sessionId}/messages`,
-      { content }
+      { content, requestId }
     );
     return response.data;
   },
