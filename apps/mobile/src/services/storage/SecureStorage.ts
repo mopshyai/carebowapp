@@ -14,6 +14,7 @@ import { allowInsecureStorageFallback } from './storageSecurityPolicy';
 
 const FALLBACK_PREFIX = '@carebow_secure_fallback:';
 const DEFAULT_SERVICE = 'com.carebow.app';
+const BIOMETRIC_SENTINEL = 'carebow-biometric-enabled';
 
 export interface SecureStorageOptions {
   service?: string;
@@ -181,7 +182,6 @@ class SecureStorageService {
         securityLevel: mergedOptions.securityLevel,
       });
 
-      // A previous development build or old app version may have left a copy.
       await this.removeFallback(key);
       if (__DEV__) console.log(`[SecureStorage] Stored securely: ${key}`);
       return true;
@@ -196,8 +196,8 @@ class SecureStorageService {
         (options?.securityLevel ?? getDefaultOptions().securityLevel) ===
         Keychain.SECURITY_LEVEL?.SECURE_HARDWARE;
 
-      // Falling back from hardware-backed to OS software-backed Keychain/Keystore
-      // is acceptable; both remain native secure storage. AsyncStorage is not.
+      // OS software-backed Keychain/Keystore is still secure storage; plaintext
+      // AsyncStorage is not. This is the only downgrade production permits.
       if (isCryptoFailure && askedForSecureHardware && Keychain.SECURITY_LEVEL?.ANY) {
         try {
           await Keychain.setGenericPassword(key, value, {
@@ -241,7 +241,6 @@ class SecureStorageService {
         return credentials.password;
       }
 
-      // Only development builds may consult a plaintext fallback bucket.
       return this.getFallback(key);
     } catch (error) {
       const errorMessage = String(error);
@@ -258,9 +257,6 @@ class SecureStorageService {
     const keychainWorks = await this.isKeychainWorking();
 
     if (!keychainWorks) {
-      // In production, inability to reach Keychain means we cannot prove the
-      // secure copy was deleted. Report failure rather than pretending logout
-      // cleanup succeeded.
       return canUseInsecureFallback() ? fallbackRemoved : false;
     }
 
@@ -331,7 +327,6 @@ class SecureStorageService {
 
       if (accessResult && refreshResult) return true;
 
-      // Never leave a half-written session behind.
       await Promise.all([
         this.removeItem('auth_access_token'),
         this.removeItem('auth_refresh_token'),
@@ -356,7 +351,6 @@ class SecureStorageService {
       this.getItem('auth_refresh_token'),
     ]);
 
-    // A session is only valid when both halves exist.
     if (!accessToken || !refreshToken) {
       if (accessToken || refreshToken) {
         await Promise.all([
@@ -383,12 +377,15 @@ class SecureStorageService {
     const enabledStored = await this.setItem('biometric_enabled', 'true');
     if (!enabledStored) return false;
 
-    if (pin) {
-      const pinStored = await this.setItemWithBiometrics('user_pin', pin);
-      if (!pinStored) {
-        await this.removeItem('biometric_enabled');
-        return false;
-      }
+    // Always create a biometric-protected credential. Without one there is
+    // nothing for Keychain/Keystore to challenge the user for later.
+    const protectedCredential = await this.setItemWithBiometrics(
+      'user_pin',
+      pin ?? BIOMETRIC_SENTINEL
+    );
+    if (!protectedCredential) {
+      await this.removeItem('biometric_enabled');
+      return false;
     }
 
     return true;
@@ -421,14 +418,19 @@ class SecureStorageService {
     _promptMessage: string = 'Authenticate to continue'
   ): Promise<boolean> {
     if (!(await this.isKeychainWorking())) {
-      // Simulator convenience is allowed only in development. Production
-      // security failures must never be interpreted as successful auth.
       return canUseInsecureFallback();
     }
 
     try {
-      await this.getItemWithBiometrics('user_pin');
-      return true;
+      const options = getBiometricOptions();
+      const credentials = await Keychain.getGenericPassword({
+        service: `${options.service}.user_pin`,
+        accessControl: options.accessControl,
+      });
+
+      // Cancellation, failed authentication, or a missing protected credential
+      // must all resolve to false. Merely making the API call is not success.
+      return !!credentials && !!credentials.password;
     } catch (error) {
       if (__DEV__) console.log('[SecureStorage] Biometric auth failed:', error);
       return false;
