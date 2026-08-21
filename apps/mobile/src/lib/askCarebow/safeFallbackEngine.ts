@@ -17,12 +17,69 @@ import { detectEmergency, assessUrgency } from './safetyClassifier';
 import { getFollowUpQuestion } from './followUpQuestions';
 import { getServiceRecommendations } from './serviceRouter';
 import { buildGuidanceResponse } from './guidanceBuilder';
+import { ageFromDateOfBirth, ageToAgeGroup } from './patientContext';
+import { useAskCarebowStore } from '@/store/askCarebowStore';
+import { useProfileStore } from '@/store/useProfileStore';
 
 const VAGUE_SICK_PATTERN =
   /\b(i\s*(?:am|'m)?\s*(?:feeling\s*)?(?:sick|ill|unwell|bad)|not feeling well|feel(?:ing)? off|something(?:'s| is) wrong)\b/i;
 
 const SPECIFIC_SYMPTOM_PATTERN =
   /\b(pain|ache|fever|temperature|cough|cold|congestion|sore throat|runny nose|sneez|chill|fatigue|fatigued|tired|exhausted|nausea|nauseous|vomit|diarr|constipat|appetite|not eating|dizz|vertigo|headache|migraine|rash|itch|breath|chest|stomach|abdomen|abdominal|back|knee|joint|weak|numb|tingl|swell|bleed|urine|urinary|confus|faint|palpitat|heart|blood pressure|sugar|glucose|sleep|insomnia|anxious|anxiety|depress|fall|fell|injur|wound)\b/i;
+
+type BoundPatient = {
+  context: HealthContext;
+  confirmation: string;
+};
+
+function listNames(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map(item => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object' && 'name' in item) {
+        return String((item as { name?: unknown }).name ?? '').trim();
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function getBoundPatientContext(context: HealthContext): BoundPatient | null {
+  const sessionMemberId = useAskCarebowStore.getState().currentSession?.memberId?.trim();
+  if (!sessionMemberId) return null;
+
+  const members = useProfileStore.getState().members as any[];
+  const member = members.find(
+    candidate => candidate?.id === sessionMemberId || candidate?.backendId === sessionMemberId
+  );
+  if (!member?.dateOfBirth || !member?.gender) return null;
+
+  const age = ageFromDateOfBirth(member.dateOfBirth);
+  const ageGroup = age === undefined ? undefined : ageToAgeGroup(age);
+  if (age === undefined || !ageGroup) return null;
+
+  const conditions = listNames(member.healthInfo?.conditions);
+  const medications = listNames(member.healthInfo?.medications);
+  const allergies = listNames(member.healthInfo?.allergies);
+  const name =
+    [member.firstName, member.lastName].filter(Boolean).join(' ').trim() ||
+    String(member.name ?? '').trim() ||
+    'the selected patient';
+  const gender = String(member.gender).replaceAll('_', ' ').toLowerCase();
+  const conditionText = conditions.length > 0 ? ` Relevant saved conditions: ${conditions.join(', ')}.` : '';
+
+  return {
+    context: {
+      ...context,
+      ageGroup,
+      chronicConditions: conditions,
+      medications,
+      allergies,
+    },
+    confirmation: `I'm checking this for ${name} (age ${age}, ${gender}).${conditionText}`,
+  };
+}
 
 function isVagueSymptom(text: string): boolean {
   const value = text.trim();
@@ -121,17 +178,36 @@ function questionResponse(
   };
 }
 
-function mainSymptomQuestion(updates: Partial<HealthContext> = {}): ConversationResponse {
+function mainSymptomQuestion(
+  updates: Partial<HealthContext> = {},
+  prefix?: string
+): ConversationResponse {
   return {
     messages: [
       {
         role: 'assistant',
         contentType: 'question',
-        text: 'What is the main symptom bothering you most right now?',
+        text: prefix
+          ? `${prefix}\n\nWhat is the main symptom bothering you most right now?`
+          : 'What is the main symptom bothering you most right now?',
       },
     ],
     phaseUpdate: 'gathering',
     healthContextUpdates: updates,
+    intent: 'symptom_help',
+  };
+}
+
+function profileRequiredResponse(): ConversationResponse {
+  return {
+    messages: [
+      {
+        role: 'assistant',
+        contentType: 'text',
+        text: 'For a health assessment, I need a saved patient profile with an exact date of birth and sex so I can use the right safety context. Please go back and add or select that person first. I will not guess those details or give symptom guidance without them.',
+      },
+    ],
+    phaseUpdate: 'completed',
     intent: 'symptom_help',
   };
 }
@@ -248,58 +324,89 @@ export async function processSafeFallbackUserInput(
 ): Promise<ConversationResponse> {
   const normalized = userText.trim();
 
+  // Emergency detection stays available even when patient context is missing.
   if (detectEmergency(normalized.toLowerCase()).isEmergency) {
     return processLegacyUserInput(userText, currentPhase, healthContext, questionsAsked as any);
   }
 
+  const boundPatient = getBoundPatientContext(healthContext);
+  if (!boundPatient) return profileRequiredResponse();
+  const clinicalContext = boundPatient.context;
+
   const intent = classifyIntent(userText);
   if (intent !== 'symptom_help' || !['initial', 'gathering'].includes(currentPhase)) {
-    return processLegacyUserInput(userText, currentPhase, healthContext, questionsAsked as any);
+    return processLegacyUserInput(userText, currentPhase, clinicalContext, questionsAsked as any);
   }
 
   if (currentPhase === 'initial') {
     const duration = parseDurationSafely(normalized);
     const severity = parseSeveritySafely(normalized);
+    const profileUpdates: Partial<HealthContext> = {
+      ageGroup: clinicalContext.ageGroup,
+      chronicConditions: clinicalContext.chronicConditions,
+      medications: clinicalContext.medications,
+      allergies: clinicalContext.allergies,
+    };
 
     if (isVagueSymptom(normalized)) {
-      return mainSymptomQuestion({
-        ...(duration ? { duration } : {}),
-        ...(severity ? { severity } : {}),
-      });
+      return mainSymptomQuestion(
+        {
+          ...profileUpdates,
+          ...(duration ? { duration } : {}),
+          ...(severity ? { severity } : {}),
+        },
+        boundPatient.confirmation
+      );
     }
 
     const primarySymptom = cleanPrimarySymptom(normalized);
     const updated: HealthContext = {
-      ...healthContext,
+      ...clinicalContext,
       primarySymptom,
       ...(duration ? { duration } : {}),
       ...(severity ? { severity } : {}),
     };
     const updates: Partial<HealthContext> = {
+      ...profileUpdates,
       primarySymptom,
       ...(duration ? { duration } : {}),
       ...(severity ? { severity } : {}),
     };
 
     if (!updated.duration) {
-      return { ...questionResponse('duration', updated), healthContextUpdates: updates };
+      return {
+        ...questionResponse('duration', updated, boundPatient.confirmation),
+        healthContextUpdates: updates,
+      };
     }
     if (!updated.severity) {
-      return { ...questionResponse('severity', updated), healthContextUpdates: updates };
+      return {
+        ...questionResponse('severity', updated, boundPatient.confirmation),
+        healthContextUpdates: updates,
+      };
     }
-    return { ...questionResponse('associated_symptoms', updated), healthContextUpdates: updates };
+    return {
+      ...questionResponse('associated_symptoms', updated, boundPatient.confirmation),
+      healthContextUpdates: updates,
+    };
   }
 
-  if (!healthContext.primarySymptom) {
+  if (!clinicalContext.primarySymptom) {
     if (isVagueSymptom(normalized)) {
-      return mainSymptomQuestion();
+      return mainSymptomQuestion({}, boundPatient.confirmation);
     }
     const primarySymptom = cleanPrimarySymptom(normalized);
-    const updated = { ...healthContext, primarySymptom };
+    const updated = { ...clinicalContext, primarySymptom };
     const next = !updated.duration ? 'duration' : !updated.severity ? 'severity' : 'associated_symptoms';
     return {
       ...questionResponse(next, updated),
-      healthContextUpdates: { primarySymptom },
+      healthContextUpdates: {
+        primarySymptom,
+        ageGroup: clinicalContext.ageGroup,
+        chronicConditions: clinicalContext.chronicConditions,
+        medications: clinicalContext.medications,
+        allergies: clinicalContext.allergies,
+      },
     };
   }
 
@@ -311,7 +418,7 @@ export async function processSafeFallbackUserInput(
     if (!duration) {
       return questionResponse(
         'duration',
-        healthContext,
+        clinicalContext,
         'I need a rough timeframe before I can assess this safely. An estimate is okay.'
       );
     }
@@ -321,7 +428,7 @@ export async function processSafeFallbackUserInput(
     if (!severity) {
       return questionResponse(
         'severity',
-        healthContext,
+        clinicalContext,
         'I need a 1-10 severity estimate before I can assess this safely.'
       );
     }
@@ -330,7 +437,7 @@ export async function processSafeFallbackUserInput(
     updates.associatedSymptoms = parseAssociatedSymptomsSafely(normalized);
   }
 
-  const updated: HealthContext = { ...healthContext, ...updates };
+  const updated: HealthContext = { ...clinicalContext, ...updates };
 
   if (!updated.duration) {
     return { ...questionResponse('duration', updated), healthContextUpdates: updates };
