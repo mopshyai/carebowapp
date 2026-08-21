@@ -83,17 +83,23 @@ export default function ConversationScreen() {
   // latest turn so local intake scaffolding does not contradict it.
   const [lastTurnUsedOrchestrator, setLastTurnUsedOrchestrator] = useState(false);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
-  // E4: the medical agent's answer as it streams in, token by token. null
-  // when nothing is streaming (including the rewrite-only fallback path,
-  // which isn't streamed); '' once a stream has started but no text has
-  // arrived yet.
+  // E4: the medical agent's answer as it streams in, token by token.
   const [streamingText, setStreamingText] = useState<string | null>(null);
 
-  // The default member represents the account holder/self profile. It is safe
-  // to use only for "me" conversations. An ad-hoc family intake has its own
-  // patient context and must never inherit this person's backend record.
   const authUserId = useAuthStore((state) => state.user?.id);
-  const selfMember = useProfileStore((state) => state.members.find((m) => m.isDefault));
+
+  // Identity is explicit. "Default" is a preference and may be Mom, so it is
+  // not proof of self. Family mode receives a memberId only when AskScreen made
+  // the user explicitly choose a saved non-self profile.
+  const selfMember = useProfileStore((state) =>
+    state.members.find((member) => member.relationship === 'self')
+  );
+  const selectedFamilyMember = useProfileStore((state) => {
+    if (conversationContext !== 'family' || !params.memberId) return undefined;
+    return state.members.find(
+      (member) => member.id === params.memberId || member.backendId === params.memberId
+    );
+  });
 
   // Episode store
   const {
@@ -136,34 +142,26 @@ export default function ConversationScreen() {
   const { saveCandidate, dismissCandidate, clearPendingCandidates } = useHealthMemoryStore();
   const pendingCandidates = usePendingCandidates();
 
-  // Holds the initial symptom (if any) until currentSession has actually
-  // re-rendered into this component. handleSendMessage's `!currentSession`
-  // guard closes over the render it was created in — calling it via
-  // setTimeout(fn, 0) right after startNewSession() still invokes the stale
-  // pre-session closure (currentSession still null there), so the very
-  // first message was silently dropped (no request, no error) every time.
-  // Stashing it in a ref and sending it from an effect keyed on
-  // currentSession guarantees handleSendMessage runs only once the session
-  // it depends on is actually in scope.
+  // Holds the initial symptom until currentSession has rendered into scope.
   const pendingInitialSymptomRef = useRef<string | null>(null);
 
   // Initialize session on mount
   useEffect(() => {
     if (!currentSession) {
-      // Reset question explanations for new conversation
       resetShownExplanations();
 
-      // Never fabricate a backend profile id. For self, a local member id is
-      // enough because ensureBackendProfile() can repair the sync just before
-      // the orchestrator call. For ad-hoc family intake this intentionally
-      // returns an empty id: using the account holder's profile would attach
-      // the wrong age/conditions/medications/allergies to the patient's turn.
-      const memberId = resolveConversationMemberId(conversationContext, selfMember);
+      // A resolved id exists only for explicit self or an explicitly selected
+      // saved family patient. Ad-hoc family intake deliberately stays unbound.
+      const memberId = resolveConversationMemberId(
+        conversationContext,
+        selfMember,
+        selectedFamilyMember
+      );
       startNewSession(authUserId ?? '', memberId, params.memberName as string);
 
-      // Seed age before the first symptom is processed so the deterministic
-      // safety engine can apply pediatric/senior rules immediately. Family age
-      // comes from the intake form; self age comes from the saved DOB.
+      // Family age is supplied by AskScreen. For a saved family member it was
+      // derived from exact DOB; for ad-hoc intake it is the user's entered age.
+      // Self age always comes from the saved self DOB.
       const ageGroup = resolveConversationAgeGroup(
         conversationContext,
         params.age,
@@ -173,10 +171,8 @@ export default function ConversationScreen() {
         updateHealthContext({ ageGroup });
       }
 
-      // If initial symptom provided, process it
       const initialSymptom = params.symptom as string;
       if (initialSymptom) {
-        // Create episode if not resuming an existing one
         let episodeId = currentEpisodeId;
         if (!episodeId) {
           const episode = startEpisode({
@@ -206,21 +202,18 @@ export default function ConversationScreen() {
     async (text: string, _images?: ImageAttachment[]) => {
       if (!currentSession || isProcessing) return;
 
-      // Check subscription/free limit
+      // This local gate is retained until the server entitlement P0 replaces it.
       if (!canAskQuestion()) {
         return;
       }
 
-      // Auto-start trial on first message if not already started
       if (!trial.hasUsedTrial && !trial.trialStartDate) {
         startTrial();
       }
 
-      // Add user message
       addUserMessage(text);
       incrementFreeQuestions();
 
-      // Save to episode
       if (currentEpisodeId) {
         addEpisodeMessage({
           episodeId: currentEpisodeId,
@@ -229,14 +222,11 @@ export default function ConversationScreen() {
         });
       }
 
-      // Show typing indicator
       setIsTyping(true);
       setIsProcessing(true);
 
       try {
-        // The deterministic on-device safety engine always creates the medical
-        // guidance first. The authenticated backend may improve wording, but it
-        // cannot remove safety advice or introduce new medical claims.
+        // Deterministic safety logic runs before any LLM path.
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
@@ -250,22 +240,19 @@ export default function ConversationScreen() {
           .filter(Boolean)
           .join('\n\n');
 
-        // Symptom-help turns get the real LLM-reasoned, RAG-grounded
-        // orchestrator response (E7) instead of the rewrite-only endpoint.
-        // Family-mode intake is deliberately excluded until it is bound to a
-        // real saved family profile; using the self profile is medically wrong.
+        // RAG/orchestrator is allowed for any symptom-help turn that has a
+        // resolved patient id: explicit self or explicit saved family profile.
+        // Ad-hoc family intake has memberId='' and therefore cannot enter here.
         let usedOrchestrator = false;
         if (
           ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
-          conversationContext === 'me' &&
           response.intent === 'symptom_help' &&
           draftResponse &&
           currentSession.memberId
         ) {
           try {
-            // Onboarding may have completed while offline. Repair that local-
-            // only self profile on demand instead of sending a fake id and
-            // silently taking a 404 from the orchestrator.
+            // If the exact selected saved profile is still local-only, validate
+            // and repair that profile before the backend ever sees an id.
             const backendProfileId = await ensureBackendProfile(currentSession.memberId);
 
             setStreamingText('');
@@ -276,9 +263,6 @@ export default function ConversationScreen() {
               onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
             });
             if (orchestratorReply) {
-              // E7 already returns one complete, grounded conversational turn
-              // with its own intake/follow-up. Do not stack local GuidanceCard,
-              // service card, and closer underneath it.
               displayMessages = [
                 {
                   role: 'assistant',
@@ -289,10 +273,9 @@ export default function ConversationScreen() {
               usedOrchestrator = true;
             }
           } catch (profileOrOrchestratorError) {
-            // A profile-sync/backend failure must degrade to the deterministic
-            // safety response, never to a different patient's profile.
+            // Never try a different profile. Degrade to deterministic safety.
             logger.warn(
-              'Ask CareBow orchestrator unavailable for the resolved self profile; using safety response',
+              'Ask CareBow orchestrator unavailable for the resolved patient profile; using safety response',
               profileOrOrchestratorError
             );
           } finally {
@@ -313,21 +296,16 @@ export default function ConversationScreen() {
               );
             }
           } catch (apiError) {
-            // Network/backend failure degrades to the local safety response.
             logger.warn('Ask CareBow rewrite unavailable; using safety response', apiError);
           }
         }
 
         setLastTurnUsedOrchestrator(usedOrchestrator);
-
-        // Hide typing indicator
         setIsTyping(false);
 
-        // Add assistant messages with enhanced response
         for (const msg of displayMessages) {
           addAssistantMessage(msg);
 
-          // Save to episode
           if (currentEpisodeId && msg.text) {
             addEpisodeMessage({
               episodeId: currentEpisodeId,
@@ -336,15 +314,12 @@ export default function ConversationScreen() {
             });
           }
 
-          // Small delay between multiple messages
           if (displayMessages.length > 1) {
             await new Promise((resolve) => setTimeout(resolve, 300));
           }
         }
 
-        // Calculate and set triage level
         if (response.urgencyLevel) {
-          // Fallback: calculate from local response
           const calculatedTriage = getTriageLevel({
             urgencyLevel: response.urgencyLevel,
             hasRedFlags: (currentSession?.healthContext.riskFactors?.length ?? 0) > 0,
@@ -352,13 +327,11 @@ export default function ConversationScreen() {
           });
           setTriageLevel(calculatedTriage);
           setShowActionButtons(true);
-          // Save to episode
           if (currentEpisodeId) {
             setEpisodeTriageLevel(currentEpisodeId, calculatedTriage);
           }
         }
 
-        // Update conversation state
         if (response.phaseUpdate) {
           updateConversationPhase(response.phaseUpdate);
         }
@@ -396,10 +369,6 @@ export default function ConversationScreen() {
     [currentSession, isProcessing, params, trial, startTrial]
   );
 
-  // Fires once currentSession is populated, sending whatever initial
-  // symptom the mount effect above stashed. The ref guard (cleared
-  // immediately) ensures this sends exactly once even though
-  // handleSendMessage's identity changes on every subsequent render.
   useEffect(() => {
     if (currentSession && pendingInitialSymptomRef.current) {
       const symptom = pendingInitialSymptomRef.current;
@@ -408,7 +377,6 @@ export default function ConversationScreen() {
     }
   }, [currentSession, handleSendMessage]);
 
-  // Handle memory candidate save
   const handleSaveMemoryCandidate = useCallback(
     (candidateId: string) => {
       saveCandidate(candidateId, currentSession?.id);
@@ -416,26 +384,17 @@ export default function ConversationScreen() {
     [saveCandidate, currentSession?.id]
   );
 
-  // Handle memory candidate edit
   const handleEditMemoryCandidate = useCallback(
     (candidateId: string, _newValue: string) => {
-      // For now, just save with the new value
-      // In a full implementation, you'd update the candidate first
       saveCandidate(candidateId, currentSession?.id);
     },
     [saveCandidate, currentSession?.id]
   );
 
-  // Handle quick option selection — send the human-readable label (what the
-  // user sees on the chip), not the internal value key. option.value is an
-  // enum-like id ('just_now', '1_2_weeks') meant for the parser, not display;
-  // parseUserResponse() already classifies natural-language labels back into
-  // these same canonical values, so sending the label is fully round-trippable.
   const handleQuickOptionSelect = (option: QuickOption) => {
     handleSendMessage(option.label);
   };
 
-  // Handle follow-up scheduling
   const handleScheduleFollowUp = useCallback(
     (days: number) => {
       if (!currentEpisodeId) return;
@@ -456,21 +415,15 @@ export default function ConversationScreen() {
   );
 
   const handleDismissFollowUp = useCallback(() => {
-    // Just dismiss the UI, don't store anything
+    // Dismiss UI only.
   }, []);
 
-  // Handle service booking
   const handleBookService = (serviceId: string) => {
     navigation.navigate('Services' as never, { recommended: serviceId });
   };
 
-  // Check if user can ask more questions
   const userCanAsk = canAskQuestion();
-
-  // Get messages from current session
   const messages = currentSession?.messages ?? [];
-
-  // Get the last message to check for quick options
   const lastMessage = messages[messages.length - 1];
   const showQuickOptions =
     lastMessage?.role === 'assistant' &&
@@ -521,12 +474,8 @@ export default function ConversationScreen() {
           />
         ))}
 
-        {/* Typing Indicator — shown until the orchestrator's stream (E4) has
-            produced its first token, if this turn is streaming at all */}
         {isTyping && !streamingText && <TypingIndicator />}
 
-        {/* Streaming preview — the medical agent's answer rendering token by
-            token, before it's added to the message list as a real message */}
         {!!streamingText && (
           <ChatBubble
             message={{
@@ -540,7 +489,6 @@ export default function ConversationScreen() {
           />
         )}
 
-        {/* Quick Options */}
         {showQuickOptions && lastMessage.quickOptions && (
           <QuickOptionButtons
             options={lastMessage.quickOptions}
@@ -549,7 +497,6 @@ export default function ConversationScreen() {
           />
         )}
 
-        {/* Memory Candidate Card - shown after AI response with learned info */}
         {pendingCandidates.length > 0 && !isTyping && (
           <MemoryCandidateCard
             candidates={pendingCandidates}
@@ -560,7 +507,6 @@ export default function ConversationScreen() {
           />
         )}
 
-        {/* Triage Action Bar - shown after assessment */}
         {showActionButtons && triageLevel && !isTyping && (
           <>
             <TriageActionBar
@@ -579,16 +525,12 @@ export default function ConversationScreen() {
                 }
               }}
             />
-            {/* Still Need Card is local intake scaffolding. Suppress it when
-                E7 drove the latest turn because the orchestrator asks its own
-                follow-up and showing both is contradictory. */}
             {!lastTurnUsedOrchestrator &&
               currentSession?.healthContext &&
               (() => {
                 const missingField = detectMissingInfo(currentSession.healthContext);
                 return missingField ? <StillNeedCard missingField={missingField} /> : null;
               })()}
-            {/* Follow-up Check-in */}
             <FollowUpCheckIn
               onSchedule={handleScheduleFollowUp}
               onDismiss={handleDismissFollowUp}
@@ -598,7 +540,8 @@ export default function ConversationScreen() {
           </>
         )}
 
-        {/* Subscription Gate */}
+        {/* Existing local subscription gate; server-authoritative entitlement is
+            the next monetization P0 and will replace this device-local gate. */}
         {!userCanAsk && !hasSubscription && (
           <SubscriptionGate
             freeQuestionsUsed={freeQuestionsUsed}
@@ -611,7 +554,6 @@ export default function ConversationScreen() {
         )}
       </ScrollView>
 
-      {/* Chat Input */}
       {userCanAsk && (
         <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
           <ChatInput
@@ -629,7 +571,6 @@ export default function ConversationScreen() {
   );
 }
 
-// Message Renderer Component
 interface MessageRendererProps {
   message: Message;
   onBookService: (serviceId: string) => void;
