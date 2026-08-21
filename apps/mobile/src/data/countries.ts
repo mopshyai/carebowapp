@@ -240,13 +240,18 @@ export function formatMoney(usd: number, code: CountryCode): string {
  */
 export function formatMinor(amountMinor: number, currency: string): string {
   const settlement = SETTLEMENT[currency === 'INR' ? 'INR' : 'USD'];
+  const minor = amountMinor || 0;
+  // Decimals are hidden only when there are none to hide. Rounding them away
+  // showed a converted plan as "$19" while the server charged $18.80.
+  const isWholeUnit = minor % 100 === 0;
   try {
     return new Intl.NumberFormat(settlement.locale, {
       style: 'currency',
       currency: settlement.currency,
-      maximumFractionDigits: 0,
-    }).format((amountMinor || 0) / 100);
+      minimumFractionDigits: isWholeUnit ? 0 : 2,
+      maximumFractionDigits: isWholeUnit ? 0 : 2,
+    }).format(minor / 100);
   } catch {
-    return `${settlement.symbol}${((amountMinor || 0) / 100).toLocaleString()}`;
+    return `${settlement.symbol}${(minor / 100).toLocaleString()}`;
   }
 }
