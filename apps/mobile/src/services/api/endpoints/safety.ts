@@ -2,9 +2,9 @@
  * Safety API endpoints.
  *
  * Device actions (dialer / SMS composer) remain available even if CareBow's
- * backend is unreachable. Server reporting is additive but its outcome is
- * returned so the UI can distinguish "accepted by CareBow" from "use direct
- * emergency actions; server alert could not be confirmed."
+ * backend is unreachable. Server reporting is additive for SOS. Daily check-in
+ * scheduling is different: automatic missed-check-in escalation is only real
+ * after the server accepts the schedule.
  */
 
 import { ApiClient } from '../ApiClient';
@@ -55,6 +55,34 @@ export interface SafetyContactsResponse {
   error?: string;
 }
 
+export interface DailyCheckInSettingsPayload {
+  enabled: boolean;
+  time: string;
+  gracePeriodMinutes: number;
+  timezone: string;
+}
+
+export interface DailyCheckInResponse {
+  success: boolean;
+  settings?: DailyCheckInSettingsPayload;
+  checkIn?: {
+    id: string;
+    status: 'PENDING' | 'COMPLETED' | 'MISSED';
+    scheduledAt: string;
+    checkedInAt?: string | null;
+  } | null;
+  deadlineAt?: string | null;
+  error?: string;
+}
+
+export function getDeviceTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 export const safetyApi = {
   /**
    * Report SOS without blocking the direct emergency path. Errors resolve null
@@ -72,8 +100,6 @@ export const safetyApi = {
 
   /**
    * Replace the authenticated user's server-side SMS emergency contact list.
-   * The mobile store keeps richer local preferences (e.g. WhatsApp); only the
-   * contacts explicitly eligible for SMS should be passed here.
    */
   syncContacts: async (contacts: SafetyApiContact[]): Promise<SafetyContactsResponse | null> => {
     try {
@@ -82,8 +108,37 @@ export const safetyApi = {
       });
       return response.data;
     } catch {
-      // The SOS request also carries the live contact list, so sync failure is
-      // recoverable and must not make contact management unusable offline.
+      return null;
+    }
+  },
+
+  getDailyCheckIn: async (): Promise<DailyCheckInResponse | null> => {
+    try {
+      const response = await ApiClient.get<DailyCheckInResponse>('/v1/safety/check-ins');
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  updateDailyCheckIn: async (
+    payload: DailyCheckInSettingsPayload
+  ): Promise<DailyCheckInResponse | null> => {
+    try {
+      const response = await ApiClient.put<DailyCheckInResponse>('/v1/safety/check-ins', payload);
+      return response.data;
+    } catch {
+      return null;
+    }
+  },
+
+  completeDailyCheckIn: async (): Promise<DailyCheckInResponse | null> => {
+    try {
+      const response = await ApiClient.post<DailyCheckInResponse>('/v1/safety/check-ins', {
+        action: 'complete',
+      });
+      return response.data;
+    } catch {
       return null;
     }
   },
