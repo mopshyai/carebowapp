@@ -68,9 +68,7 @@ export function SafetyHubScreen() {
 
   // Store actions
   const recordCheckIn = useSafetyStore((state) => state.recordCheckIn);
-  const recordMissedCheckIn = useSafetyStore((state) => state.recordMissedCheckIn);
   const triggerSOS = useSafetyStore((state) => state.triggerSOS);
-  const addEvent = useSafetyStore((state) => state.addEvent);
 
   // UI state
   const [showSOSSheet, setShowSOSSheet] = useState(false);
@@ -88,7 +86,8 @@ export function SafetyHubScreen() {
 
     const serverCheckIn = response.checkIn;
     const completedAt =
-      serverCheckIn?.completedAt ?? serverCheckIn?.checkedInAt ??
+      serverCheckIn?.completedAt ??
+      serverCheckIn?.checkedInAt ??
       (serverCheckIn?.status === 'COMPLETED' ? serverCheckIn?.updatedAt : null);
     const missedAt =
       serverCheckIn?.status === 'MISSED'
@@ -143,18 +142,18 @@ export function SafetyHubScreen() {
     [triggerSOS]
   );
 
-  const handleCheckIn = useCallback(async () => {
+  const handleCheckIn = useCallback(async (): Promise<boolean> => {
     const response = await safetyApi.completeDailyCheckIn();
     if (!response?.success) {
       Alert.alert(
         'Check-in not confirmed',
         'CareBow could not confirm your check-in with the server. Please check your connection and try again.'
       );
-      return;
+      return false;
     }
 
     recordCheckIn();
-    setShowMissedCheckInModal(false);
+    return true;
   }, [recordCheckIn]);
 
   const handleEnableCheckIn = useCallback(async () => {
@@ -195,17 +194,6 @@ export function SafetyHubScreen() {
       });
     }
   }, [settings.dailyCheckInTime, settings.gracePeriodMinutes]);
-
-  const handleMissedCheckInNotify = useCallback(() => {
-    // Server escalation is automatic. This callback only records that the
-    // user explicitly requested an additional device-side contact alert.
-    recordMissedCheckIn();
-    addEvent('TEST_ALERT_SENT', { note: 'Additional missed check-in contact alert requested' });
-  }, [recordMissedCheckIn, addEvent]);
-
-  const handleMissedCheckInOK = useCallback(() => {
-    void handleCheckIn();
-  }, [handleCheckIn]);
 
   const handleManageContacts = useCallback(() => {
     navigation.navigate('SafetyContacts');
@@ -331,11 +319,7 @@ export function SafetyHubScreen() {
       <MissedCheckInModal
         visible={showMissedCheckInModal}
         onClose={() => setShowMissedCheckInModal(false)}
-        onCheckIn={handleMissedCheckInOK}
-        onNotifyContacts={handleMissedCheckInNotify}
-        contacts={contacts}
-        shareLocation={settings.shareLocationOnMissedCheckIn}
-        userName={userName}
+        onCheckIn={handleCheckIn}
       />
     </View>
   );
