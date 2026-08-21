@@ -46,16 +46,11 @@ type ProfileState = {
   members: FamilyMember[];
   selectedMemberId: string | null;
 
-  // Emergency contacts
+  // Legacy device-only data. These collections remain for backward-compatible
+  // cache migration, but launch UI must not present them as cloud-backed data.
   emergencyContacts: EmergencyContact[];
-
-  // Care addresses
   addresses: CareAddress[];
-
-  // Insurance
   insuranceInfo: InsuranceInfo[];
-
-  // Health records
   healthRecords: HealthRecord[];
 
   // Preferences
@@ -99,24 +94,24 @@ type ProfileActions = {
   // Member care preferences
   updateMemberCarePreferences: (memberId: string, updates: Partial<CarePreferences>) => void;
 
-  // Emergency contacts
+  // Legacy emergency contacts
   addEmergencyContact: (contact: Omit<EmergencyContact, 'id'>) => EmergencyContact;
   updateEmergencyContact: (id: string, updates: Partial<EmergencyContact>) => void;
   deleteEmergencyContact: (id: string) => void;
   setDefaultEmergencyContact: (id: string) => void;
 
-  // Care addresses
+  // Legacy care addresses
   addAddress: (address: Omit<CareAddress, 'id' | 'createdAt' | 'updatedAt'>) => CareAddress;
   updateAddress: (id: string, updates: Partial<CareAddress>) => void;
   deleteAddress: (id: string) => void;
   setDefaultAddress: (id: string) => void;
 
-  // Insurance
+  // Legacy insurance
   addInsurance: (insurance: Omit<InsuranceInfo, 'id' | 'createdAt' | 'updatedAt'>) => InsuranceInfo;
   updateInsurance: (id: string, updates: Partial<InsuranceInfo>) => void;
   deleteInsurance: (id: string) => void;
 
-  // Health records
+  // Legacy health records
   addHealthRecord: (record: Omit<HealthRecord, 'id' | 'createdAt' | 'updatedAt'>) => HealthRecord;
   updateHealthRecord: (id: string, updates: Partial<HealthRecord>) => void;
   deleteHealthRecord: (id: string) => void;
@@ -229,7 +224,6 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
             state.selectedMemberId === id
               ? state.members.find((m) => m.id !== id)?.id || null
               : state.selectedMemberId,
-          // Also delete associated addresses and records
           addresses: state.addresses.filter((a) => a.memberId !== id),
           healthRecords: state.healthRecords.filter((r) => r.memberId !== id),
         }));
@@ -387,7 +381,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         }));
       },
 
-      // ========== EMERGENCY CONTACTS ==========
+      // ========== LEGACY EMERGENCY CONTACTS ==========
       addEmergencyContact: (contactData) => {
         const contact: EmergencyContact = {
           ...contactData,
@@ -425,7 +419,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         }));
       },
 
-      // ========== CARE ADDRESSES ==========
+      // ========== LEGACY CARE ADDRESSES ==========
       addAddress: (addressData) => {
         const now = new Date().toISOString();
         const address: CareAddress = {
@@ -466,7 +460,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         }));
       },
 
-      // ========== INSURANCE ==========
+      // ========== LEGACY INSURANCE ==========
       addInsurance: (insuranceData) => {
         const now = new Date().toISOString();
         const insurance: InsuranceInfo = {
@@ -498,7 +492,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
         }));
       },
 
-      // ========== HEALTH RECORDS ==========
+      // ========== LEGACY HEALTH RECORDS ==========
       addHealthRecord: (recordData) => {
         const now = new Date().toISOString();
         const record: HealthRecord = {
@@ -553,6 +547,9 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
       },
 
       // ========== CARE READINESS ==========
+      // This legacy imperative action is kept for compatibility with callers
+      // and tests. It intentionally excludes local-only address/insurance data
+      // from the readiness promise.
       calculateCareReadiness: (memberId) => {
         const state = get();
         const member = memberId
@@ -607,24 +604,6 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
             weight: 15,
             screen: 'EmergencyContacts',
             whyWeAsk: 'For urgent coordination.',
-          },
-          {
-            id: 'care_address',
-            label: 'Add care address',
-            description: 'Where should care be provided',
-            isComplete: state.addresses.length > 0,
-            weight: 15,
-            screen: 'Addresses',
-            whyWeAsk: 'So providers can reach you.',
-          },
-          {
-            id: 'insurance',
-            label: 'Add insurance (optional)',
-            description: 'May help with coverage',
-            isComplete: state.insuranceInfo.length > 0,
-            weight: 5,
-            screen: 'Insurance',
-            whyWeAsk: 'May reduce out-of-pocket costs.',
           },
         ];
 
@@ -756,16 +735,22 @@ export const useAddresses = () => useProfileStore((state) => state.addresses);
 
 export const useInsuranceInfo = () => useProfileStore((state) => state.insuranceInfo);
 
+/**
+ * Launch readiness intentionally scores only patient data that is part of the
+ * server-backed profile path. Safety contacts are shown separately by the SOS
+ * subsystem; device-only address/insurance/contact caches are not allowed to
+ * inflate this score or create fake completion CTAs.
+ */
 export const useCareReadiness = (memberId?: string): CareReadinessScore => {
   const members = useProfileStore((state) => state.members);
-  const emergencyContacts = useProfileStore((state) => state.emergencyContacts);
-  const addresses = useProfileStore((state) => state.addresses);
-  const insuranceInfo = useProfileStore((state) => state.insuranceInfo);
+  const selectedMemberId = useProfileStore((state) => state.selectedMemberId);
 
   return React.useMemo(() => {
     const member = memberId
       ? members.find((m) => m.id === memberId)
-      : members.find((m) => m.isDefault) || members[0];
+      : selectedMemberId
+        ? members.find((m) => m.id === selectedMemberId)
+        : members[0];
 
     const items: CareReadinessItem[] = [
       {
@@ -807,33 +792,6 @@ export const useCareReadiness = (memberId?: string): CareReadinessScore => {
         params: { tab: 'medications' },
         whyWeAsk: 'Avoids drug interactions.',
       },
-      {
-        id: 'emergency_contact',
-        label: 'Add emergency contact',
-        description: 'Someone we can reach in emergencies',
-        isComplete: emergencyContacts.length > 0,
-        weight: 15,
-        screen: 'EmergencyContacts',
-        whyWeAsk: 'For urgent coordination.',
-      },
-      {
-        id: 'care_address',
-        label: 'Add care address',
-        description: 'Where should care be provided',
-        isComplete: addresses.length > 0,
-        weight: 15,
-        screen: 'Addresses',
-        whyWeAsk: 'So providers can reach you.',
-      },
-      {
-        id: 'insurance',
-        label: 'Add insurance (optional)',
-        description: 'May help with coverage',
-        isComplete: insuranceInfo.length > 0,
-        weight: 5,
-        screen: 'Insurance',
-        whyWeAsk: 'May reduce out-of-pocket costs.',
-      },
     ];
 
     const totalPoints = items.reduce((sum, item) => sum + item.weight, 0);
@@ -848,7 +806,7 @@ export const useCareReadiness = (memberId?: string): CareReadinessScore => {
       missingItems: items.filter((item) => !item.isComplete),
       completedItems: items.filter((item) => item.isComplete),
     };
-  }, [members, emergencyContacts, addresses, insuranceInfo, memberId]);
+  }, [members, selectedMemberId, memberId]);
 };
 
 export const useNotificationPreferences = () =>
