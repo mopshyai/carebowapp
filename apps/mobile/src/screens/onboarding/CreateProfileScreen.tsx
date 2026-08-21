@@ -32,15 +32,11 @@ import {
 import type { OnboardingStackParamList } from '@/navigation/types';
 import { createLogger } from '@/utils/logger';
 import { profilesApi } from '@/services/api/endpoints/profiles';
-
-const GENDER_TO_BACKEND: Record<GenderType, 'MALE' | 'FEMALE' | 'OTHER'> = {
-  male: 'MALE',
-  female: 'FEMALE',
-  other: 'OTHER',
-  // The backend profile schema only has three gender values; there's no
-  // direct equivalent, and 'OTHER' is a closer fallback than guessing.
-  prefer_not_to_say: 'OTHER',
-};
+import {
+  mapGender,
+  normalizeDateOfBirth,
+  relationshipForBackend,
+} from '@/lib/profileSync';
 
 const logger = createLogger('CreateProfile');
 
@@ -51,7 +47,7 @@ type CreateProfileNavigationProp = NativeStackNavigationProp<
 type CreateProfileRouteProp = RouteProp<OnboardingStackParamList, 'CreateProfile'>;
 
 type RelationshipType = 'self' | 'parent' | 'spouse' | 'child' | 'other';
-type GenderType = 'male' | 'female' | 'other' | 'prefer_not_to_say';
+type GenderType = 'male' | 'female' | 'other';
 
 interface RelationshipOption {
   id: RelationshipType;
@@ -71,7 +67,6 @@ const genderOptions: { id: GenderType; label: string }[] = [
   { id: 'male', label: 'Male' },
   { id: 'female', label: 'Female' },
   { id: 'other', label: 'Other' },
-  { id: 'prefer_not_to_say', label: 'Prefer not to say' },
 ];
 
 export default function CreateProfileScreen() {
@@ -86,16 +81,17 @@ export default function CreateProfileScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
-  const [age, setAge] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [relationship, setRelationship] = useState<RelationshipType>(
     isFamilyMember ? 'self' : 'other'
   );
   const [gender, setGender] = useState<GenderType | null>(null);
   const [country, setSelectedCountry] = useState<CountryCode>(storeCountry);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<{
     name?: string;
-    age?: string;
+    dateOfBirth?: string;
     gender?: string;
   }>({});
 
@@ -106,10 +102,11 @@ export default function CreateProfileScreen() {
       newErrors.name = 'Name is required';
     }
 
-    if (!age) {
-      newErrors.age = 'Age is required';
-    } else if (isNaN(Number(age)) || Number(age) < 0 || Number(age) > 120) {
-      newErrors.age = 'Please enter a valid age';
+    try {
+      normalizeDateOfBirth(dateOfBirth.trim());
+    } catch (error) {
+      newErrors.dateOfBirth =
+        error instanceof Error ? error.message : 'Please enter a valid date of birth';
     }
 
     if (!gender) {
@@ -121,59 +118,48 @@ export default function CreateProfileScreen() {
   };
 
   const handleContinue = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm() || !gender) return;
 
     setIsLoading(true);
+    setSubmitError(null);
+    let createdBackendId: string | null = null;
 
     try {
-      // Create the first family member profile
-      const birthYear = new Date().getFullYear() - Number(age);
-      const dateOfBirth = new Date(birthYear, 0, 1).toISOString();
+      // Never turn an approximate age into a fake January 1 birthday. The
+      // backend clinical profile stores an exact DOB, so onboarding asks for the
+      // exact value and validates it before anything is persisted.
+      const normalizedDateOfBirth = normalizeDateOfBirth(dateOfBirth.trim());
 
-      // Split name into first and last name
-      const nameParts = name.trim().split(' ');
+      const nameParts = name.trim().split(/\s+/);
       const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      const lastName = nameParts.slice(1).join(' ');
 
-      // Real backend Profile row — required for any feature that checks
-      // profile ownership server-side (e.g. the Ask CareBow orchestrator,
-      // which 404s with "Profile not found" otherwise). Best-effort: a
-      // failure here (offline, backend hiccup) still lets onboarding finish
-      // locally rather than stranding a new user on this screen — those
-      // backend-only features just won't work until the profile syncs.
-      let backendId: string | undefined;
-      try {
-        const profile = await profilesApi.createProfile({
-          name: name.trim(),
-          dateOfBirth,
-          gender: GENDER_TO_BACKEND[gender as GenderType],
-          relationship: relationship.charAt(0).toUpperCase() + relationship.slice(1),
-        });
-        backendId = profile.id;
-      } catch (syncError) {
-        logger.warn('Backend profile sync failed; continuing with local-only profile', syncError);
-      }
+      // Server first. Onboarding cannot report a completed account profile when
+      // only one device's AsyncStorage knows the patient exists.
+      const profile = await profilesApi.createProfile({
+        name: name.trim(),
+        dateOfBirth: normalizedDateOfBirth,
+        gender: mapGender(gender),
+        relationship: relationshipForBackend(relationship),
+      });
+      createdBackendId = profile.id;
 
       addMember({
         firstName,
         lastName,
         relationship,
-        dateOfBirth,
-        gender: gender || undefined,
+        dateOfBirth: normalizedDateOfBirth,
+        gender,
         isDefault: true,
-        backendId,
+        backendId: profile.id,
         healthInfo: createEmptyMemberHealthInfo(),
         carePreferences: createEmptyCarePreferences(),
       });
 
-      // If it's "self", also update the user profile
       if (relationship === 'self') {
-        const [firstName, ...lastNameParts] = name.trim().split(' ');
         updateUser({
           firstName,
-          lastName: lastNameParts.join(' '),
+          lastName,
         });
       }
 
@@ -183,7 +169,22 @@ export default function CreateProfileScreen() {
       setOnboardingStep('complete');
       navigation.navigate('OnboardingComplete');
     } catch (error) {
+      // If the backend row was created but a later local write unexpectedly
+      // failed, undo it rather than leave an invisible orphan profile.
+      if (createdBackendId) {
+        try {
+          await profilesApi.deleteProfile(createdBackendId);
+        } catch (rollbackError) {
+          logger.error('Failed to roll back orphaned onboarding profile', rollbackError);
+        }
+      }
+
       logger.error('Failed to create profile', error);
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'CareBow could not save this profile. Check your connection and try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -233,35 +234,46 @@ export default function CreateProfileScreen() {
                     if (errors.name) {
                       setErrors((prev) => ({ ...prev, name: undefined }));
                     }
+                    if (submitError) setSubmitError(null);
                   }}
                   autoCapitalize="words"
                   autoCorrect={false}
+                  editable={!isLoading}
                 />
               </View>
               {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
             </View>
 
-            {/* Age Input */}
+            {/* Exact DOB Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Age</Text>
-              <View style={[styles.inputContainer, errors.age && styles.inputError]}>
+              <Text style={styles.label}>Date of birth</Text>
+              <Text style={styles.helperText}>
+                Used for age-appropriate safety checks. CareBow does not guess birthdays.
+              </Text>
+              <View style={[styles.inputContainer, errors.dateOfBirth && styles.inputError]}>
                 <Icon name="calendar" size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Age in years"
+                  placeholder="YYYY-MM-DD"
                   placeholderTextColor={colors.textTertiary}
-                  value={age}
+                  value={dateOfBirth}
                   onChangeText={(text) => {
-                    setAge(text.replace(/[^0-9]/g, ''));
-                    if (errors.age) {
-                      setErrors((prev) => ({ ...prev, age: undefined }));
+                    setDateOfBirth(text);
+                    if (errors.dateOfBirth) {
+                      setErrors((prev) => ({ ...prev, dateOfBirth: undefined }));
                     }
+                    if (submitError) setSubmitError(null);
                   }}
-                  keyboardType="number-pad"
-                  maxLength={3}
+                  keyboardType="numbers-and-punctuation"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={10}
+                  editable={!isLoading}
                 />
               </View>
-              {errors.age ? <Text style={styles.errorText}>{errors.age}</Text> : null}
+              {errors.dateOfBirth ? (
+                <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+              ) : null}
             </View>
 
             {/* Relationship */}
@@ -274,6 +286,7 @@ export default function CreateProfileScreen() {
                       key={option.id}
                       style={[styles.chip, relationship === option.id && styles.chipSelected]}
                       onPress={() => setRelationship(option.id)}
+                      disabled={isLoading}
                     >
                       <Icon
                         name={option.icon}
@@ -311,7 +324,9 @@ export default function CreateProfileScreen() {
                       if (errors.gender) {
                         setErrors((prev) => ({ ...prev, gender: undefined }));
                       }
+                      if (submitError) setSubmitError(null);
                     }}
+                    disabled={isLoading}
                   >
                     <Text
                       style={[styles.chipText, gender === option.id && styles.chipTextSelected]}
@@ -333,7 +348,11 @@ export default function CreateProfileScreen() {
                   <Pressable
                     key={option.code}
                     style={[styles.chip, country === option.code && styles.chipSelected]}
-                    onPress={() => setSelectedCountry(option.code)}
+                    onPress={() => {
+                      setSelectedCountry(option.code);
+                      if (submitError) setSubmitError(null);
+                    }}
+                    disabled={isLoading}
                   >
                     <Text
                       style={[styles.chipText, country === option.code && styles.chipTextSelected]}
@@ -352,13 +371,14 @@ export default function CreateProfileScreen() {
 
           {/* Continue Button */}
           <View style={styles.footer}>
+            {submitError ? <Text style={styles.submitErrorText}>{submitError}</Text> : null}
             <Pressable
               style={({ pressed }) => [
                 styles.continueButton,
                 pressed && styles.buttonPressed,
                 isLoading && styles.buttonDisabled,
               ]}
-              onPress={handleContinue}
+              onPress={() => void handleContinue()}
               disabled={isLoading}
             >
               {isLoading ? (
@@ -372,7 +392,7 @@ export default function CreateProfileScreen() {
             </Pressable>
 
             <Text style={styles.hintText}>
-              You can add more profiles later from your profile settings
+              Your patient profile is saved to your CareBow account before onboarding completes.
             </Text>
           </View>
         </ScrollView>
@@ -461,6 +481,11 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.caption,
     color: colors.error,
+  },
+  submitErrorText: {
+    ...typography.bodySmall,
+    color: colors.error,
+    textAlign: 'center',
   },
 
   // Chips
