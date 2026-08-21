@@ -1,9 +1,9 @@
 /**
  * Safety Contacts Screen
- * Manage emergency contacts for safety features
+ * Manage emergency contacts used by on-device actions and CareBow SMS dispatch.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,41 +21,49 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, components } from '@/theme';
+import { safetyApi } from '@/services/api/endpoints/safety';
 
 import { useSafetyStore, useSafetyContacts } from '../store';
 import { SafetyContact } from '../types';
 import { SafetyContactCard, EmptyContactsState } from '../components';
 import { isValidPhoneNumber } from '../services/sosService';
-
-// ============================================
-// COMPONENT
-// ============================================
+import { toServerSafetyContacts } from '../services/contactSync';
 
 export function SafetyContactsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
-  // Store
   const contacts = useSafetyContacts();
   const addContact = useSafetyStore((state) => state.addContact);
   const updateContact = useSafetyStore((state) => state.updateContact);
   const deleteContact = useSafetyStore((state) => state.deleteContact);
   const setPrimaryContact = useSafetyStore((state) => state.setPrimaryContact);
 
-  // Modal state
   const [showModal, setShowModal] = useState(false);
   const [editingContact, setEditingContact] = useState<SafetyContact | null>(null);
-
-  // Form state
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [canReceiveSMS, setCanReceiveSMS] = useState(true);
   const [canReceiveWhatsApp, setCanReceiveWhatsApp] = useState(false);
   const [isPrimary, setIsPrimary] = useState(false);
-
-  // Form validation
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  /**
+   * Local contacts remain available offline. Server sync is additive; the SOS
+   * request itself also carries this list, so a sync outage cannot produce an
+   * empty recipient list during the emergency that follows.
+   */
+  const syncCurrentContacts = useCallback(() => {
+    const current = useSafetyStore.getState().contacts;
+    void safetyApi.syncContacts(toServerSafetyContacts(current));
+  }, []);
+
+  // Migrate contacts created by older local-only app builds as soon as the user
+  // opens contact management after upgrading.
+  useEffect(() => {
+    syncCurrentContacts();
+  }, [syncCurrentContacts]);
 
   const resetForm = useCallback(() => {
     setName('');
@@ -70,10 +78,7 @@ export function SafetyContactsScreen() {
 
   const openAddModal = useCallback(() => {
     resetForm();
-    // If no contacts, new one will be primary
-    if (contacts.length === 0) {
-      setIsPrimary(true);
-    }
+    if (contacts.length === 0) setIsPrimary(true);
     setShowModal(true);
   }, [resetForm, contacts.length]);
 
@@ -97,9 +102,7 @@ export function SafetyContactsScreen() {
   const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!name.trim()) {
-      newErrors.name = 'Name is required';
-    }
+    if (!name.trim()) newErrors.name = 'Name is required';
 
     if (!phoneNumber.trim()) {
       newErrors.phoneNumber = 'Phone number is required';
@@ -107,13 +110,9 @@ export function SafetyContactsScreen() {
       newErrors.phoneNumber = 'Please enter a valid phone number';
     }
 
-    if (!canReceiveSMS && !canReceiveWhatsApp) {
-      newErrors.contact = 'Select at least one contact method';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [name, phoneNumber, canReceiveSMS, canReceiveWhatsApp]);
+  }, [name, phoneNumber]);
 
   const handleSave = useCallback(() => {
     if (!validateForm()) return;
@@ -136,6 +135,7 @@ export function SafetyContactsScreen() {
       addContact(contactData);
     }
 
+    syncCurrentContacts();
     closeModal();
   }, [
     validateForm,
@@ -149,6 +149,7 @@ export function SafetyContactsScreen() {
     updateContact,
     setPrimaryContact,
     addContact,
+    syncCurrentContacts,
     closeModal,
   ]);
 
@@ -161,26 +162,25 @@ export function SafetyContactsScreen() {
           style: 'destructive',
           onPress: () => {
             deleteContact(contact.id);
-            if (showModal) {
-              closeModal();
-            }
+            syncCurrentContacts();
+            if (showModal) closeModal();
           },
         },
       ]);
     },
-    [deleteContact, showModal, closeModal]
+    [deleteContact, syncCurrentContacts, showModal, closeModal]
   );
 
   const handleSetPrimary = useCallback(
     (contact: SafetyContact) => {
       setPrimaryContact(contact.id);
+      syncCurrentContacts();
     },
-    [setPrimaryContact]
+    [setPrimaryContact, syncCurrentContacts]
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
@@ -193,20 +193,16 @@ export function SafetyContactsScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xl },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
       >
-        {/* Info Banner */}
         <View style={styles.infoBanner}>
           <Icon name="information-circle" size={18} color={colors.accent} />
           <Text style={styles.infoText}>
-            These contacts will be notified during emergencies and missed check-ins.
+            SMS-enabled contacts are included in CareBow emergency dispatch. Calls and WhatsApp
+            still require direct action from your phone.
           </Text>
         </View>
 
-        {/* Contacts List */}
         {contacts.length > 0 ? (
           <View style={styles.contactsList}>
             {contacts.map((contact) => (
@@ -242,7 +238,6 @@ export function SafetyContactsScreen() {
         )}
       </ScrollView>
 
-      {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -260,7 +255,6 @@ export function SafetyContactsScreen() {
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.form}>
-              {/* Name */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Name *</Text>
                 <TextInput
@@ -274,7 +268,6 @@ export function SafetyContactsScreen() {
                 {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
               </View>
 
-              {/* Relationship */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Relationship (optional)</Text>
                 <TextInput
@@ -286,7 +279,6 @@ export function SafetyContactsScreen() {
                 />
               </View>
 
-              {/* Phone Number */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Phone Number *</Text>
                 <TextInput
@@ -300,15 +292,16 @@ export function SafetyContactsScreen() {
                 {errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
               </View>
 
-              {/* Contact Methods */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Contact Methods</Text>
-                {errors.contact && <Text style={styles.errorText}>{errors.contact}</Text>}
+                <Text style={styles.label}>Emergency Delivery Preferences</Text>
 
                 <View style={styles.switchRow}>
                   <View style={styles.switchInfo}>
                     <Icon name="chatbubble" size={20} color={colors.textSecondary} />
-                    <Text style={styles.switchLabel}>Can receive SMS</Text>
+                    <View>
+                      <Text style={styles.switchLabel}>Include in SMS alerts</Text>
+                      <Text style={styles.switchDescription}>Used by CareBow server dispatch</Text>
+                    </View>
                   </View>
                   <Switch
                     value={canReceiveSMS}
@@ -321,7 +314,12 @@ export function SafetyContactsScreen() {
                 <View style={styles.switchRow}>
                   <View style={styles.switchInfo}>
                     <Icon name="logo-whatsapp" size={20} color={colors.textSecondary} />
-                    <Text style={styles.switchLabel}>Can receive WhatsApp</Text>
+                    <View>
+                      <Text style={styles.switchLabel}>WhatsApp preference</Text>
+                      <Text style={styles.switchDescription}>
+                        Saved locally; automatic WhatsApp delivery is not active yet
+                      </Text>
+                    </View>
                   </View>
                   <Switch
                     value={canReceiveWhatsApp}
@@ -332,7 +330,6 @@ export function SafetyContactsScreen() {
                 </View>
               </View>
 
-              {/* Primary Contact */}
               {contacts.length > 0 && (
                 <View style={styles.inputGroup}>
                   <View style={styles.switchRow}>
@@ -340,9 +337,7 @@ export function SafetyContactsScreen() {
                       <Icon name="star" size={20} color={colors.warning} />
                       <View>
                         <Text style={styles.switchLabel}>Primary Contact</Text>
-                        <Text style={styles.switchDescription}>
-                          First contacted during emergencies
-                        </Text>
+                        <Text style={styles.switchDescription}>First direct-call option in SOS</Text>
                       </View>
                     </View>
                     <Switch
@@ -355,7 +350,6 @@ export function SafetyContactsScreen() {
                 </View>
               )}
 
-              {/* Delete Button (Edit mode only) */}
               {editingContact && (
                 <TouchableOpacity
                   style={styles.deleteButton}
@@ -372,10 +366,6 @@ export function SafetyContactsScreen() {
     </View>
   );
 }
-
-// ============================================
-// STYLES
-// ============================================
 
 const styles = StyleSheet.create({
   container: {
@@ -456,7 +446,6 @@ const styles = StyleSheet.create({
   deleteChipText: {
     color: colors.error,
   },
-  // Modal
   modalContainer: {
     flex: 1,
     backgroundColor: colors.surface2,
