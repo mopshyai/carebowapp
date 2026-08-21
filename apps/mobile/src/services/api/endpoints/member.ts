@@ -1,13 +1,11 @@
 /**
  * Member / Provider API (mobile, JWT-authenticated v1 endpoints only)
  *
- * GET /v1/member/overview now serves the provider home dashboard aggregates
- * directly (server-side), so the client no longer derives them from
- * /v1/bookings. Other JWT-accessible provider data:
+ * GET /v1/member/overview serves provider dashboard aggregates directly.
+ * Other JWT-accessible provider data:
  *   - GET /v1/bookings          → bookings where I'm the provider or the user
  *   - GET /v1/provider/profile  → provider profile (rating, verification)
  *   - GET /v1/services          → service catalog
- * Verified against source `mopshyai/carebow-main` 2026-07-25.
  */
 
 import { ApiClient } from '../ApiClient';
@@ -31,10 +29,13 @@ export interface V1Booking {
    * raised — so this is what decides whether to offer a Pay button.
    */
   paymentStatus?: string;
+  /** Provider/customer booking handoff. Includes sanitized Ask CareBow referral when present. */
+  notes?: string | null;
+  address?: string | null;
   service?: { name: string; category: string } | null;
   profile?: { name: string } | null;
   provider?: { name: string; image?: string | null } | null;
-  user?: { name?: string; email?: string } | null;
+  user?: { name?: string; email?: string; phoneNumber?: string | null } | null;
 }
 
 /**
@@ -81,6 +82,7 @@ export interface MemberOverview {
   totalPatients: number;
   earningsThisMonthPaise: number;
   nextAppointment: {
+    id: string;
     scheduledAt: string;
     patientName: string;
     service: string;
