@@ -79,6 +79,9 @@ export default function ConversationScreen() {
 
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
+  // The orchestrator runs its own intake/follow-ups. Track whether it drove the
+  // latest turn so local intake scaffolding does not contradict it.
+  const [lastTurnUsedOrchestrator, setLastTurnUsedOrchestrator] = useState(false);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
   // E4: the medical agent's answer as it streams in, token by token. null
   // when nothing is streaming (including the rewrite-only fallback path,
@@ -273,9 +276,16 @@ export default function ConversationScreen() {
               onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
             });
             if (orchestratorReply) {
-              displayMessages = response.messages.map((message, index) =>
-                index === 0 ? { ...message, text: orchestratorReply.text } : message
-              );
+              // E7 already returns one complete, grounded conversational turn
+              // with its own intake/follow-up. Do not stack local GuidanceCard,
+              // service card, and closer underneath it.
+              displayMessages = [
+                {
+                  role: 'assistant',
+                  contentType: 'text',
+                  text: orchestratorReply.text,
+                },
+              ];
               usedOrchestrator = true;
             }
           } catch (profileOrOrchestratorError) {
@@ -307,6 +317,8 @@ export default function ConversationScreen() {
             logger.warn('Ask CareBow rewrite unavailable; using safety response', apiError);
           }
         }
+
+        setLastTurnUsedOrchestrator(usedOrchestrator);
 
         // Hide typing indicator
         setIsTyping(false);
@@ -567,8 +579,11 @@ export default function ConversationScreen() {
                 }
               }}
             />
-            {/* Still Need Card - shows missing info */}
-            {currentSession?.healthContext &&
+            {/* Still Need Card is local intake scaffolding. Suppress it when
+                E7 drove the latest turn because the orchestrator asks its own
+                follow-up and showing both is contradictory. */}
+            {!lastTurnUsedOrchestrator &&
+              currentSession?.healthContext &&
               (() => {
                 const missingField = detectMissingInfo(currentSession.healthContext);
                 return missingField ? <StillNeedCard missingField={missingField} /> : null;
