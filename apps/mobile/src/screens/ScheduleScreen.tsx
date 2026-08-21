@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   View,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -24,16 +24,31 @@ export default function ScheduleScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    memberApi
-      .getBookings()
-      .then((response) => {
-        if (response.success) setBookings(response.bookings ?? []);
-        else setLoadError(true);
-      })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setLoading(true);
+      setLoadError(false);
+
+      memberApi
+        .getBookings()
+        .then((response) => {
+          if (!active) return;
+          if (response.success) setBookings(response.bookings ?? []);
+          else setLoadError(true);
+        })
+        .catch(() => {
+          if (active) setLoadError(true);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const appointments = useMemo(() => {
     const now = Date.now();
