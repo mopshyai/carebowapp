@@ -24,6 +24,10 @@ const serviceSearchText = (service: Service) =>
     .join(' ')
     .toLowerCase();
 
+function asRecommendationGroup(id: string, title: string, items: Service[]): ServiceCategory[] {
+  return items.length > 0 ? [{ id, title, items }] : [];
+}
+
 function filterForCareIntent(
   categories: ServiceCategory[],
   requestedCategory?: string
@@ -38,40 +42,52 @@ function filterForCareIntent(
   if (exact.length > 0) return exact;
 
   const allServices = categories.flatMap((category) => category.items);
-  let matches: Service[] = [];
-  let title = 'Recommended care';
 
   if (requested === 'video-consult' || requested === 'teleconsult') {
-    title = 'Consult a doctor';
-    matches = allServices.filter((service) => {
+    const liveConsults = allServices.filter((service) => {
       const text = serviceSearchText(service);
       return /video|teleconsult|telemedicine|virtual|online consult/.test(text);
     });
-  } else if (
+    if (liveConsults.length > 0) {
+      return asRecommendationGroup('carebow_video_consult', 'Live doctor consultations', liveConsults);
+    }
+
+    // If no dedicated virtual service exists yet, show actual doctor services
+    // rather than unrelated nursing, cleaning, food, or generic "care" items.
+    const doctorAlternatives = allServices.filter((service) => {
+      const text = serviceSearchText(service);
+      return /doctor|physician/.test(text);
+    });
+    if (doctorAlternatives.length > 0) {
+      return asRecommendationGroup(
+        'carebow_doctor_alternatives',
+        'Available doctor options',
+        doctorAlternatives
+      );
+    }
+  }
+
+  if (
     requested === 'doctor-visit' ||
     requested === 'home-care' ||
     requested === 'home-visit'
   ) {
-    title = 'Doctor & home care';
-    matches = allServices.filter((service) => {
+    const homeDoctorServices = allServices.filter((service) => {
       const text = serviceSearchText(service);
       return /doctor|physician|home visit|medical visit/.test(text);
     });
+    if (homeDoctorServices.length > 0) {
+      return asRecommendationGroup(
+        'carebow_home_doctor',
+        'Doctor & home visit options',
+        homeDoctorServices
+      );
+    }
   }
 
-  if (matches.length > 0) {
-    return [
-      {
-        id: `carebow_${requested}`,
-        title,
-        items: matches,
-      },
-    ];
-  }
-
-  // The live catalog may not yet have a dedicated teleconsult/home-visit tag.
-  // Fall back to healthcare instead of silently ignoring the recommendation
-  // and showing unrelated cleaning/food/companion services.
+  // The live catalog may use a broad healthcare category rather than explicit
+  // doctor tags. Restrict fallback to health/medical/doctor wording only. Do
+  // not match generic "care", which previously pulled daily-care categories in.
   if (
     requested === 'video-consult' ||
     requested === 'teleconsult' ||
@@ -81,7 +97,7 @@ function filterForCareIntent(
   ) {
     const healthcare = categories.filter((category) => {
       const text = `${category.id} ${category.title}`.toLowerCase();
-      return /health|medical|doctor|care/.test(text);
+      return /health|medical|doctor/.test(text);
     });
     if (healthcare.length > 0) return healthcare;
   }
