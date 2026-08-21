@@ -1,16 +1,11 @@
 /**
  * Ask CareBow Conversation Screen
  * AI-powered health assistant conversation interface
- *
- * Upgrades:
- * - Enhanced chat bubbles with collapsible sections
- * - Memory candidate cards after AI responses
- * - Action buttons (Connect to doctor, Book home visit, Save summary)
- * - Support for image attachments
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   ScrollView,
@@ -25,7 +20,6 @@ import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 
-// Store & Types
 import { useAskCarebowStore } from '../store/askCarebowStore';
 import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -33,21 +27,25 @@ import { useProfileStore } from '../store/useProfileStore';
 import { Message, QuickOption } from '../types/askCarebow';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
-// AI Engine
 import { processUserInput } from '../lib/askCarebow';
 import { askCareBowApi } from '../services/api/endpoints/askCareBow';
+import {
+  askCarebowEntitlementApi,
+  type AskCarebowEntitlement,
+} from '../services/api/endpoints/askCarebowEntitlement';
+import { ApiError } from '../services/api/types';
 import { streamOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
 import {
   resolveConversationAgeGroup,
   resolveConversationMemberId,
 } from '../lib/askCarebow/patientContext';
+import { createAskCarebowTurnRequestId } from '../lib/askCarebow/turnRequestId';
 import { ensureBackendProfile } from '../lib/profileSync';
 import { ASK_CAREBOW_ORCHESTRATOR_ENABLED } from '../config/featureFlags';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('Conversation');
 
-// Components
 import {
   ChatBubble,
   ChatInput,
@@ -69,6 +67,17 @@ import { formatFollowUpDate } from '../types/followUp';
 import { resetShownExplanations } from '../utils/questionExplanations';
 import { detectMissingInfo } from '../utils/missingInfoDetector';
 
+function isSafetyBypass(response: {
+  isEmergency?: boolean;
+  urgencyLevel?: string;
+}): boolean {
+  return (
+    response.isEmergency === true ||
+    response.urgencyLevel === 'emergency' ||
+    response.urgencyLevel === 'urgent'
+  );
+}
+
 export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
@@ -79,18 +88,14 @@ export default function ConversationScreen() {
 
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);
-  // The orchestrator runs its own intake/follow-ups. Track whether it drove the
-  // latest turn so local intake scaffolding does not contradict it.
   const [lastTurnUsedOrchestrator, setLastTurnUsedOrchestrator] = useState(false);
   const [currentEpisodeId, setCurrentEpisodeId] = useState<string | null>(params.episodeId || null);
-  // E4: the medical agent's answer as it streams in, token by token.
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [entitlement, setEntitlement] = useState<AskCarebowEntitlement | null>(null);
+  const [accessBlocked, setAccessBlocked] = useState(false);
 
   const authUserId = useAuthStore((state) => state.user?.id);
 
-  // Identity is explicit. "Default" is a preference and may be Mom, so it is
-  // not proof of self. Family mode receives a memberId only when AskScreen made
-  // the user explicitly choose a saved non-self profile.
   const selfMember = useProfileStore((state) =>
     state.members.find((member) => member.relationship === 'self')
   );
@@ -101,7 +106,6 @@ export default function ConversationScreen() {
     );
   });
 
-  // Episode store
   const {
     startEpisode,
     addMessage: addEpisodeMessage,
@@ -109,20 +113,14 @@ export default function ConversationScreen() {
     getEpisode,
   } = useEpisodeStore();
 
-  // Follow-up store
   const { scheduleFollowUp } = useFollowUpStore();
   const hasScheduledFollowUp = useHasScheduledFollowUp(currentEpisodeId || '');
   const [followUpScheduledLabel, setFollowUpScheduledLabel] = useState<string | null>(null);
 
-  // Store state and actions
   const {
     currentSession,
     isTyping,
     isProcessing,
-    hasSubscription,
-    freeQuestionsUsed,
-    maxFreeQuestions,
-    trial,
     startNewSession,
     addUserMessage,
     addAssistantMessage,
@@ -133,25 +131,29 @@ export default function ConversationScreen() {
     addServiceRecommendation,
     setIsTyping,
     setIsProcessing,
-    incrementFreeQuestions,
-    canAskQuestion,
-    startTrial,
   } = useAskCarebowStore();
 
-  // Health memory store
   const { saveCandidate, dismissCandidate, clearPendingCandidates } = useHealthMemoryStore();
   const pendingCandidates = usePendingCandidates();
-
-  // Holds the initial symptom until currentSession has rendered into scope.
   const pendingInitialSymptomRef = useRef<string | null>(null);
 
-  // Initialize session on mount
+  const refreshEntitlement = useCallback(async (): Promise<AskCarebowEntitlement> => {
+    const current = await askCarebowEntitlementApi.get();
+    setEntitlement(current);
+    setAccessBlocked(!current.canAsk);
+    return current;
+  }, []);
+
+  useEffect(() => {
+    void refreshEntitlement().catch((error) => {
+      logger.warn('Ask CareBow entitlement prefetch unavailable', error);
+    });
+  }, [refreshEntitlement]);
+
   useEffect(() => {
     if (!currentSession) {
       resetShownExplanations();
 
-      // A resolved id exists only for explicit self or an explicitly selected
-      // saved family patient. Ad-hoc family intake deliberately stays unbound.
       const memberId = resolveConversationMemberId(
         conversationContext,
         selfMember,
@@ -159,9 +161,6 @@ export default function ConversationScreen() {
       );
       startNewSession(authUserId ?? '', memberId, params.memberName as string);
 
-      // Family age is supplied by AskScreen. For a saved family member it was
-      // derived from exact DOB; for ad-hoc intake it is the user's entered age.
-      // Self age always comes from the saved self DOB.
       const ageGroup = resolveConversationAgeGroup(
         conversationContext,
         params.age,
@@ -184,55 +183,64 @@ export default function ConversationScreen() {
           episodeId = episode.id;
           setCurrentEpisodeId(episode.id);
         }
-
         pendingInitialSymptomRef.current = initialSymptom;
       }
     }
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [currentSession?.messages, isTyping]);
 
-  // Handle sending a message
   const handleSendMessage = useCallback(
     async (text: string, _images?: ImageAttachment[]) => {
       if (!currentSession || isProcessing) return;
 
-      // This local gate is retained until the server entitlement P0 replaces it.
-      if (!canAskQuestion()) {
-        return;
-      }
-
-      if (!trial.hasUsedTrial && !trial.trialStartDate) {
-        startTrial();
-      }
-
-      addUserMessage(text);
-      incrementFreeQuestions();
-
-      if (currentEpisodeId) {
-        addEpisodeMessage({
-          episodeId: currentEpisodeId,
-          role: 'user',
-          text,
-        });
-      }
-
-      setIsTyping(true);
       setIsProcessing(true);
+      const requestId = createAskCarebowTurnRequestId();
 
       try {
-        // Deterministic safety logic runs before any LLM path.
+        // Safety classification happens before monetization. Emergency/urgent
+        // guidance is never suppressed because a trial or quota ended.
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
           currentSession.healthContext,
           currentSession.conversationState.questionsAsked
         );
+        const safetyBypass = isSafetyBypass(response);
+
+        if (!safetyBypass) {
+          let currentAccess: AskCarebowEntitlement;
+          try {
+            currentAccess = await refreshEntitlement();
+          } catch (error) {
+            logger.warn('Unable to verify Ask CareBow entitlement', error);
+            Alert.alert(
+              'Could not verify Ask CareBow access',
+              'Please check your connection and try again. Emergency guidance remains available.'
+            );
+            return;
+          }
+
+          if (!currentAccess.canAsk) {
+            setAccessBlocked(true);
+            return;
+          }
+        }
+
+        addUserMessage(text);
+        if (currentEpisodeId) {
+          addEpisodeMessage({
+            episodeId: currentEpisodeId,
+            role: 'user',
+            text,
+          });
+        }
+
+        setIsTyping(true);
 
         let displayMessages = response.messages;
         const draftResponse = response.messages
@@ -240,10 +248,9 @@ export default function ConversationScreen() {
           .filter(Boolean)
           .join('\n\n');
 
-        // RAG/orchestrator is allowed for any symptom-help turn that has a
-        // resolved patient id: explicit self or explicit saved family profile.
-        // Ad-hoc family intake has memberId='' and therefore cannot enter here.
         let usedOrchestrator = false;
+        let serverDeniedTurn = false;
+
         if (
           ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
           response.intent === 'symptom_help' &&
@@ -251,8 +258,6 @@ export default function ConversationScreen() {
           currentSession.memberId
         ) {
           try {
-            // If the exact selected saved profile is still local-only, validate
-            // and repair that profile before the backend ever sees an id.
             const backendProfileId = await ensureBackendProfile(currentSession.memberId);
 
             setStreamingText('');
@@ -260,6 +265,7 @@ export default function ConversationScreen() {
               localSessionId: currentSession.id,
               profileId: backendProfileId,
               text,
+              requestId,
               onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
             });
             if (orchestratorReply) {
@@ -273,9 +279,8 @@ export default function ConversationScreen() {
               usedOrchestrator = true;
             }
           } catch (profileOrOrchestratorError) {
-            // Never try a different profile. Degrade to deterministic safety.
             logger.warn(
-              'Ask CareBow orchestrator unavailable for the resolved patient profile; using safety response',
+              'Ask CareBow orchestrator unavailable for the resolved patient profile',
               profileOrOrchestratorError
             );
           } finally {
@@ -289,19 +294,42 @@ export default function ConversationScreen() {
               messageText: text,
               draftResponse,
               forWhom: conversationContext,
+              requestId,
             });
+            if (liveResponse.entitlement) {
+              setEntitlement(liveResponse.entitlement);
+              setAccessBlocked(!liveResponse.entitlement.canAsk);
+            }
             if (liveResponse.success && liveResponse.assistantMessage) {
               displayMessages = response.messages.map((message, index) =>
                 index === 0 ? { ...message, text: liveResponse.assistantMessage } : message
               );
             }
           } catch (apiError) {
-            logger.warn('Ask CareBow rewrite unavailable; using safety response', apiError);
+            if (apiError instanceof ApiError && apiError.status === 402 && !safetyBypass) {
+              serverDeniedTurn = true;
+              setAccessBlocked(true);
+              displayMessages = [];
+              void refreshEntitlement().catch(() => {});
+            } else {
+              // For a true safety bypass the deterministic response remains the
+              // source of truth even if the network/AI writer is unavailable.
+              logger.warn('Ask CareBow rewrite unavailable; using deterministic response', apiError);
+            }
           }
         }
 
         setLastTurnUsedOrchestrator(usedOrchestrator);
         setIsTyping(false);
+
+        if (serverDeniedTurn) {
+          addAssistantMessage({
+            role: 'assistant',
+            contentType: 'text',
+            text: 'Your Ask CareBow access limit has been reached. View Care Plans to continue. Emergency guidance remains available.',
+          });
+          return;
+        }
 
         for (const msg of displayMessages) {
           addAssistantMessage(msg);
@@ -332,26 +360,16 @@ export default function ConversationScreen() {
           }
         }
 
-        if (response.phaseUpdate) {
-          updateConversationPhase(response.phaseUpdate);
-        }
-
-        if (response.healthContextUpdates) {
-          updateHealthContext(response.healthContextUpdates);
-        }
-
-        if (response.urgencyLevel) {
-          setUrgencyLevel(response.urgencyLevel);
-        }
-
-        if (response.questionAsked) {
-          markQuestionAsked(response.questionAsked);
-        }
-
+        if (response.phaseUpdate) updateConversationPhase(response.phaseUpdate);
+        if (response.healthContextUpdates) updateHealthContext(response.healthContextUpdates);
+        if (response.urgencyLevel) setUrgencyLevel(response.urgencyLevel);
+        if (response.questionAsked) markQuestionAsked(response.questionAsked);
         if (response.serviceRecommendations) {
-          for (const rec of response.serviceRecommendations) {
-            addServiceRecommendation(rec);
-          }
+          for (const rec of response.serviceRecommendations) addServiceRecommendation(rec);
+        }
+
+        if (!safetyBypass) {
+          void refreshEntitlement().catch(() => {});
         }
       } catch (error) {
         logger.error('Error processing message', error);
@@ -363,10 +381,11 @@ export default function ConversationScreen() {
           text: "I'm having trouble processing your message. Please try again.",
         });
       } finally {
+        setIsTyping(false);
         setIsProcessing(false);
       }
     },
-    [currentSession, isProcessing, params, trial, startTrial]
+    [currentSession, isProcessing, currentEpisodeId, conversationContext, refreshEntitlement]
   );
 
   useEffect(() => {
@@ -414,15 +433,12 @@ export default function ConversationScreen() {
     [currentEpisodeId, getEpisode, scheduleFollowUp]
   );
 
-  const handleDismissFollowUp = useCallback(() => {
-    // Dismiss UI only.
-  }, []);
+  const handleDismissFollowUp = useCallback(() => {}, []);
 
   const handleBookService = (serviceId: string) => {
     navigation.navigate('Services' as never, { recommended: serviceId });
   };
 
-  const userCanAsk = canAskQuestion();
   const messages = currentSession?.messages ?? [];
   const lastMessage = messages[messages.length - 1];
   const showQuickOptions =
@@ -437,7 +453,6 @@ export default function ConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
@@ -456,7 +471,6 @@ export default function ConversationScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Messages */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.messagesContainer}
@@ -540,25 +554,19 @@ export default function ConversationScreen() {
           </>
         )}
 
-        {/* Existing local subscription gate; server-authoritative entitlement is
-            the next monetization P0 and will replace this device-local gate. */}
-        {!userCanAsk && !hasSubscription && (
+        {accessBlocked && entitlement && (
           <SubscriptionGate
-            freeQuestionsUsed={freeQuestionsUsed}
-            maxFreeQuestions={maxFreeQuestions}
-            onSubscribe={() =>
-              navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never)
-            }
-            onViewPlans={() => navigation.navigate('Services')}
+            entitlement={entitlement}
+            onViewPlans={() => navigation.navigate('CarePlans')}
           />
         )}
       </ScrollView>
 
-      {userCanAsk && (
+      {!accessBlocked && (
         <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
           <ChatInput
             onSend={handleSendMessage}
-            disabled={isProcessing || !userCanAsk}
+            disabled={isProcessing}
             placeholder={
               currentSession?.conversationState.phase === 'initial'
                 ? 'Describe your symptoms...'
