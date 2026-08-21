@@ -10,7 +10,7 @@
  * Features:
  * - Automatic crash reporting
  * - Performance monitoring
- * - User context tracking
+ * - Pseudonymous user context tracking
  * - Custom error logging
  * - Breadcrumb trail
  */
@@ -25,6 +25,8 @@ import { SENTRY_DSN as ENV_SENTRY_DSN } from '@env';
 
 export interface UserContext {
   id: string;
+  // Accepted for backwards-compatible callers, but intentionally never sent
+  // to Sentry. CareBow monitoring should not contain direct identity fields.
   email?: string;
   username?: string;
 }
@@ -90,6 +92,10 @@ class SentryServiceClass {
         dist: APP_BUILD,
         environment: __DEV__ ? 'development' : 'production',
 
+        // CareBow handles health information. Never ask the SDK to enrich
+        // events with default personally-identifying data.
+        sendDefaultPii: false,
+
         // Performance monitoring
         tracesSampleRate: __DEV__ ? 1.0 : 0.2, // 20% in production
         profilesSampleRate: __DEV__ ? 1.0 : 0.1, // 10% in production
@@ -101,20 +107,59 @@ class SentryServiceClass {
         // Breadcrumb settings
         maxBreadcrumbs: 100,
 
-        // Filter sensitive data
+        // Health-app privacy boundary. Error names/stacks and operational tags
+        // are useful; direct identity, request payloads and arbitrary extras are
+        // not worth the risk of copying PHI/PII into a monitoring vendor.
         beforeSend: (event) => {
-          // Remove sensitive data before sending
           if (event.user) {
-            delete event.user.ip_address;
+            event.user = event.user.id ? { id: event.user.id } : undefined;
           }
 
-          // Filter out certain error types if needed
-          // if (event.exception?.values?.[0]?.type === 'NetworkError') {
-          //   return null; // Don't send network errors
-          // }
+          if (event.request) {
+            delete event.request.data;
+            delete event.request.query_string;
+            delete event.request.cookies;
+
+            if (event.request.headers) {
+              const safeHeaders = { ...event.request.headers };
+              for (const key of Object.keys(safeHeaders)) {
+                const normalized = key.toLowerCase();
+                if (
+                  normalized === 'authorization' ||
+                  normalized === 'cookie' ||
+                  normalized === 'set-cookie' ||
+                  normalized === 'x-api-key'
+                ) {
+                  delete safeHeaders[key];
+                }
+              }
+              event.request.headers = safeHeaders;
+            }
+          }
+
+          // captureError() accepts convenience context for local debugging, but
+          // arbitrary extras can contain symptoms, names, phone numbers, or
+          // booking notes. Do not export them from the device.
+          delete event.extra;
+
+          // Automatic breadcrumbs are useful for chronology, but their data
+          // objects may include URLs, request parameters, or input values.
+          if (event.breadcrumbs) {
+            event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
+              ...breadcrumb,
+              data: undefined,
+            }));
+          }
 
           return event;
         },
+
+        // Strip breadcrumb payloads before they are attached to any event. Keep
+        // category/message/level so crash chronology remains useful.
+        beforeBreadcrumb: (breadcrumb) => ({
+          ...breadcrumb,
+          data: undefined,
+        }),
 
         // Add default tags
         integrations: [Sentry.reactNativeTracingIntegration()],
@@ -135,17 +180,14 @@ class SentryServiceClass {
   }
 
   /**
-   * Set user context for error tracking
+   * Set pseudonymous user context for error tracking.
+   * Direct identifiers (email/username) deliberately stay on-device.
    */
   setUser(user: UserContext | null): void {
     if (!this.isInitialized) return;
 
     if (user) {
-      Sentry.setUser({
-        id: user.id,
-        email: user.email,
-        username: user.username,
-      });
+      Sentry.setUser({ id: user.id });
 
       if (__DEV__) {
         console.log('[Sentry] User set:', user.id);
@@ -176,7 +218,8 @@ class SentryServiceClass {
       // Set severity level
       scope.setLevel(severity);
 
-      // Add custom context
+      // Context remains useful locally/in scope, but beforeSend strips arbitrary
+      // extras before the event leaves the device.
       if (context) {
         scope.setExtras(context);
       }
@@ -211,7 +254,8 @@ class SentryServiceClass {
   }
 
   /**
-   * Add a breadcrumb for debugging
+   * Add a breadcrumb for debugging. Data is accepted for local call-site
+   * compatibility but removed by beforeBreadcrumb before export.
    */
   addBreadcrumb(
     message: string,
