@@ -1,6 +1,6 @@
 /**
  * Profile Index Screen
- * Main profile hub with navigation to all profile sections
+ * Main profile hub with navigation to launch-safe profile sections
  */
 
 import React from 'react';
@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore, useCareReadiness, useSelectedMember } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSafetyContacts } from '../../features/safety/store';
 
 const menuSections = [
   {
@@ -29,12 +30,6 @@ const menuSections = [
         title: 'Family Members',
         screen: 'FamilyMembers',
       },
-      {
-        id: 'addresses' as const,
-        icon: 'location-outline',
-        title: 'Care Addresses',
-        screen: 'Addresses',
-      },
     ],
   },
   {
@@ -46,19 +41,7 @@ const menuSections = [
         title: 'Care History',
         screen: 'CareHistory',
       },
-      {
-        id: 'records' as const,
-        icon: 'folder-outline',
-        title: 'Health Records',
-        screen: 'HealthRecords',
-      },
       { id: 'vitals' as const, icon: 'pulse-outline', title: 'Vitals', screen: 'Vitals' },
-      {
-        id: 'insurance' as const,
-        icon: 'shield-checkmark-outline',
-        title: 'Insurance',
-        screen: 'Insurance',
-      },
       {
         id: 'payments' as const,
         icon: 'receipt-outline',
@@ -98,13 +81,13 @@ export default function ProfileIndexScreen() {
   const navigation = useNavigation() as AppNavigationProp;
 
   const user = useProfileStore((state) => state.user);
-  const emergencyContacts = useProfileStore((state) => state.emergencyContacts);
+  const emergencyContacts = useSafetyContacts();
   // Use the auth-store logout: clears JWT + SecureStorage and flips
   // isAuthenticated (returns to login). It also clears the profile store.
   const logout = useAuthStore((state) => state.logout);
 
   const selectedMember = useSelectedMember();
-  const careReadiness = useCareReadiness();
+  const careReadiness = useCareReadiness(selectedMember?.id);
 
   // Get display name
   const displayName = user?.firstName
@@ -159,7 +142,7 @@ export default function ProfileIndexScreen() {
       title: 'Emergency Contact',
       value:
         emergencyContacts.length > 0
-          ? `${emergencyContacts[0].name} (${emergencyContacts[0].relationship})`
+          ? `${emergencyContacts[0].name}${emergencyContacts[0].relationship ? ` (${emergencyContacts[0].relationship})` : ''}`
           : 'Not set',
       color: colors.success,
       screen: 'EmergencyContacts',
