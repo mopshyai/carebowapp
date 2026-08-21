@@ -1,9 +1,10 @@
 /**
  * Family Members Screen
- * List, add, edit, and delete family members
+ * List, add, edit, and delete family members.
+ * Backend Profiles are the account source of truth; Zustand/AsyncStorage is a cache.
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -14,18 +15,21 @@ import {
   Alert,
   Modal,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { profilesApi } from '../../services/api/endpoints/profiles';
 import {
   mapGender,
   normalizeDateOfBirth,
   relationshipForBackend,
 } from '../../lib/profileSync';
+import { hydrateOwnedProfilesFromServer } from '../../lib/profileRepository';
 import {
   FamilyMember,
   Gender,
@@ -57,6 +61,7 @@ const GENDER_OPTIONS: Array<{ value: Exclude<Gender, 'prefer_not_to_say'>; label
 export default function FamilyMembersScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const userId = useAuthStore((state) => state.user?.id);
 
   const members = useProfileStore((state) => state.members);
   const addMember = useProfileStore((state) => state.addMember);
@@ -70,6 +75,38 @@ export default function FamilyMembersScreen() {
   const [newDateOfBirth, setNewDateOfBirth] = useState('');
   const [newGender, setNewGender] = useState<Exclude<Gender, 'prefer_not_to_say'> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const refreshProfiles = useCallback(
+    async (showSpinner = false) => {
+      if (!userId) return;
+      if (showSpinner) setIsRefreshing(true);
+
+      try {
+        await hydrateOwnedProfilesFromServer(userId);
+        setSyncError(null);
+      } catch (error) {
+        setSyncError(
+          error instanceof Error
+            ? error.message
+            : 'Could not refresh your CareBow account profiles.'
+        );
+      } finally {
+        if (showSpinner) setIsRefreshing(false);
+      }
+    },
+    [userId]
+  );
+
+  // Refresh on every focus so a profile created/edited/deleted on another device
+  // is reflected here. A failed read leaves the last local cache visible but is
+  // labeled honestly below; it never replaces server data with an empty list.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshProfiles(false);
+    }, [refreshProfiles])
+  );
 
   const resetAddForm = () => {
     setNewFirstName('');
@@ -128,6 +165,7 @@ export default function FamilyMembersScreen() {
 
       setShowAddModal(false);
       resetAddForm();
+      setSyncError(null);
       Alert.alert('Family member added', 'This profile is saved to your CareBow account.');
     } catch (error) {
       // If the server row was created but the local cache write unexpectedly
@@ -136,8 +174,8 @@ export default function FamilyMembersScreen() {
         try {
           await profilesApi.deleteProfile(createdBackendId);
         } catch {
-          // The primary failure is still shown below. A future successful GET
-          // /v1/profiles will reveal any row the rollback could not remove.
+          // The primary failure is still shown below. A future successful refresh
+          // will reveal any row the rollback could not remove.
         }
       }
       Alert.alert(
@@ -188,6 +226,8 @@ export default function FamilyMembersScreen() {
   };
 
   const handleSetDefault = (member: FamilyMember) => {
+    // Default member is an app preference; the Profile API does not claim to
+    // persist it and the UI does not label it as an account-wide setting.
     setDefaultMember(member.id);
     Alert.alert('Default member updated', `${member.firstName} is now selected by default.`);
   };
@@ -214,6 +254,12 @@ export default function FamilyMembersScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void refreshProfiles(true)}
+          />
+        }
       >
         {/* Info Card */}
         <View style={styles.infoCard}>
@@ -225,6 +271,15 @@ export default function FamilyMembersScreen() {
             )}
           </Text>
         </View>
+
+        {syncError && (
+          <View style={styles.syncWarning}>
+            <Icon name="cloud-offline-outline" size={20} color={colors.warning} />
+            <Text style={styles.syncWarningText}>
+              Account refresh failed. Showing the last data saved on this device. Pull down to retry.
+            </Text>
+          </View>
+        )}
 
         {/* Members List */}
         {members.length > 0 ? (
@@ -387,7 +442,9 @@ export default function FamilyMembersScreen() {
                   maxLength={10}
                   editable={!isSaving}
                 />
-                <Text style={styles.fieldHint}>Used for age-appropriate safety checks. We never guess this.</Text>
+                <Text style={styles.fieldHint}>
+                  Used for age-appropriate safety checks. We never guess this.
+                </Text>
               </View>
 
               {/* Gender */}
@@ -504,6 +561,19 @@ const styles = StyleSheet.create({
   infoText: {
     ...typography.bodySmall,
     color: colors.accent,
+    flex: 1,
+  },
+  syncWarning: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.warningSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  syncWarningText: {
+    ...typography.bodySmall,
+    color: colors.warning,
     flex: 1,
   },
   membersList: {
@@ -659,7 +729,6 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textInverse,
   },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: colors.surface2,
