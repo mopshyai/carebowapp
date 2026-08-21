@@ -67,10 +67,7 @@ import { formatFollowUpDate } from '../types/followUp';
 import { resetShownExplanations } from '../utils/questionExplanations';
 import { detectMissingInfo } from '../utils/missingInfoDetector';
 
-function isSafetyBypass(response: {
-  isEmergency?: boolean;
-  urgencyLevel?: string;
-}): boolean {
+function isSafetyBypass(response: { isEmergency?: boolean; urgencyLevel?: string }): boolean {
   return (
     response.isEmergency === true ||
     response.urgencyLevel === 'emergency' ||
@@ -202,8 +199,8 @@ export default function ConversationScreen() {
       const requestId = createAskCarebowTurnRequestId();
 
       try {
-        // Safety classification happens before monetization. Emergency/urgent
-        // guidance is never suppressed because a trial or quota ended.
+        // Run deterministic safety before monetization. Emergency/urgent
+        // guidance is always allowed even if normal Ask access is exhausted.
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
@@ -312,8 +309,6 @@ export default function ConversationScreen() {
               displayMessages = [];
               void refreshEntitlement().catch(() => {});
             } else {
-              // For a true safety bypass the deterministic response remains the
-              // source of truth even if the network/AI writer is unavailable.
               logger.warn('Ask CareBow rewrite unavailable; using deterministic response', apiError);
             }
           }
@@ -562,19 +557,19 @@ export default function ConversationScreen() {
         )}
       </ScrollView>
 
-      {!accessBlocked && (
-        <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
-          <ChatInput
-            onSend={handleSendMessage}
-            disabled={isProcessing}
-            placeholder={
-              currentSession?.conversationState.phase === 'initial'
+      <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={isProcessing}
+          placeholder={
+            accessBlocked
+              ? 'Describe urgent or emergency symptoms...'
+              : currentSession?.conversationState.phase === 'initial'
                 ? 'Describe your symptoms...'
                 : 'Type your response...'
-            }
-          />
-        </View>
-      )}
+          }
+        />
+      </View>
     </KeyboardAvoidingView>
   );
 }
