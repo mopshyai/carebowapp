@@ -4,19 +4,20 @@
  * Uses Zustand with AsyncStorage persistence
  */
 
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { getDeviceTimeZone, safetyApi } from '@/services/api/endpoints/safety';
 import {
-  SafetyEvent,
-  SafetySettings,
-  SafetyContact,
-  SafetyPermissions,
   DEFAULT_SAFETY_SETTINGS,
-  createSafetyEvent,
-  createSafetyContact,
-  SafetyEventType,
+  SafetyContact,
+  SafetyEvent,
   SafetyEventMetadata,
+  SafetyEventType,
+  SafetyPermissions,
+  SafetySettings,
+  createSafetyContact,
+  createSafetyEvent,
 } from '../types';
 
 // ============================================
@@ -24,19 +25,10 @@ import {
 // ============================================
 
 type SafetyState = {
-  // Safety settings
   settings: SafetySettings;
-
-  // Safety events history
   events: SafetyEvent[];
-
-  // Safety contacts (separate from profile emergency contacts for flexibility)
   contacts: SafetyContact[];
-
-  // Permission states
   permissions: SafetyPermissions;
-
-  // UI state
   isLoading: boolean;
   sosInProgress: boolean;
 };
@@ -60,7 +52,7 @@ type SafetyActions = {
   getContactById: (id: string) => SafetyContact | undefined;
 
   // Check-in
-  recordCheckIn: () => SafetyEvent;
+  recordCheckIn: () => Promise<SafetyEvent | null>;
   recordMissedCheckIn: () => SafetyEvent;
   hasCheckedInToday: () => boolean;
   getLastCheckInTime: () => Date | null;
@@ -92,10 +84,6 @@ const initialState: SafetyState = {
   isLoading: false,
   sosInProgress: false,
 };
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 
 function isSameLocalDay(date1: Date, date2: Date): boolean {
   return (
@@ -129,7 +117,7 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
       addEvent: (type, metadata = {}) => {
         const event = createSafetyEvent(type, 'guest', metadata);
         set((state) => ({
-          events: [event, ...state.events].slice(0, 100), // Keep last 100 events
+          events: [event, ...state.events].slice(0, 100),
         }));
         return event;
       },
@@ -146,11 +134,9 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
       addContact: (contactData) => {
         const contact = createSafetyContact({
           ...contactData,
-          // If no contacts exist, make this one primary
           isPrimary: get().contacts.length === 0 ? true : contactData.isPrimary,
         });
 
-        // If this contact is primary, unset primary on others
         if (contact.isPrimary) {
           set((state) => ({
             contacts: [...state.contacts.map((c) => ({ ...c, isPrimary: false })), contact],
@@ -178,8 +164,6 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
         const deletedContact = contacts.find((c) => c.id === id);
         const remainingContacts = contacts.filter((c) => c.id !== id);
 
-        // If deleted contact was primary and there are remaining contacts,
-        // make the first one primary
         if (deletedContact?.isPrimary && remainingContacts.length > 0) {
           remainingContacts[0].isPrimary = true;
         }
@@ -197,23 +181,25 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
         }));
       },
 
-      getPrimaryContact: () => {
-        return get().contacts.find((c) => c.isPrimary);
-      },
-
-      getContactById: (id) => {
-        return get().contacts.find((c) => c.id === id);
-      },
+      getPrimaryContact: () => get().contacts.find((c) => c.isPrimary),
+      getContactById: (id) => get().contacts.find((c) => c.id === id),
 
       // ========== CHECK-IN ==========
-      recordCheckIn: () => {
-        const now = new Date().toISOString();
+      recordCheckIn: async () => {
+        // A local green check without backend confirmation is dangerous: the
+        // server could still mark the person MISSED and alert family. Only
+        // record success locally after the JWT endpoint accepts "I'm OK".
+        const response = await safetyApi.completeDailyCheckIn();
+        if (!response?.success || !response.checkIn) {
+          return null;
+        }
+
+        const now = response.checkIn.checkedInAt ?? new Date().toISOString();
         const state = get();
         const wasLate = Boolean(
           state.settings.lastMissedCheckInAt &&
           isSameLocalDay(new Date(state.settings.lastMissedCheckInAt), new Date())
         );
-
         const event = createSafetyEvent('CHECKIN_CONFIRMED', 'guest', { wasLate });
 
         set((s) => ({
@@ -245,11 +231,7 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
       hasCheckedInToday: () => {
         const { lastCheckInAt } = get().settings;
         if (!lastCheckInAt) return false;
-
-        const lastCheckIn = new Date(lastCheckInAt);
-        const today = new Date();
-
-        return isSameLocalDay(lastCheckIn, today);
+        return isSameLocalDay(new Date(lastCheckInAt), new Date());
       },
 
       getLastCheckInTime: () => {
@@ -299,6 +281,19 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
         contacts: state.contacts,
         permissions: state.permissions,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Migrate users from the old local-only build. Re-sending the schedule
+        // is idempotent and ensures the backend knows about an already-enabled
+        // check-in without requiring the user to toggle the setting off/on.
+        const settings = state?.settings;
+        if (!settings?.dailyCheckInEnabled) return;
+        void safetyApi.updateDailyCheckIn({
+          enabled: true,
+          time: settings.dailyCheckInTime,
+          gracePeriodMinutes: settings.gracePeriodMinutes,
+          timezone: getDeviceTimeZone(),
+        });
+      },
     }
   )
 );
@@ -308,28 +303,17 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
 // ============================================
 
 export const useSafetySettings = () => useSafetyStore((state) => state.settings);
-
 export const useSafetyContacts = () => useSafetyStore((state) => state.contacts);
-
-// Note: Returns raw events array - consumers should slice if needed
 export const useSafetyEvents = () => useSafetyStore((state) => state.events);
-
 export const useSafetyPermissions = () => useSafetyStore((state) => state.permissions);
-
 export const useSOSInProgress = () => useSafetyStore((state) => state.sosInProgress);
-
 export const usePrimaryContact = () =>
   useSafetyStore((state) => state.contacts.find((c) => c.isPrimary));
 
 export const useHasCheckedInToday = () => {
   const lastCheckInAt = useSafetyStore((state) => state.settings.lastCheckInAt);
-
   if (!lastCheckInAt) return false;
-
-  const lastCheckIn = new Date(lastCheckInAt);
-  const today = new Date();
-
-  return isSameLocalDay(lastCheckIn, today);
+  return isSameLocalDay(new Date(lastCheckInAt), new Date());
 };
 
 export const useCheckInEnabled = () =>
