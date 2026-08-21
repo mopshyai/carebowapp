@@ -22,7 +22,6 @@ export default function CareHistoryScreen() {
   const navigation = useNavigation<any>();
   const sessions = useAskCarebowStore((state) => state.sessions);
   const [tab, setTab] = useState<Tab>('all');
-  // Shared store, so history and the bookings list cannot disagree.
   const bookings = useBookingsStore((s) => s.bookings);
   const status = useBookingsStore((s) => s.status);
   const storeError = useBookingsStore((s) => s.error);
@@ -48,12 +47,13 @@ export default function CareHistoryScreen() {
   );
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const items = useMemo(() => {
     const bookingItems = bookings.map((booking) => ({
       id: `booking-${booking.id}`,
+      bookingId: booking.id,
       kind: 'booking' as const,
       title: booking.service?.name || 'Care service',
       subtitle: booking.profile?.name || 'Care recipient',
@@ -134,11 +134,14 @@ export default function CareHistoryScreen() {
                 <TouchableOpacity
                   key={item.id}
                   style={styles.card}
-                  activeOpacity={item.kind === 'conversation' ? 0.7 : 1}
-                  onPress={() =>
-                    item.kind === 'conversation' &&
-                    navigation.navigate('Conversation', { sessionId: item.sessionId })
-                  }
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    if (item.kind === 'booking') {
+                      navigation.navigate('OrderDetails', { id: item.bookingId });
+                    } else {
+                      navigation.navigate('Conversation', { sessionId: item.sessionId });
+                    }
+                  }}
                 >
                   <View style={styles.iconWrap}>
                     <Icon
@@ -162,7 +165,10 @@ export default function CareHistoryScreen() {
                       })}
                     </Text>
                   </View>
-                  <Text style={styles.status}>{item.status}</Text>
+                  <View style={styles.trailing}>
+                    <Text style={styles.status}>{item.status}</Text>
+                    <Icon name="chevron-forward" size={16} color={colors.textTertiary} />
+                  </View>
                 </TouchableOpacity>
               ))
             )}
@@ -243,5 +249,6 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.label, color: colors.textPrimary },
   cardSubtitle: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 2 },
   cardDate: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.xxs },
+  trailing: { alignItems: 'flex-end', gap: spacing.xxs },
   status: { ...typography.caption, color: colors.accent, textTransform: 'capitalize' },
 });
