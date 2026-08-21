@@ -187,13 +187,12 @@ export default function OrderDetailsScreen() {
     ['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(booking.status);
   const busy = paying || checkout.busy;
 
-  const medicines = Array.isArray(booking.prescription?.medicines)
-    ? booking.prescription.medicines
-    : [];
-  const labTests = Array.isArray(booking.prescription?.labTests)
-    ? booking.prescription.labTests
-    : [];
-  const hasOutcome = Boolean(booking.consultationNote || booking.prescription);
+  const prescription = booking.prescription ?? null;
+  const medicines =
+    prescription && Array.isArray(prescription.medicines) ? prescription.medicines : [];
+  const labTests =
+    prescription && Array.isArray(prescription.labTests) ? prescription.labTests : [];
+  const hasOutcome = Boolean(booking.consultationNote || prescription);
 
   return (
     <ScrollView
@@ -252,7 +251,7 @@ export default function OrderDetailsScreen() {
             </>
           )}
 
-          {booking.prescription && (
+          {prescription && (
             <View style={styles.prescriptionBlock}>
               <Text style={styles.subheading}>Prescription / next steps</Text>
               {medicines.map((medicine, index) => {
@@ -277,17 +276,17 @@ export default function OrderDetailsScreen() {
                   <Text style={styles.value}>{labTests.join(', ')}</Text>
                 </>
               ) : null}
-              {booking.prescription.advice ? (
+              {prescription.advice ? (
                 <>
                   <Text style={styles.label}>Advice</Text>
-                  <Text style={styles.value}>{booking.prescription.advice}</Text>
+                  <Text style={styles.value}>{prescription.advice}</Text>
                 </>
               ) : null}
-              {booking.prescription.nextReview ? (
+              {prescription.nextReview ? (
                 <>
                   <Text style={styles.label}>Next review</Text>
                   <Text style={styles.value}>
-                    {new Date(booking.prescription.nextReview).toLocaleDateString()}
+                    {new Date(prescription.nextReview).toLocaleDateString()}
                   </Text>
                 </>
               ) : null}
