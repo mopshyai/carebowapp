@@ -98,3 +98,53 @@ describe('processUserInput in the talking phase', () => {
     expect(response.phaseUpdate).toBe('gathering');
   });
 });
+
+describe('processUserInput after guidance', () => {
+  it('re-routes a doctor request instead of treating it as a symptom follow-up', async () => {
+    const response = await processUserInput(
+      'actually connect me to a doctor',
+      'guidance',
+      createEmptyHealthContext(),
+      []
+    );
+
+    expect(response.phaseUpdate).toBe('service_routing');
+    expect(response.intent).toBe('want_doctor');
+    expect(response.serviceRecommendations?.[0].serviceId).toBe('video_consult');
+  });
+
+  it('re-routes a lab-test request after guidance', async () => {
+    const response = await processUserInput(
+      'I want to book a lab test',
+      'guidance',
+      createEmptyHealthContext(),
+      []
+    );
+
+    expect(response.phaseUpdate).toBe('service_routing');
+    expect(response.intent).toBe('want_test');
+    expect(response.serviceRecommendations?.[0].serviceId).toBe('lab_test');
+  });
+
+  it('answers identity questions instead of repeating the symptom-status prompt', async () => {
+    const response = await processUserInput(
+      'who are you?',
+      'guidance',
+      createEmptyHealthContext(),
+      []
+    );
+
+    expect(response.messages[0].text).toContain('Ask CareBow');
+    expect(response.messages[0].text).toContain('AI health assistant');
+    expect(response.messages[0].text).not.toContain('staying the same');
+  });
+
+  it('does not loop the same better-or-worse question on an unmatched reply', async () => {
+    const response = await processUserInput('no', 'guidance', createEmptyHealthContext(), []);
+
+    expect(response.messages[0].text).not.toContain(
+      'Are your symptoms staying the same, getting better, or getting worse?'
+    );
+    expect(response.messages[0].text).toContain('specific worry');
+  });
+});
