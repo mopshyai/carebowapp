@@ -26,6 +26,7 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [unconfirmedOrderId, setUnconfirmedOrderId] = useState<string | null>(null);
 
   // Same hosted flow as the booking checkout: Razorpay's page collects, the
   // webhook records, and this screen only asks what happened.
@@ -73,6 +74,47 @@ export default function OrderDetailsScreen() {
     }
   };
 
+  const reconcileSettlementStatus = async (orderId: string) => {
+    if (!id) return;
+
+    try {
+      const status = await paymentsApi.getPaymentStatus(orderId);
+      if (!status.success) {
+        throw new Error(status.error || 'Could not confirm payment status');
+      }
+
+      if (status.status === 'SUCCESS') {
+        setUnconfirmedOrderId(null);
+        await fetchOne(id);
+        Alert.alert('Payment received', 'This booking is now paid in full.');
+        return;
+      }
+
+      if (status.status === 'FAILED' || status.status === 'REFUNDED') {
+        setUnconfirmedOrderId(null);
+        await fetchOne(id);
+        Alert.alert(
+          status.status === 'REFUNDED' ? 'Payment refunded' : 'Payment not completed',
+          status.status === 'REFUNDED'
+            ? 'This payment was refunded. You can start a new payment if a balance is still due.'
+            : 'Nothing was confirmed for this order. You can try payment again.'
+        );
+        return;
+      }
+
+      await fetchOne(id);
+      Alert.alert(
+        'Still confirming your payment',
+        'CareBow is still waiting for Razorpay confirmation. This booking is locked to the existing payment so you cannot accidentally pay twice.'
+      );
+    } catch {
+      Alert.alert(
+        'Could not confirm payment yet',
+        'Do not pay again. Check your connection, then use “Check payment status” again.'
+      );
+    }
+  };
+
   /**
    * Pay for a booking that already exists — a quote priced after assessment, one
    * raised on the customer's behalf, or a checkout they abandoned. The amount is
@@ -82,6 +124,11 @@ export default function OrderDetailsScreen() {
     if (!id) return;
     setPaying(true);
     try {
+      if (unconfirmedOrderId) {
+        await reconcileSettlementStatus(unconfirmedOrderId);
+        return;
+      }
+
       const order = await paymentsApi.createSettleOrder({
         bookingId: id,
         hosted: true,
@@ -104,11 +151,12 @@ export default function OrderDetailsScreen() {
       } else if (outcome.status === 'failed') {
         Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
       } else {
-        // Not a failure — the webhook may still be on its way.
+        // Keep this booking locked to the same order until server truth is known.
+        setUnconfirmedOrderId(order.orderId);
         await fetchOne(id);
         Alert.alert(
           'Still confirming your payment',
-          'If you completed payment this booking will show as paid shortly. Check here before paying again.'
+          'If you completed payment this booking will show as paid shortly. This screen will only recheck the same payment until CareBow knows the result.'
         );
       }
     } finally {
@@ -174,9 +222,19 @@ export default function OrderDetailsScreen() {
           onPress={payNow}
           disabled={busy}
         >
-          <Icon name="card-outline" size={18} color={colors.textInverse} />
+          <Icon
+            name={unconfirmedOrderId ? 'refresh' : 'card-outline'}
+            size={18}
+            color={colors.textInverse}
+          />
           <Text style={styles.payText}>
-            {busy ? 'Opening payment…' : `Pay ${money(booking.amount, booking.currency)}`}
+            {busy
+              ? unconfirmedOrderId
+                ? 'Checking payment…'
+                : 'Opening payment…'
+              : unconfirmedOrderId
+                ? 'Check payment status'
+                : `Pay ${money(booking.amount, booking.currency)}`}
           </Text>
         </TouchableOpacity>
       )}

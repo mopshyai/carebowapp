@@ -36,6 +36,12 @@ import { colors, radius, spacing, typography } from '../theme';
 // India, USD elsewhere — so the card and the Razorpay page agree.
 const money = (amountMinor: number, currency: string) => formatMinor(amountMinor, currency);
 
+type UnconfirmedPlanPayment = {
+  orderId: string;
+  planId: string;
+  planTitle: string;
+};
+
 export default function CarePlansScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -46,6 +52,9 @@ export default function CarePlansScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [unconfirmedPayment, setUnconfirmedPayment] = useState<UnconfirmedPlanPayment | null>(
+    null
+  );
 
   const checkout = useHostedCheckout();
 
@@ -72,9 +81,58 @@ export default function CarePlansScreen() {
     void load();
   }, [load]);
 
+  const refreshPlanTruth = async () => {
+    await refreshUser();
+    await load();
+  };
+
+  const recheckPlanPayment = async (pending: UnconfirmedPlanPayment) => {
+    try {
+      const status = await paymentsApi.getPaymentStatus(pending.orderId);
+      if (!status.success) {
+        throw new Error(status.error || 'Could not confirm payment status');
+      }
+
+      if (status.status === 'SUCCESS') {
+        setUnconfirmedPayment(null);
+        await refreshPlanTruth();
+        Alert.alert('You are on the new plan', `${pending.planTitle} is now active on your account.`);
+        return;
+      }
+
+      if (status.status === 'FAILED' || status.status === 'REFUNDED') {
+        setUnconfirmedPayment(null);
+        await refreshPlanTruth();
+        Alert.alert(
+          status.status === 'REFUNDED' ? 'Payment refunded' : 'Payment not completed',
+          status.status === 'REFUNDED'
+            ? 'This payment was refunded. You can start a new purchase if you still want the plan.'
+            : 'Nothing was confirmed for this order. You can try again.'
+        );
+        return;
+      }
+
+      await refreshPlanTruth();
+      Alert.alert(
+        'Still confirming your payment',
+        'CareBow is still waiting for Razorpay confirmation. Plan purchases are locked to this payment so you cannot accidentally pay twice.'
+      );
+    } catch {
+      Alert.alert(
+        'Could not confirm payment yet',
+        'Do not pay again. Check your connection, then use “Check payment status” again.'
+      );
+    }
+  };
+
   const buy = async (plan: Plan) => {
     setBuyingId(plan.id);
     try {
+      if (unconfirmedPayment) {
+        await recheckPlanPayment(unconfirmedPayment);
+        return;
+      }
+
       const order = await paymentsApi.createPlanOrder({
         planSlug: plan.id,
         hosted: true,
@@ -93,17 +151,20 @@ export default function CarePlansScreen() {
 
       if (outcome.status === 'paid') {
         // The upgrade lands on the user record, so refresh it before saying so.
-        await refreshUser();
-        await load();
+        await refreshPlanTruth();
         Alert.alert('You are on the new plan', `${plan.title} is now active on your account.`);
       } else if (outcome.status === 'failed') {
         Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
       } else {
-        await refreshUser();
-        await load();
+        setUnconfirmedPayment({
+          orderId: order.orderId,
+          planId: plan.id,
+          planTitle: plan.title,
+        });
+        await refreshPlanTruth();
         Alert.alert(
           'Still confirming your payment',
-          'If you completed payment your plan will update shortly. Check here before paying again.'
+          'If you completed payment your plan will update shortly. CareBow will only recheck this same payment until the result is known.'
         );
       }
     } finally {
@@ -111,7 +172,8 @@ export default function CarePlansScreen() {
     }
   };
 
-  const busy = (planId: string) => buyingId === planId || checkout.busy;
+  const busy = (planId: string) =>
+    buyingId === planId || checkout.busy || (!!unconfirmedPayment && unconfirmedPayment.planId !== planId);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
@@ -180,9 +242,13 @@ export default function CarePlansScreen() {
                     disabled={busy(plan.id)}
                   >
                     <Text style={styles.buttonText}>
-                      {busy(plan.id)
-                        ? 'Opening payment…'
-                        : `Subscribe · ${money(plan.amount, plan.currency)}`}
+                      {buyingId === plan.id || checkout.busy
+                        ? unconfirmedPayment?.planId === plan.id
+                          ? 'Checking payment…'
+                          : 'Opening payment…'
+                        : unconfirmedPayment?.planId === plan.id
+                          ? 'Check payment status'
+                          : `Subscribe · ${money(plan.amount, plan.currency)}`}
                     </Text>
                   </TouchableOpacity>
                 )}
