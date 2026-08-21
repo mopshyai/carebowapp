@@ -35,7 +35,12 @@ export function localRelationshipFromBackend(value: string): Relationship {
   const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ');
 
   if (normalized === 'self' || normalized === 'myself') return 'self';
-  if (normalized === 'spouse' || normalized === 'partner' || normalized === 'wife' || normalized === 'husband') {
+  if (
+    normalized === 'spouse' ||
+    normalized === 'partner' ||
+    normalized === 'wife' ||
+    normalized === 'husband'
+  ) {
     return 'spouse';
   }
   if (['parent', 'mother', 'father', 'mom', 'dad'].includes(normalized)) return 'parent';
@@ -50,7 +55,7 @@ export function localRelationshipFromBackend(value: string): Relationship {
 function splitName(name: string): { firstName: string; lastName: string } {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return {
-    firstName: parts[0] || 'Patient',
+    firstName: parts[0] || '',
     lastName: parts.slice(1).join(' '),
   };
 }
@@ -74,7 +79,7 @@ function parseMedications(value?: string | null) {
       id: generateId(),
       name,
       dosage,
-      frequency: frequency || 'As directed',
+      frequency,
     };
   });
 }
@@ -82,9 +87,13 @@ function parseMedications(value?: string | null) {
 /**
  * Convert the server Profile into the mobile cache shape.
  *
- * Server-backed clinical fields replace the cache. Fields the current backend
- * cannot represent (height/weight/mobility/notes/care preferences) are preserved
- * only on an existing device and are never presented as cloud-synced data.
+ * Server-backed clinical fields replace the cache. The backend currently stores
+ * allergy/condition names but not their severity/status, so imported entries
+ * are explicitly `unknown` rather than fabricated as moderate/active.
+ *
+ * Fields the current backend cannot represent (height/weight/mobility/notes/care
+ * preferences) are preserved only on an existing device and are never presented
+ * as cloud-synced data.
  */
 export function memberInputFromBackend(
   profile: V1Profile,
@@ -111,12 +120,12 @@ export function memberInputFromBackend(
       allergies: splitCommaList(profile.allergies).map((name) => ({
         id: generateId(),
         name,
-        severity: 'moderate' as const,
+        severity: 'unknown' as const,
       })),
       conditions: splitCommaList(profile.conditions).map((name) => ({
         id: generateId(),
         name,
-        status: 'active' as const,
+        status: 'unknown' as const,
       })),
       medications: parseMedications(profile.medications),
     },
