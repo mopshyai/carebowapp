@@ -3,7 +3,11 @@
  * Export all modules for the AI Health Assistant
  */
 
-export * from './conversationEngine';
+// The legacy engine remains available to focused regression tests, but the app
+// entry point uses the conservative clinical fallback gate so a shadowed or
+// unavailable server orchestrator cannot skip required intake fields.
+export type { ConversationResponse } from './conversationEngine';
+export { processSafeFallbackUserInput as processUserInput } from './safeFallbackEngine';
 export * from './followUpQuestions';
 export * from './safetyClassifier';
 export * from './serviceRouter';
