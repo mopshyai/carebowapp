@@ -28,6 +28,10 @@ import { Message, QuickOption } from '../types/askCarebow';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
 import { processUserInput } from '../lib/askCarebow';
+import {
+  detectEmergencyWithContext,
+  extractPatientContext,
+} from '../lib/askCarebow/safetyClassifier';
 import { askCareBowApi } from '../services/api/endpoints/askCareBow';
 import {
   askCarebowEntitlementApi,
@@ -199,15 +203,20 @@ export default function ConversationScreen() {
       const requestId = createAskCarebowTurnRequestId();
 
       try {
-        // Run deterministic safety before monetization. Emergency/urgent
-        // guidance is always allowed even if normal Ask access is exhausted.
+        // Run deterministic safety before monetization. The context-aware pass
+        // catches pediatric, pregnancy and senior-specific red flags on every
+        // turn, not just broad generic emergency phrases.
         const response = await processUserInput(
           text,
           currentSession.conversationState.phase,
           currentSession.healthContext,
           currentSession.conversationState.questionsAsked
         );
-        const safetyBypass = isSafetyBypass(response);
+        const contextEmergency = detectEmergencyWithContext(
+          text,
+          extractPatientContext(currentSession.healthContext)
+        );
+        const safetyBypass = contextEmergency.isEmergency || isSafetyBypass(response);
 
         if (!safetyBypass) {
           let currentAccess: AskCarebowEntitlement;
