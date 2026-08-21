@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safetyApi, getDeviceTimezone } from '@/services/api/endpoints/safety';
 import {
   SafetyEvent,
   SafetySettings,
@@ -105,6 +106,16 @@ function isSameLocalDay(date1: Date, date2: Date): boolean {
   );
 }
 
+const SERVER_CHECKIN_SETTING_KEYS: Array<keyof SafetySettings> = [
+  'dailyCheckInEnabled',
+  'dailyCheckInTime',
+  'gracePeriodMinutes',
+];
+
+function changesServerCheckInSchedule(updates: Partial<SafetySettings>): boolean {
+  return SERVER_CHECKIN_SETTING_KEYS.some((key) => Object.prototype.hasOwnProperty.call(updates, key));
+}
+
 // ============================================
 // STORE IMPLEMENTATION
 // ============================================
@@ -116,9 +127,48 @@ export const useSafetyStore = create<SafetyState & SafetyActions>()(
 
       // ========== SETTINGS ==========
       updateSettings: (updates) => {
-        set((state) => ({
-          settings: { ...state.settings, ...updates },
-        }));
+        if (!changesServerCheckInSchedule(updates)) {
+          set((state) => ({
+            settings: { ...state.settings, ...updates },
+          }));
+          return;
+        }
+
+        // Daily check-in is a server-enforced safety promise, not just a local
+        // preference. Do not flip the local state to enabled/change its schedule
+        // until the backend has persisted the exact schedule it will enforce.
+        const next = { ...get().settings, ...updates };
+        void safetyApi
+          .saveDailyCheckInSettings({
+            enabled: next.dailyCheckInEnabled,
+            time: next.dailyCheckInTime,
+            gracePeriodMinutes: next.gracePeriodMinutes,
+            timezone: getDeviceTimezone(),
+          })
+          .then((response) => {
+            if (!response?.success || !response.settings) {
+              console.warn(
+                '[Safety] Daily check-in schedule was not accepted by CareBow; keeping previous local settings.'
+              );
+              return;
+            }
+
+            set((state) => ({
+              settings: {
+                ...state.settings,
+                dailyCheckInEnabled: response.settings!.enabled,
+                dailyCheckInTime: response.settings!.time,
+                gracePeriodMinutes: response.settings!.gracePeriodMinutes,
+              },
+            }));
+          })
+          .catch(() => {
+            // safetyApi already normalizes transport failures to null, but keep
+            // this fail-closed guard in case its implementation changes.
+            console.warn(
+              '[Safety] Daily check-in schedule sync failed; keeping previous local settings.'
+            );
+          });
       },
 
       resetSettings: () => {
