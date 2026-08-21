@@ -32,6 +32,8 @@ export type AskCareBowMessagePayload = {
   memorySnapshot: MemorySnapshot;
   conversationId?: string;
   systemPrompt?: string;
+  /** Stable id for this user turn so retries cannot consume quota twice. */
+  requestId?: string;
 };
 
 export type AskCareBowMessageResponse = {
@@ -45,6 +47,10 @@ export type AskCareBowMessageResponse = {
 
 const emergencyPattern =
   /(?:difficulty breathing|can(?:not|'t) breathe|chest pain|unconscious|seizure|stroke|severe bleeding|suicid)/i;
+
+function createTurnRequestId(): string {
+  return `ask-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 export async function sendAskCareBowMessage(
   payload: AskCareBowMessagePayload
@@ -65,6 +71,7 @@ export async function sendAskCareBowMessage(
     messageText: payload.messageText,
     draftResponse: safetyDraft,
     forWhom: payload.context.forWhom,
+    requestId: payload.requestId || createTurnRequestId(),
   });
   if (!response.success || !response.assistantMessage) {
     throw new Error(response.error || 'Ask CareBow is unavailable');
@@ -103,5 +110,6 @@ export function createMessagePayload(
     memorySnapshot,
     conversationId,
     systemPrompt: conversationId ? undefined : HEALTH_BUDDY_SYSTEM_PROMPT,
+    requestId: createTurnRequestId(),
   };
 }
