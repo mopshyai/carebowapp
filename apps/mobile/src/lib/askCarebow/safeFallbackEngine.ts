@@ -8,7 +8,10 @@ import type {
   UrgencyLevel,
 } from '@/types/askCarebow';
 
-import { processUserInput as processLegacyUserInput, type ConversationResponse } from './conversationEngine';
+import {
+  processUserInput as processLegacyUserInput,
+  type ConversationResponse,
+} from './conversationEngine';
 import { classifyIntent } from './intentClassifier';
 import { detectEmergency, assessUrgency } from './safetyClassifier';
 import { getFollowUpQuestion } from './followUpQuestions';
@@ -57,7 +60,6 @@ function parseDurationSafely(text: string): Duration | undefined {
   }
   if (/\b(chronic|ongoing for a long time|always)\b/.test(value)) return 'chronic';
 
-  // Preserve the existing quick-option values without guessing from unknown text.
   if (
     value === 'just_now' ||
     value === 'today' ||
@@ -75,8 +77,15 @@ function parseDurationSafely(text: string): Duration | undefined {
 
 function parseSeveritySafely(text: string): Severity | undefined {
   const value = text.toLowerCase().trim();
-  const numeric = value.match(/(?:^|\b)(10|[1-9])(?:\s*(?:\/|out of)\s*10)?(?:\b|$)/);
-  if (numeric) return Number(numeric[1]) as Severity;
+
+  // A bare 1-10 answer is valid because this parser is also used directly on
+  // replies to the severity question. In a longer first symptom sentence, a
+  // number only counts as severity when the user explicitly writes x/10 or
+  // "x out of 10". This prevents "headache for 2 days" becoming severity 2.
+  const bareNumeric = value.match(/^(10|[1-9])$/);
+  if (bareNumeric) return Number(bareNumeric[1]) as Severity;
+  const ratedNumeric = value.match(/\b(10|[1-9])\s*(?:\/|out of)\s*10\b/);
+  if (ratedNumeric) return Number(ratedNumeric[1]) as Severity;
 
   if (/\b(mild|slight)\b/.test(value)) return 3;
   if (/\bmoderate\b/.test(value)) return 5;
@@ -88,8 +97,6 @@ function parseSeveritySafely(text: string): Severity | undefined {
 function parseAssociatedSymptomsSafely(text: string): string[] {
   const value = text.trim();
   if (/\b(none|no other|nothing else|just that|only that)\b/i.test(value)) return [];
-  // Preserve the patient's words rather than pretending a small keyword list
-  // captured everything they reported.
   return value ? [value.slice(0, 300)] : [];
 }
 
@@ -146,7 +153,6 @@ function monitoringInstruction(urgency: UrgencyLevel): string {
 }
 
 function formatClinicalGuidance(
-  context: HealthContext,
   urgency: UrgencyLevel,
   recommendations: ServiceRecommendation[],
   guidance: ReturnType<typeof buildGuidanceResponse>
@@ -210,7 +216,7 @@ function assessmentResponse(context: HealthContext): ConversationResponse {
   const assessment = assessUrgency(context);
   const recommendations = getServiceRecommendations(context, assessment.urgency);
   const guidance = buildGuidanceResponse(context, assessment, recommendations);
-  const text = formatClinicalGuidance(context, assessment.urgency, recommendations, guidance);
+  const text = formatClinicalGuidance(assessment.urgency, recommendations, guidance);
 
   const message: Omit<Message, 'id' | 'timestamp'> = {
     role: 'assistant',
@@ -238,12 +244,10 @@ export async function processSafeFallbackUserInput(
   userText: string,
   currentPhase: ConversationPhase,
   healthContext: HealthContext,
-  questionsAsked: Array<'duration' | 'severity' | 'associated_symptoms' | string>
+  questionsAsked: string[]
 ): Promise<ConversationResponse> {
   const normalized = userText.trim();
 
-  // Preserve the mature emergency/crisis response path exactly. This runs on
-  // every turn, including while an intake question is pending.
   if (detectEmergency(normalized.toLowerCase()).isEmergency) {
     return processLegacyUserInput(userText, currentPhase, healthContext, questionsAsked as any);
   }
