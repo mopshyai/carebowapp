@@ -4,12 +4,21 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import {
+  Alert,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, space, radius, typography, shadows, layout } from '@/theme/tokens';
 import { useProfileStore } from '@/store/useProfileStore';
+import { safetyApi, getDeviceTimezone } from '@/services/api/endpoints/safety';
 
 import {
   useSafetyStore,
@@ -62,14 +71,49 @@ export function SafetyHubScreen() {
   const recordMissedCheckIn = useSafetyStore((state) => state.recordMissedCheckIn);
   const triggerSOS = useSafetyStore((state) => state.triggerSOS);
   const addEvent = useSafetyStore((state) => state.addEvent);
-  const updateSettings = useSafetyStore((state) => state.updateSettings);
 
   // UI state
   const [showSOSSheet, setShowSOSSheet] = useState(false);
   const [showMissedCheckInModal, setShowMissedCheckInModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Check for missed check-in on mount
+  /**
+   * Reconcile local display state from the schedule/check-in the backend will
+   * actually enforce. Old builds persisted this feature only on-device; those
+   * values must not remain authoritative after server-backed escalation ships.
+   */
+  const syncServerCheckIn = useCallback(async () => {
+    const response = await safetyApi.getDailyCheckIn();
+    if (!response?.success || !response.settings) return false;
+
+    const serverCheckIn = response.checkIn;
+    const completedAt =
+      serverCheckIn?.completedAt ?? serverCheckIn?.checkedInAt ??
+      (serverCheckIn?.status === 'COMPLETED' ? serverCheckIn?.updatedAt : null);
+    const missedAt =
+      serverCheckIn?.status === 'MISSED'
+        ? serverCheckIn?.updatedAt ?? response.deadlineAt ?? new Date().toISOString()
+        : null;
+
+    useSafetyStore.setState((state) => ({
+      settings: {
+        ...state.settings,
+        dailyCheckInEnabled: response.settings!.enabled,
+        dailyCheckInTime: response.settings!.time,
+        gracePeriodMinutes: response.settings!.gracePeriodMinutes,
+        ...(completedAt ? { lastCheckInAt: completedAt } : {}),
+        ...(missedAt ? { lastMissedCheckInAt: missedAt } : {}),
+      },
+    }));
+    return true;
+  }, []);
+
+  // Server state wins on entry. This also repairs old local-only installs.
+  useEffect(() => {
+    void syncServerCheckIn();
+  }, [syncServerCheckIn]);
+
+  // Check for missed check-in after server reconciliation/local state changes.
   useEffect(() => {
     if (
       settings.dailyCheckInEnabled &&
@@ -100,35 +144,68 @@ export function SafetyHubScreen() {
   );
 
   const handleCheckIn = useCallback(async () => {
+    const response = await safetyApi.completeDailyCheckIn();
+    if (!response?.success) {
+      Alert.alert(
+        'Check-in not confirmed',
+        'CareBow could not confirm your check-in with the server. Please check your connection and try again.'
+      );
+      return;
+    }
+
     recordCheckIn();
+    setShowMissedCheckInModal(false);
   }, [recordCheckIn]);
 
   const handleEnableCheckIn = useCallback(async () => {
-    // Request notification permission
+    // Request notification permission for the local reminder. Server-side
+    // missed-check-in escalation does not depend on this permission.
     const permission = await requestNotificationPermission();
 
-    if (permission === 'granted') {
-      // Enable check-in and schedule notifications
-      updateSettings({ dailyCheckInEnabled: true });
-      await scheduleCheckInReminder({
-        checkInTime: settings.dailyCheckInTime,
-        gracePeriodMinutes: settings.gracePeriodMinutes,
-      });
-    } else {
-      // Enable anyway but warn about notifications
-      updateSettings({ dailyCheckInEnabled: true });
-      // Could show an alert here about notifications being disabled
+    const response = await safetyApi.saveDailyCheckInSettings({
+      enabled: true,
+      time: settings.dailyCheckInTime,
+      gracePeriodMinutes: settings.gracePeriodMinutes,
+      timezone: getDeviceTimezone(),
+    });
+
+    if (!response?.success || !response.settings) {
+      Alert.alert(
+        'Could not enable daily check-in',
+        response?.error ||
+          'CareBow could not save the safety schedule. Daily check-in was not enabled.'
+      );
+      return;
     }
-  }, [updateSettings, settings.dailyCheckInTime, settings.gracePeriodMinutes]);
+
+    // Only claim enabled after the server has accepted the schedule.
+    useSafetyStore.setState((state) => ({
+      settings: {
+        ...state.settings,
+        dailyCheckInEnabled: response.settings!.enabled,
+        dailyCheckInTime: response.settings!.time,
+        gracePeriodMinutes: response.settings!.gracePeriodMinutes,
+      },
+    }));
+
+    if (permission === 'granted') {
+      await scheduleCheckInReminder({
+        checkInTime: response.settings.time,
+        gracePeriodMinutes: response.settings.gracePeriodMinutes,
+      });
+    }
+  }, [settings.dailyCheckInTime, settings.gracePeriodMinutes]);
 
   const handleMissedCheckInNotify = useCallback(() => {
+    // Server escalation is automatic. This callback only records that the
+    // user explicitly requested an additional device-side contact alert.
     recordMissedCheckIn();
-    addEvent('TEST_ALERT_SENT', { note: 'Missed check-in notification sent' });
+    addEvent('TEST_ALERT_SENT', { note: 'Additional missed check-in contact alert requested' });
   }, [recordMissedCheckIn, addEvent]);
 
   const handleMissedCheckInOK = useCallback(() => {
-    recordCheckIn();
-  }, [recordCheckIn]);
+    void handleCheckIn();
+  }, [handleCheckIn]);
 
   const handleManageContacts = useCallback(() => {
     navigation.navigate('SafetyContacts');
@@ -140,8 +217,9 @@ export function SafetyHubScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    await syncServerCheckIn();
     setRefreshing(false);
-  }, []);
+  }, [syncServerCheckIn]);
 
   return (
     <View style={styles.container}>
