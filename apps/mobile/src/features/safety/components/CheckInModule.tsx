@@ -28,7 +28,8 @@ const logger = createLogger('CheckIn');
 interface CheckInModuleProps {
   state: CheckInState;
   enabled: boolean;
-  onCheckIn: () => Promise<void>;
+  /** Return false when the authoritative check-in was not confirmed. */
+  onCheckIn: () => Promise<boolean | void>;
   onEnableCheckIn?: () => void;
 }
 
@@ -103,10 +104,12 @@ export function CheckInModule({ state, enabled, onCheckIn, onEnableCheckIn }: Ch
     scale.value = withSequence(withTiming(0.95, { duration: 100 }), withSpring(1));
 
     try {
-      await onCheckIn();
+      const confirmed = await onCheckIn();
+      if (confirmed === false) return;
+
       await triggerSuccessHaptic();
 
-      // Show success animation
+      // Show success animation only after the authoritative check-in succeeds.
       checkmarkScale.value = withSequence(withSpring(1.2), withSpring(1));
 
       // Reset after animation

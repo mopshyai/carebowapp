@@ -1,6 +1,9 @@
 /**
  * Missed Check-In Modal Component
- * Shows when user opens app after missing check-in deadline
+ * Shows when user opens app after missing check-in deadline.
+ *
+ * Family/emergency-contact escalation is server-driven. This modal must not
+ * send a second copy or close before the server confirms "I'm OK".
  */
 
 import React, { useState, useCallback } from 'react';
@@ -15,12 +18,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
-import { SafetyContact } from '../types';
-import { sendMissedCheckInAlert } from '../services/sosService';
-import { getLocationWithFallback, LocationData } from '../services/locationService';
-import { createLogger } from '../../../utils/logger';
-
-const logger = createLogger('MissedCheckIn');
 
 // ============================================
 // TYPES
@@ -29,11 +26,8 @@ const logger = createLogger('MissedCheckIn');
 interface MissedCheckInModalProps {
   visible: boolean;
   onClose: () => void;
-  onCheckIn: () => void;
-  onNotifyContacts: () => void;
-  contacts: SafetyContact[];
-  shareLocation: boolean;
-  userName: string;
+  /** Return false when CareBow could not confirm the check-in. */
+  onCheckIn: () => Promise<boolean> | boolean;
 }
 
 // ============================================
@@ -44,110 +38,65 @@ export function MissedCheckInModal({
   visible,
   onClose,
   onCheckIn,
-  onNotifyContacts,
-  contacts,
-  shareLocation,
-  userName,
 }: MissedCheckInModalProps) {
   const insets = useSafeAreaInsets();
-  const [isNotifying, setIsNotifying] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
 
-  const handleNotifyContacts = useCallback(async () => {
-    setIsNotifying(true);
+  const handleImOK = useCallback(async () => {
+    if (isCheckingIn) return;
+    setIsCheckingIn(true);
 
     try {
-      let location: LocationData | null = null;
-
-      if (shareLocation) {
-        const result = await getLocationWithFallback(5000);
-        if (result.success) {
-          location = result.data;
-        }
-      }
-
-      await sendMissedCheckInAlert(contacts, userName, location, shareLocation);
-      onNotifyContacts();
-      onClose();
-    } catch (error) {
-      logger.error('Failed to notify contacts', error);
+      const confirmed = await onCheckIn();
+      if (confirmed) onClose();
     } finally {
-      setIsNotifying(false);
+      setIsCheckingIn(false);
     }
-  }, [contacts, userName, shareLocation, onNotifyContacts, onClose]);
-
-  const handleImOK = useCallback(() => {
-    onCheckIn();
-    onClose();
-  }, [onCheckIn, onClose]);
+  }, [isCheckingIn, onCheckIn, onClose]);
 
   const handleSkip = useCallback(() => {
     onClose();
   }, [onClose]);
 
-  const hasContacts = contacts.length > 0;
-  const smsContacts = contacts.filter((c) => c.canReceiveSMS);
-
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.modal, { marginBottom: insets.bottom }]}>
-          {/* Icon */}
           <View style={styles.iconContainer}>
             <Icon name="time" size={40} color={colors.warning} />
           </View>
 
-          {/* Content */}
           <Text style={styles.title}>Missed Check-in</Text>
           <Text style={styles.description}>
-            You missed today's scheduled check-in. Would you like to notify your emergency contacts?
+            CareBow has marked today's check-in as missed and automatic safety alerts may already be
+            in progress. If you're safe, confirm now so CareBow records that you're OK.
           </Text>
 
-          {!hasContacts && (
-            <View style={styles.infoBanner}>
-              <Icon name="information-circle" size={16} color={colors.info} />
-              <Text style={styles.infoText}>
-                No emergency contacts set up yet.
-              </Text>
-            </View>
-          )}
+          <View style={styles.infoBanner}>
+            <Icon name="information-circle" size={16} color={colors.info} />
+            <Text style={styles.infoText}>
+              You do not need to manually send the same missed-check-in alert again.
+            </Text>
+          </View>
 
-          {/* Actions */}
           <View style={styles.actions}>
-            {smsContacts.length > 0 && (
-              <TouchableOpacity
-                style={styles.notifyButton}
-                onPress={handleNotifyContacts}
-                disabled={isNotifying}
-              >
-                {isNotifying ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <>
-                    <Icon name="notifications" size={18} color={colors.white} />
-                    <Text style={styles.notifyButtonText}>Notify Contacts</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-
             <TouchableOpacity
               style={styles.imOKButton}
               onPress={handleImOK}
+              disabled={isCheckingIn}
             >
-              <Icon name="hand-right" size={18} color={colors.success} />
-              <Text style={styles.imOKButtonText}>I'm OK</Text>
+              {isCheckingIn ? (
+                <ActivityIndicator size="small" color={colors.success} />
+              ) : (
+                <>
+                  <Icon name="hand-right" size={18} color={colors.success} />
+                  <Text style={styles.imOKButtonText}>I'm OK</Text>
+                </>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={handleSkip}
-            >
-              <Text style={styles.skipButtonText}>Skip</Text>
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkip} disabled={isCheckingIn}>
+              <Text style={styles.skipButtonText}>Close for now</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -215,21 +164,6 @@ const styles = StyleSheet.create({
   actions: {
     width: '100%',
     gap: spacing.sm,
-  },
-  notifyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.warning,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    ...shadows.button,
-  },
-  notifyButtonText: {
-    ...typography.label,
-    color: colors.white,
-    fontWeight: '600',
   },
   imOKButton: {
     flexDirection: 'row',
