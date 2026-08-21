@@ -1,12 +1,6 @@
 /**
  * Ask CareBow Tab Screen
- * Entry point for the AI Health Assistant with Trial System
- *
- * Upgrades:
- * - Image upload with bottom sheet
- * - Health buddy starter prompts
- * - Inline red-flag warning
- * - Health Memory entry point
+ * Entry point for the AI Health Assistant.
  */
 
 import Voice from '@react-native-voice/voice';
@@ -25,20 +19,20 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { AskAccessStatusCard } from '../../components/askCarebow/AskAccessStatusCard';
 import { ImageThumbnailRow } from '../../components/askCarebow/ImageThumbnailRow';
 import {
   ImageAttachment,
   ImageUploadBottomSheet,
 } from '../../components/askCarebow/ImageUploadBottomSheet';
 import { RedFlagWarning, detectRedFlags } from '../../components/askCarebow/RedFlagWarning';
-import { TrialBanner, TrialSignupCard } from '../../components/askCarebow/TrialSignupCard';
 import { resolveAskInputText } from '../../lib/askCarebow/askInput';
 import {
   getSavedFamilyMembers,
   selectionForSavedFamilyMember,
 } from '../../lib/askCarebow/familyProfileSelection';
 import type { AppNavigationProp } from '../../navigation/types';
-import { useAskCarebowStore, useIsTrialActive, useTrialState } from '../../store/askCarebowStore';
+import { useAskCarebowStore } from '../../store/askCarebowStore';
 import { useMemoryCount } from '../../store/healthMemoryStore';
 import { useProfileStore } from '../../store/useProfileStore';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
@@ -53,7 +47,6 @@ const relationships = [
   { value: 'other', label: 'Other family member' },
 ];
 
-// Health buddy starter prompts - improved
 const STARTER_PROMPTS = [
   { text: "I'm feeling sick and worried", icon: 'sad-outline' },
   { text: 'I have a rash (photo attached)', icon: 'image-outline' },
@@ -75,7 +68,7 @@ export default function AskCareBowScreen() {
   const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
-  const [, setBaseText] = useState(''); // Text before voice recognition started
+  const [, setBaseText] = useState('');
   const symptomInputRef = useRef(symptomInput);
   const baseTextRef = useRef('');
   const inputModeRef = useRef(inputMode);
@@ -96,14 +89,10 @@ export default function AskCareBowScreen() {
     inputModeRef.current = inputMode;
   }, [symptomInput, inputMode]);
 
-  // New state for image upload
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [showImageSheet, setShowImageSheet] = useState(false);
+  const clearCurrentSession = useAskCarebowStore((state) => state.clearCurrentSession);
 
-  // Get subscription and trial status from store
-  const { hasSubscription, clearCurrentSession } = useAskCarebowStore();
-  const isTrialActive = useIsTrialActive();
-  const trialState = useTrialState();
   useEffect(() => {
     Voice.onSpeechStart = onSpeechStart;
     Voice.onSpeechEnd = onSpeechEnd;
@@ -124,7 +113,6 @@ export default function AskCareBowScreen() {
     console.log('onSpeechStart:', e);
     setIsListening(true);
     setRecognizedText('');
-    // In text mode only: save existing input as base to append speech-to-text
     if (inputModeRef.current === 'text') {
       const current = symptomInputRef.current.trim();
       baseTextRef.current = current;
@@ -138,11 +126,6 @@ export default function AskCareBowScreen() {
     console.log('onSpeechEnd:', e);
     setIsListening(false);
     setBaseText('');
-    // Do not clear recognizedText here. Native speech callbacks are not
-    // guaranteed to deliver onSpeechResults after onSpeechEnd; clearing here
-    // can erase a valid final transcript and disable the safety checks/CTA.
-    // baseTextRef is intentionally kept until the next speech start because a
-    // final result may still arrive after this callback in text-input mode.
   };
 
   const onSpeechResults = (e: any) => {
@@ -151,14 +134,10 @@ export default function AskCareBowScreen() {
       const text = e.value[0];
       const trimmedNew = text.trim();
       if (inputModeRef.current === 'text') {
-        // Text mode: append to input field only
         const base = baseTextRef.current;
         const newText = base ? `${base} ${trimmedNew}` : trimmedNew;
         setSymptomInput(newText);
       } else {
-        // Voice mode is speech-to-text input for the real Ask CareBow flow.
-        // Never answer with canned testing TTS here: doing so can audibly
-        // dismiss a genuine symptom before the safety engine sees it.
         setRecognizedText(trimmedNew);
       }
     }
@@ -170,12 +149,10 @@ export default function AskCareBowScreen() {
       const partialText = e.value[0];
       const trimmedPartial = partialText.trim();
       if (inputModeRef.current === 'text') {
-        // Text mode: append to input field only
         const base = baseTextRef.current;
         const newText = base ? `${base} ${trimmedPartial}` : trimmedPartial;
         setSymptomInput(newText);
       } else {
-        // Voice mode: update recognized text only
         setRecognizedText(trimmedPartial);
       }
     }
@@ -202,38 +179,29 @@ export default function AskCareBowScreen() {
 
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           return true;
-        } else {
-          Alert.alert(
-            'Permission Required',
-            'Microphone permission is needed for voice input. Please enable it in your device settings.',
-            [{ text: 'OK' }]
-          );
-          return false;
         }
+        Alert.alert(
+          'Permission Required',
+          'Microphone permission is needed for voice input. Please enable it in your device settings.',
+          [{ text: 'OK' }]
+        );
+        return false;
       } catch (err) {
         console.warn('Permission request error:', err);
         return false;
       }
     }
-    // iOS permissions are handled via Info.plist
     return true;
   };
 
   const startRecognizing = async () => {
     try {
       setRecognizedText('');
-
-      // Request permissions first
       const hasPermission = await requestMicrophonePermission();
-      if (!hasPermission) {
-        return;
-      }
+      if (!hasPermission) return;
 
-      // Check if speech recognition is available
       const isAvailable = await Voice.isAvailable();
-      if (!isAvailable) {
-        return;
-      }
+      if (!isAvailable) return;
 
       await Voice.start('en-US');
     } catch (error: any) {
@@ -250,19 +218,14 @@ export default function AskCareBowScreen() {
       console.log('stopRecognizing error:', error);
     }
   };
-  // Health memory
-  const memoryCount = useMemoryCount();
 
-  // One canonical patient utterance drives safety checks, emotional context,
-  // CTA enablement and the actual conversation request.
+  const memoryCount = useMemoryCount();
   const effectiveSymptom = resolveAskInputText(inputMode, symptomInput, recognizedText);
 
-  // Red flag detection
   const showRedFlagWarning = useMemo(() => {
     return detectRedFlags(effectiveSymptom);
   }, [effectiveSymptom]);
 
-  // Emotional keyword detection for reassurance message
   const EMOTIONAL_KEYWORDS = [
     'worried',
     'scared',
@@ -280,7 +243,6 @@ export default function AskCareBowScreen() {
     return EMOTIONAL_KEYWORDS.some((keyword) => lowerInput.includes(keyword));
   }, [effectiveSymptom]);
 
-  // Image handlers
   const handleImagesSelected = useCallback((images: ImageAttachment[]) => {
     setAttachedImages((prev) => [...prev, ...images].slice(0, 3));
   }, []);
@@ -313,13 +275,8 @@ export default function AskCareBowScreen() {
       memberName = familyRelation;
     }
 
-    // Clear any existing session before starting a new one
     clearCurrentSession();
 
-    // The patient id is present only when the user explicitly chose a saved
-    // family profile. Ad-hoc relationship/age intake deliberately carries no
-    // id, so ConversationScreen cannot accidentally attach somebody else's
-    // clinical record.
     navigation.navigate('Conversation' as never, {
       symptom: effectiveSymptom,
       context: contextType,
@@ -327,14 +284,11 @@ export default function AskCareBowScreen() {
       age,
       memberName,
       memberId,
-      // Pass caregiver presence for family mode
       caregiverPresent: contextType === 'family' ? String(caregiverPresent) : undefined,
-      // Pass image URIs as JSON string (navigation params must be serializable)
       attachedImages: JSON.stringify(attachedImages),
     });
   };
 
-  // Navigate to Health Memory screen
   const handleOpenHealthMemory = () => {
     navigation.navigate('HealthMemory' as never);
   };
@@ -355,7 +309,6 @@ export default function AskCareBowScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header with Health Memory entry point */}
         <View style={styles.headerRow}>
           <View style={styles.header}>
             <View style={styles.headerIcon}>
@@ -366,7 +319,6 @@ export default function AskCareBowScreen() {
               <Text style={styles.headerBadge}>AI Health Assistant</Text>
             </View>
           </View>
-          {/* Health Memory Entry Point */}
           <TouchableOpacity style={styles.memoryButton} onPress={handleOpenHealthMemory}>
             <Icon name="leaf" size={18} color={colors.accent} />
             {memoryCount > 0 && (
@@ -379,25 +331,11 @@ export default function AskCareBowScreen() {
         <Text style={styles.headerSubtitle}>
           I'll help you understand your symptoms and guide you to the right care.
         </Text>
-        {/* Trial Banner - shown during active trial */}
-        {isTrialActive && <TrialBanner />}
 
-        {/* Trial Signup Card - shown if trial not started */}
-        {!hasSubscription && !trialState.hasUsedTrial && (
-          <View style={styles.trialSection}>
-            <TrialSignupCard compact />
-          </View>
-        )}
+        <View style={styles.accessSection}>
+          <AskAccessStatusCard />
+        </View>
 
-        {/* Premium Badge - shown for subscribers */}
-        {hasSubscription && (
-          <View style={styles.premiumBadge}>
-            <Icon name="diamond" size={16} color={colors.accent} />
-            <Text style={styles.premiumBadgeText}>Premium Member</Text>
-          </View>
-        )}
-
-        {/* Context Selector */}
         <View style={styles.section}>
           <Text style={styles.label}>
             Who is this for? <Text style={styles.required}>*</Text>
@@ -448,7 +386,6 @@ export default function AskCareBowScreen() {
           </View>
         </View>
 
-        {/* Family Context Fields */}
         {contextType === 'family' && (
           <View style={styles.familySection}>
             {savedFamilyMembers.length > 0 && (
@@ -580,7 +517,6 @@ export default function AskCareBowScreen() {
               </>
             )}
 
-            {/* Caregiver Presence Toggle */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Are you with them right now?</Text>
               <View style={styles.presenceToggle}>
@@ -625,13 +561,11 @@ export default function AskCareBowScreen() {
           </View>
         )}
 
-        {/* Symptom Input */}
         <View style={styles.section}>
           <View style={styles.labelRow}>
             <Text style={styles.labelNoMargin}>
               Tell me what's been bothering you. <Text style={styles.required}>*</Text>
             </Text>
-            {/* Input Mode Toggle with Image */}
             <View style={styles.inputModeToggle}>
               <TouchableOpacity
                 style={[styles.modeButton, inputMode === 'text' && styles.modeButtonActive]}
@@ -670,7 +604,6 @@ export default function AskCareBowScreen() {
 
           {inputMode === 'text' ? (
             <>
-              {/* Emotional Acknowledgement (shown ABOVE input when emotional keywords detected) */}
               {showEmotionalReassurance && (
                 <View style={styles.emotionalReassurance}>
                   <Icon name="heart" size={14} color={colors.accent} />
@@ -680,7 +613,6 @@ export default function AskCareBowScreen() {
                 </View>
               )}
 
-              {/* Image Thumbnail Row (if images attached) */}
               {attachedImages.length > 0 && (
                 <ImageThumbnailRow
                   images={attachedImages}
@@ -718,7 +650,6 @@ export default function AskCareBowScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Consolidated helper: privacy/memory + specificity + photo sharing */}
               <Text style={styles.safeSpaceSignal}>
                 Private • Judgment-free • Share photos if it helps, and be as specific as you can
                 (when it started, how severe, what you've tried) — I'll remember useful details to
@@ -727,7 +658,6 @@ export default function AskCareBowScreen() {
             </>
           ) : (
             <View style={styles.voiceInputContainer}>
-              {/* Real-time speech recognition display */}
               {isListening && (
                 <View style={styles.listeningIndicator}>
                   <View style={styles.listeningDot} />
@@ -735,7 +665,6 @@ export default function AskCareBowScreen() {
                 </View>
               )}
 
-              {/* Display recognized text in real-time */}
               {recognizedText ? (
                 <View style={styles.recognizedTextContainer}>
                   <Text style={styles.recognizedTextLabel}>You said:</Text>
@@ -745,7 +674,6 @@ export default function AskCareBowScreen() {
                 <Text style={styles.waitingText}>Waiting for speech...</Text>
               ) : null}
 
-              {/* Voice input */}
               <View style={styles.voiceInputDivider}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>OR</Text>
@@ -765,12 +693,9 @@ export default function AskCareBowScreen() {
             </View>
           )}
 
-          {/* Safety warning must follow the effective input, regardless of
-              whether it came from the text field or speech recognition. */}
           <RedFlagWarning visible={showRedFlagWarning} />
         </View>
 
-        {/* Health Buddy Starter Prompts (improved) */}
         <View style={styles.examplesSection}>
           <Text style={styles.examplesTitle}>Try something like:</Text>
           <View style={styles.examplesList}>
@@ -790,7 +715,6 @@ export default function AskCareBowScreen() {
           </View>
         </View>
 
-        {/* CTA Button */}
         <TouchableOpacity
           style={[styles.ctaButton, !canStart && styles.ctaButtonDisabled]}
           onPress={handleStart}
@@ -806,7 +730,6 @@ export default function AskCareBowScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Disclaimer — quiet persistent footnote, not a shouted last-second warning */}
         <View style={styles.disclaimer}>
           <Icon name="information-circle-outline" size={14} color={colors.textTertiary} />
           <Text style={styles.disclaimerText}>
@@ -816,7 +739,6 @@ export default function AskCareBowScreen() {
         </View>
       </ScrollView>
 
-      {/* Image Upload Bottom Sheet */}
       <ImageUploadBottomSheet
         visible={showImageSheet}
         onClose={() => setShowImageSheet(false)}
@@ -899,23 +821,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
-  trialSection: {
+  accessSection: {
     marginBottom: spacing.lg,
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.accentMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  premiumBadgeText: {
-    ...typography.labelSmall,
-    color: colors.accent,
   },
   labelRow: {
     flexDirection: 'row',
@@ -1159,8 +1066,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md + 40, // Extra padding for voice button
-    paddingRight: 64, // Extra padding on right for voice button
+    paddingBottom: spacing.md + 40,
+    paddingRight: 64,
     ...typography.body,
     color: colors.textPrimary,
     minHeight: 140,
