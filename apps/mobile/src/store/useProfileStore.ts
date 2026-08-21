@@ -10,7 +10,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CountryCode, DEFAULT_COUNTRY, setServerCurrency } from '../data/countries';
 import { regionApi } from '../services/api/endpoints/region';
-import { useSafetyContacts } from '../features/safety/store';
 import {
   UserProfile,
   FamilyMember,
@@ -737,15 +736,14 @@ export const useAddresses = () => useProfileStore((state) => state.addresses);
 export const useInsuranceInfo = () => useProfileStore((state) => state.insuranceInfo);
 
 /**
- * Readiness shown in the launch UI includes only data paths we can stand behind:
- * server-backed patient identity/clinical fields plus the emergency contacts
- * actually used by the SOS subsystem. Device-only address/insurance caches are
- * deliberately excluded.
+ * Launch readiness intentionally scores only patient data that is part of the
+ * server-backed profile path. Safety contacts are shown separately by the SOS
+ * subsystem; device-only address/insurance/contact caches are not allowed to
+ * inflate this score or create fake completion CTAs.
  */
 export const useCareReadiness = (memberId?: string): CareReadinessScore => {
   const members = useProfileStore((state) => state.members);
   const selectedMemberId = useProfileStore((state) => state.selectedMemberId);
-  const emergencyContacts = useSafetyContacts();
 
   return React.useMemo(() => {
     const member = memberId
@@ -794,15 +792,6 @@ export const useCareReadiness = (memberId?: string): CareReadinessScore => {
         params: { tab: 'medications' },
         whyWeAsk: 'Avoids drug interactions.',
       },
-      {
-        id: 'emergency_contact',
-        label: 'Add emergency contact',
-        description: 'Someone we can reach in emergencies',
-        isComplete: emergencyContacts.length > 0,
-        weight: 15,
-        screen: 'EmergencyContacts',
-        whyWeAsk: 'For urgent coordination.',
-      },
     ];
 
     const totalPoints = items.reduce((sum, item) => sum + item.weight, 0);
@@ -817,7 +806,7 @@ export const useCareReadiness = (memberId?: string): CareReadinessScore => {
       missingItems: items.filter((item) => !item.isComplete),
       completedItems: items.filter((item) => item.isComplete),
     };
-  }, [members, selectedMemberId, emergencyContacts, memberId]);
+  }, [members, selectedMemberId, memberId]);
 };
 
 export const useNotificationPreferences = () =>
