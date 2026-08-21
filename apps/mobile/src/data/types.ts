@@ -92,6 +92,25 @@ export type ServiceCategory = {
 export type ServiceItem = Service;
 
 // ============================================
+// CARE REFERRAL / BOOKING HANDOFF
+// ============================================
+
+/**
+ * Context captured when Ask CareBow recommends a real-world care action.
+ * This is referral metadata, not a new clinical decision engine. The completed
+ * clinical system remains the source of the triage level and symptom context.
+ */
+export type CareReferralContext = {
+  source: 'ask_carebow';
+  episodeId?: string;
+  profileId?: string;
+  triageLevel: 'emergency' | 'urgent' | 'soon' | 'self_care';
+  symptoms: string[];
+  careIntent: 'teleconsult' | 'home_visit' | 'general_care';
+  createdAt: string;
+};
+
+// ============================================
 // BOOKING DRAFT / SELECTIONS
 // ============================================
 
@@ -109,6 +128,7 @@ export type BookingDraft = {
   hours: number | null; // for hourly pricing
   days: number | null; // for daily pricing
   requestNotes: string;
+  referralContext?: CareReferralContext | null;
 
   // Computed pricing
   subtotal: number;
@@ -136,6 +156,7 @@ export type CartItem = {
   hours?: number;
   days?: number;
   requestNotes: string;
+  referralContext?: CareReferralContext | null;
   subtotal: number;
   discount: number;
   total: number;
