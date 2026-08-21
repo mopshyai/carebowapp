@@ -20,8 +20,15 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
+import { profilesApi } from '../../services/api/endpoints/profiles';
+import {
+  mapGender,
+  normalizeDateOfBirth,
+  relationshipForBackend,
+} from '../../lib/profileSync';
 import {
   FamilyMember,
+  Gender,
   Relationship,
   RELATIONSHIP_LABELS,
   createEmptyMemberHealthInfo,
@@ -41,6 +48,12 @@ const RELATIONSHIP_OPTIONS: { value: Relationship; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+const GENDER_OPTIONS: Array<{ value: Exclude<Gender, 'prefer_not_to_say'>; label: string }> = [
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function FamilyMembersScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -54,28 +67,88 @@ export default function FamilyMembersScreen() {
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
   const [newRelationship, setNewRelationship] = useState<Relationship>('self');
+  const [newDateOfBirth, setNewDateOfBirth] = useState('');
+  const [newGender, setNewGender] = useState<Exclude<Gender, 'prefer_not_to_say'> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleAddMember = () => {
-    if (!newFirstName.trim()) {
-      Alert.alert('Error', 'Please enter a first name');
-      return;
-    }
-
-    addMember({
-      firstName: newFirstName.trim(),
-      lastName: newLastName.trim(),
-      relationship: newRelationship,
-      isDefault: members.length === 0,
-      healthInfo: createEmptyMemberHealthInfo(),
-      carePreferences: createEmptyCarePreferences(),
-    });
-
-    setShowAddModal(false);
+  const resetAddForm = () => {
     setNewFirstName('');
     setNewLastName('');
     setNewRelationship('self');
+    setNewDateOfBirth('');
+    setNewGender(null);
+  };
 
-    Alert.alert('Success', 'Family member added successfully');
+  const handleAddMember = async () => {
+    if (isSaving) return;
+    if (!newFirstName.trim()) {
+      Alert.alert('Missing name', 'Please enter a first name.');
+      return;
+    }
+    if (!newGender) {
+      Alert.alert('Missing gender', 'Please select the patient gender.');
+      return;
+    }
+
+    let normalizedDob: string;
+    try {
+      normalizedDob = normalizeDateOfBirth(newDateOfBirth.trim());
+    } catch (error) {
+      Alert.alert(
+        'Check date of birth',
+        error instanceof Error ? error.message : 'Please enter a valid date of birth.'
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    let createdBackendId: string | null = null;
+    try {
+      // Server first. The app must not say a family profile exists when only an
+      // AsyncStorage row was created on one phone.
+      const backendProfile = await profilesApi.createProfile({
+        name: `${newFirstName.trim()} ${newLastName.trim()}`.trim(),
+        dateOfBirth: normalizedDob,
+        gender: mapGender(newGender),
+        relationship: relationshipForBackend(newRelationship),
+      });
+      createdBackendId = backendProfile.id;
+
+      addMember({
+        backendId: backendProfile.id,
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        relationship: newRelationship,
+        dateOfBirth: normalizedDob,
+        gender: newGender,
+        isDefault: members.length === 0,
+        healthInfo: createEmptyMemberHealthInfo(),
+        carePreferences: createEmptyCarePreferences(),
+      });
+
+      setShowAddModal(false);
+      resetAddForm();
+      Alert.alert('Family member added', 'This profile is saved to your CareBow account.');
+    } catch (error) {
+      // If the server row was created but the local cache write unexpectedly
+      // failed, undo the server row rather than leave an invisible orphan.
+      if (createdBackendId) {
+        try {
+          await profilesApi.deleteProfile(createdBackendId);
+        } catch {
+          // The primary failure is still shown below. A future successful GET
+          // /v1/profiles will reveal any row the rollback could not remove.
+        }
+      }
+      Alert.alert(
+        'Could not add family member',
+        error instanceof Error
+          ? error.message
+          : 'CareBow could not save this profile. Please check your connection and try again.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteMember = (member: FamilyMember) => {
@@ -87,7 +160,28 @@ export default function FamilyMembersScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteMember(member.id),
+          onPress: async () => {
+            try {
+              if (member.backendId) {
+                const response = await profilesApi.deleteProfile(member.backendId);
+                if (!response.success) {
+                  throw new Error(response.error || 'CareBow could not delete this profile.');
+                }
+              }
+
+              // Old app versions may have local-only members with no backendId.
+              // Those can be removed locally because there is no claimed server
+              // profile to delete.
+              deleteMember(member.id);
+            } catch (error) {
+              Alert.alert(
+                'Could not remove family member',
+                error instanceof Error
+                  ? error.message
+                  : 'The profile was not removed. Please try again.'
+              );
+            }
+          },
         },
       ]
     );
@@ -95,7 +189,7 @@ export default function FamilyMembersScreen() {
 
   const handleSetDefault = (member: FamilyMember) => {
     setDefaultMember(member.id);
-    Alert.alert('Success', `${member.firstName} is now the default member`);
+    Alert.alert('Default member updated', `${member.firstName} is now selected by default.`);
   };
 
   const getProgressColor = (completeness: number) => {
@@ -237,16 +331,18 @@ export default function FamilyMembersScreen() {
       <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+            <TouchableOpacity disabled={isSaving} onPress={() => setShowAddModal(false)}>
+              <Text style={[styles.modalCancel, isSaving && styles.disabledText]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Family Member</Text>
-            <TouchableOpacity onPress={handleAddMember}>
-              <Text style={styles.modalSave}>Add</Text>
+            <TouchableOpacity disabled={isSaving} onPress={() => void handleAddMember()}>
+              <Text style={[styles.modalSave, isSaving && styles.disabledText]}>
+                {isSaving ? 'Saving…' : 'Add'}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
             <View style={styles.modalForm}>
               {/* First Name */}
               <View style={styles.inputGroup}>
@@ -259,6 +355,7 @@ export default function FamilyMembersScreen() {
                   placeholderTextColor={colors.textTertiary}
                   autoCapitalize="words"
                   autoFocus
+                  editable={!isSaving}
                 />
               </View>
 
@@ -272,7 +369,52 @@ export default function FamilyMembersScreen() {
                   placeholder="Enter last name"
                   placeholderTextColor={colors.textTertiary}
                   autoCapitalize="words"
+                  editable={!isSaving}
                 />
+              </View>
+
+              {/* Date of birth */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Date of Birth *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newDateOfBirth}
+                  onChangeText={setNewDateOfBirth}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textTertiary}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={10}
+                  editable={!isSaving}
+                />
+                <Text style={styles.fieldHint}>Used for age-appropriate safety checks. We never guess this.</Text>
+              </View>
+
+              {/* Gender */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Gender *</Text>
+                <View style={styles.relationshipOptions}>
+                  {GENDER_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.relationshipOption,
+                        newGender === option.value && styles.relationshipOptionSelected,
+                      ]}
+                      onPress={() => setNewGender(option.value)}
+                      disabled={isSaving}
+                    >
+                      <Text
+                        style={[
+                          styles.relationshipOptionText,
+                          newGender === option.value && styles.relationshipOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               {/* Relationship */}
@@ -287,6 +429,7 @@ export default function FamilyMembersScreen() {
                         newRelationship === option.value && styles.relationshipOptionSelected,
                       ]}
                       onPress={() => setNewRelationship(option.value)}
+                      disabled={isSaving}
                     >
                       <Text
                         style={[
@@ -307,9 +450,8 @@ export default function FamilyMembersScreen() {
                 <View style={styles.whyWeAskContent}>
                   <Text style={styles.whyWeAskTitle}>Why we ask</Text>
                   <Text style={styles.whyWeAskText}>
-                    Adding family members helps us provide personalized care for each person. You
-                    can add their health information, allergies, and medications for safer care
-                    recommendations.
+                    Date of birth and gender help CareBow apply the right age-aware safety context.
+                    The profile is saved to your account before the app reports success.
                   </Text>
                 </View>
               </View>
@@ -543,6 +685,9 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.accent,
   },
+  disabledText: {
+    opacity: 0.45,
+  },
   modalContent: {
     flex: 1,
   },
@@ -560,6 +705,11 @@ const styles = StyleSheet.create({
   input: {
     ...components.input,
     color: colors.textPrimary,
+  },
+  fieldHint: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginTop: spacing.xxs,
   },
   relationshipOptions: {
     flexDirection: 'row',
