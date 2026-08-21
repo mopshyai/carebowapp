@@ -4,7 +4,7 @@
  * Backed by `/v1/vitals` via `vitalsApi`.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { vitalsApi, Vital } from '@/services/api/endpoints/vitals';
-import { profilesApi } from '@/services/api/endpoints/profiles';
+import { useSelectedMember } from '@/store/useProfileStore';
+import { backendProfileIdForVitals } from '@/lib/vitalsPatientBinding';
 
 type VitalTypeKey = 'blood_pressure' | 'heart_rate' | 'blood_sugar' | 'weight' | 'temperature';
 
@@ -80,9 +81,11 @@ const whenLabel = (iso: string) =>
 export default function VitalsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [resolvingProfile, setResolvingProfile] = useState(true);
+  const selectedMember = useSelectedMember();
+  const profileId = backendProfileIdForVitals(selectedMember);
+  const activeProfileIdRef = useRef(profileId);
+  const loadRequestRef = useRef(0);
+  activeProfileIdRef.current = profileId;
 
   const [selectedType, setSelectedType] = useState<VitalTypeKey>('blood_pressure');
   const [value, setValue] = useState('');
@@ -93,76 +96,81 @@ export default function VitalsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Resolve the active profile id. The profile store's family members are
-  // local-only records (client-generated ids) and are not guaranteed to
-  // correspond to a backend /v1/profiles record, so we resolve directly
-  // against the backend profiles endpoint.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const profiles = await profilesApi.getProfiles();
-        if (cancelled) return;
-        setProfileId(profiles[0]?.id ?? null);
-      } catch {
-        if (!cancelled) setProfileId(null);
-      } finally {
-        if (!cancelled) setResolvingProfile(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  /**
+   * Read only the exact selected patient's backend profile. A previous version
+   * fetched every profile and silently used profiles[0], which could show or
+   * write another family member's clinical readings.
+   */
   const loadHistory = useCallback(async () => {
-    if (!profileId) {
+    const requestId = ++loadRequestRef.current;
+    const requestedProfileId = profileId;
+
+    if (!requestedProfileId) {
+      setVitals([]);
       setLoading(false);
       setRefreshing(false);
+      setError(null);
       return;
     }
+
     try {
       setError(null);
-      const res = await vitalsApi.list({ profileId, limit: 30 });
+      const res = await vitalsApi.list({ profileId: requestedProfileId, limit: 30 });
       if (!res.success) throw new Error(res.error || 'Unable to load vitals');
+      if (requestId !== loadRequestRef.current) return;
       setVitals(res.vitals ?? []);
-    } catch (e) {
+    } catch {
+      if (requestId !== loadRequestRef.current) return;
       setError('Cannot reach CareBow servers. Pull to retry.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === loadRequestRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [profileId]);
 
   useEffect(() => {
-    if (!resolvingProfile) {
-      loadHistory();
-    }
-  }, [resolvingProfile, loadHistory]);
+    setVitals([]);
+    setLoading(Boolean(profileId));
+    setRefreshing(false);
+    setError(null);
+    void loadHistory();
+
+    return () => {
+      loadRequestRef.current += 1;
+    };
+  }, [profileId, loadHistory]);
 
   const handleLog = async () => {
     if (!profileId || !value.trim() || submitting) return;
+    const targetProfileId = profileId;
     const cfg = VITAL_TYPES[selectedType];
     setSubmitting(true);
     try {
       const res = await vitalsApi.record({
-        profileId,
+        profileId: targetProfileId,
         type: selectedType,
         value: value.trim(),
         unit: cfg.unit,
       });
       if (!res.success) throw new Error(res.error || 'Unable to save vital');
+
+      // If the selected patient changed while the request was in flight, do not
+      // let the old patient's response mutate the new patient's screen state.
+      if (activeProfileIdRef.current !== targetProfileId) return;
       setValue('');
       await loadHistory();
     } catch {
-      setError('Could not save this reading. Please try again.');
+      if (activeProfileIdRef.current === targetProfileId) {
+        setError('Could not save this reading. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const showFullScreenLoading =
-    resolvingProfile || (loading && !refreshing && vitals.length === 0 && !error);
+  const showFullScreenLoading = loading && !refreshing && vitals.length === 0 && !error;
 
   return (
     <View style={styles.container}>
@@ -174,10 +182,14 @@ export default function VitalsScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      {!resolvingProfile && !profileId ? (
+      {!profileId ? (
         <View style={styles.centerFill}>
           <Icon name="pulse-outline" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>Add a profile to track vitals</Text>
+          <Text style={styles.emptyText}>
+            {selectedMember
+              ? `${selectedMember.firstName}'s profile is not synced yet. Reopen Family Members and save the profile before logging vitals.`
+              : 'Select or add a patient before logging vitals.'}
+          </Text>
         </View>
       ) : showFullScreenLoading ? (
         <View style={styles.centerFill}>
@@ -198,7 +210,7 @@ export default function VitalsScreen() {
                 refreshing={refreshing}
                 onRefresh={() => {
                   setRefreshing(true);
-                  loadHistory();
+                  void loadHistory();
                 }}
                 tintColor={colors.accent}
               />
