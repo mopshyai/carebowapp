@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, API_TIMEOUT } from '@env';
+import { SecureStorage } from '@/services/storage/SecureStorage';
 import { HttpMethod, RequestConfig, ApiResponse, ApiError, AuthTokens } from './types';
 
 // ============================================
@@ -29,8 +30,11 @@ const API_CONFIG = {
 };
 
 const STORAGE_KEYS = {
-  ACCESS_TOKEN: '@carebow/access_token',
-  REFRESH_TOKEN: '@carebow/refresh_token',
+  // Token material must never live here. These two legacy keys are retained
+  // only so initialize()/setTokens()/clearTokens() can erase copies written by
+  // older builds.
+  LEGACY_ACCESS_TOKEN: '@carebow/access_token',
+  LEGACY_REFRESH_TOKEN: '@carebow/refresh_token',
   TOKEN_EXPIRY: '@carebow/token_expiry',
 };
 
@@ -70,15 +74,21 @@ class ApiClientImpl {
 
   async initialize(): Promise<void> {
     try {
-      const [accessToken, refreshToken, expiry] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
-        AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+      const [{ accessToken, refreshToken }, expiry] = await Promise.all([
+        SecureStorage.getAuthTokens(),
         AsyncStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRY),
       ]);
 
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
       this.tokenExpiry = expiry ? parseInt(expiry, 10) : 0;
+
+      // Cleanup for upgrades from builds where ApiClient duplicated raw access
+      // and refresh tokens into AsyncStorage. Expiry is not secret and can stay.
+      await Promise.all([
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
+      ]);
 
       if (__DEV__) {
         console.log('[ApiClient] Initialized', {
@@ -102,10 +112,18 @@ class ApiClientImpl {
     this.refreshToken = tokens.refreshToken;
     this.tokenExpiry = tokens.expiresAt;
 
+    const storedSecurely = await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
+    if (!storedSecurely) {
+      // Do not silently claim a durable authenticated session when token
+      // persistence failed. Keep in-memory state for the current process, but
+      // surface the failure to the caller so login/refresh can fail closed.
+      throw new Error('Failed to persist authentication tokens securely');
+    }
+
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken),
-      AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken),
       AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, tokens.expiresAt.toString()),
+      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
     ]);
   }
 
@@ -115,9 +133,10 @@ class ApiClientImpl {
     this.tokenExpiry = 0;
 
     await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
-      AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+      SecureStorage.clearAuthTokens(),
       AsyncStorage.removeItem(STORAGE_KEYS.TOKEN_EXPIRY),
+      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
+      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
     ]);
   }
 
