@@ -1,6 +1,7 @@
 /**
  * Checkout Screen
- * Professional checkout with order summary and payment
+ * Server-driven booking review. Paid services use Razorpay; quote-only services
+ * create a real pending booking without pretending a payment is required.
  */
 
 import React, { useState } from 'react';
@@ -20,6 +21,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { formatTime, formatDuration } from '../data/services';
 import { useCartStore } from '../store/useCartStore';
 import { useProfileStore } from '../store/useProfileStore';
+import { useBookingsStore } from '../store';
 import { colors, spacing, radius, typography, shadows } from '../theme';
 import { formatMoney } from '../data/countries';
 import { ensureBackendProfile } from '../lib/profileSync';
@@ -35,22 +37,17 @@ export default function CheckoutScreen() {
   const route = useRoute();
   const { serviceId } = (route.params as { serviceId: string }) || {};
 
-  // Store hooks
   const { bookingDraft, clearBookingDraft } = useCartStore();
+  const createDirectBooking = useBookingsStore((state) => state.create);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // If Razorpay returned but the webhook is still pending, keep the exact order
-  // id locked to this checkout. The next tap checks that order; it must never
-  // create a second payment for the same booking while the first is unresolved.
   const [unconfirmedOrderId, setUnconfirmedOrderId] = useState<string | null>(null);
-
-  /**
-   * Paying means leaving the app for Razorpay's page, so the outcome comes from
-   * asking the server on resume — never from anything this screen observed. The
-   * mechanics of that are shared with the other paid flows.
-   */
   const checkout = useHostedCheckout();
 
-  // Format date for display
+  // calculatePrice uses this exact label only for a quote service with no
+  // booking fee. The backend still makes the final eligibility decision.
+  const isQuoteOnlyRequest =
+    bookingDraft?.total === 0 && bookingDraft?.pricingLabel === 'Price confirmed by CareBow';
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
@@ -63,8 +60,6 @@ export default function CheckoutScreen() {
 
   const showPaidConfirmation = () => {
     setUnconfirmedOrderId(null);
-    // A confirmed payment already produced the server booking. Remove the draft
-    // immediately so this screen cannot issue a second payment for it.
     clearBookingDraft();
     Alert.alert(
       'Payment received',
@@ -74,12 +69,25 @@ export default function CheckoutScreen() {
     );
   };
 
+  const showRequestConfirmation = (bookingId: string) => {
+    clearBookingDraft();
+    Alert.alert(
+      'Request submitted',
+      'CareBow received your request. The care team will review the details, confirm the price if needed, and assign a provider before the visit.',
+      [
+        {
+          text: 'View booking',
+          onPress: () => navigation.navigate('OrderDetails', { id: bookingId }),
+        },
+      ],
+      { cancelable: false }
+    );
+  };
+
   const recheckUnconfirmedOrder = async (orderId: string) => {
     try {
       const status = await paymentsApi.getPaymentStatus(orderId);
-      if (!status.success) {
-        throw new Error(status.error || 'Could not confirm payment status');
-      }
+      if (!status.success) throw new Error(status.error || 'Could not confirm payment status');
 
       if (status.status === 'SUCCESS') {
         showPaidConfirmation();
@@ -113,6 +121,7 @@ export default function CheckoutScreen() {
   const handleBooking = async () => {
     if (!bookingDraft?.memberId || !bookingDraft.date || !bookingDraft.startTime) return;
     setIsSubmitting(true);
+
     try {
       if (unconfirmedOrderId) {
         await recheckUnconfirmedOrder(unconfirmedOrderId);
@@ -123,8 +132,6 @@ export default function CheckoutScreen() {
         `${bookingDraft.date}T${bookingDraft.startTime}:00`
       ).toISOString();
 
-      // The service catalog is backend-driven, so bookingDraft.serviceId is
-      // already a real /v1/services row id.
       const noteParts = [
         `Requested: ${bookingDraft.serviceTitle}`,
         bookingDraft.selectedPackageLabel ? `Package: ${bookingDraft.selectedPackageLabel}` : null,
@@ -134,7 +141,7 @@ export default function CheckoutScreen() {
       let backendProfileId: string;
       try {
         backendProfileId = await ensureBackendProfile(bookingDraft.memberId);
-      } catch (error) {
+      } catch {
         Alert.alert(
           'Could not prepare your profile',
           "Please make sure you're signed in and try again."
@@ -142,11 +149,6 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // What the customer picked. The server prices it against its own catalog —
-      // we never send an amount, so a modified client cannot name its own price.
-      // Re-read the exact service at the payment boundary so the pricing model
-      // comes from the live backend catalog too. A valid backend-only service
-      // must not be rejected because it is absent from the bundled local catalog.
       let liveService;
       try {
         const v1Service = await servicesApi.getServiceDetails(bookingDraft.serviceId);
@@ -156,6 +158,28 @@ export default function CheckoutScreen() {
           'Service changed',
           'CareBow could not verify this service with the live catalog. Please go back and choose it again.'
         );
+        return;
+      }
+
+      // A quote with no booking fee has nothing to charge today. Create the
+      // real PENDING booking through the server's direct-booking gate instead
+      // of opening a zero-value Razorpay checkout. The server independently
+      // verifies that this exact service is allowed to be requested for free.
+      if (
+        isQuoteOnlyRequest &&
+        liveService.pricing.type === 'quote' &&
+        !liveService.pricing.bookingFee
+      ) {
+        const result = await createDirectBooking({
+          serviceId: bookingDraft.serviceId,
+          profileId: backendProfileId,
+          scheduledAt,
+          notes: noteParts.join(' · ') || undefined,
+          careContext: bookingDraft.referralContext ?? undefined,
+        });
+
+        if (!result.ok) throw new Error(result.error);
+        showRequestConfirmation(result.booking.id);
         return;
       }
 
@@ -188,18 +212,13 @@ export default function CheckoutScreen() {
         throw new Error(order.error || 'Could not start payment');
       }
 
-      const outcome = await checkout.start({
-        orderId: order.orderId,
-        paymentUrl: order.paymentUrl,
-      });
+      const outcome = await checkout.start({ orderId: order.orderId, paymentUrl: order.paymentUrl });
 
       if (outcome.status === 'paid') {
         showPaidConfirmation();
       } else if (outcome.status === 'failed') {
         Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
       } else {
-        // Lock this checkout to the same server order. A slow webhook is not a
-        // reason to mint another payment link and risk charging the customer twice.
         setUnconfirmedOrderId(order.orderId);
         Alert.alert(
           'Still confirming your payment',
@@ -217,7 +236,6 @@ export default function CheckoutScreen() {
     }
   };
 
-  // Error state
   if (!bookingDraft || bookingDraft.serviceId !== serviceId) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -241,7 +259,6 @@ export default function CheckoutScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <TouchableOpacity
           style={styles.backButton}
@@ -251,7 +268,7 @@ export default function CheckoutScreen() {
         >
           <Icon name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Checkout</Text>
+        <Text style={styles.headerTitle}>Review booking</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -260,7 +277,6 @@ export default function CheckoutScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 140 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Order Summary Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardIconWrap}>
@@ -330,7 +346,6 @@ export default function CheckoutScreen() {
           )}
         </View>
 
-        {/* Special Requests */}
         {bookingDraft.requestNotes.trim() && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -343,21 +358,22 @@ export default function CheckoutScreen() {
           </View>
         )}
 
-        {/* Pricing Breakdown */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconWrap, { backgroundColor: colors.successSoft }]}>
               <Icon name="wallet-outline" size={20} color={colors.success} />
             </View>
-            <Text style={styles.cardTitle}>Price</Text>
+            <Text style={styles.cardTitle}>{isQuoteOnlyRequest ? 'Pricing' : 'Price'}</Text>
           </View>
 
           <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>{bookingDraft.pricingLabel}</Text>
-            <Text style={styles.pricingValue}>{formatMoney(bookingDraft.subtotal, country)}</Text>
+            <Text style={styles.pricingValue}>
+              {isQuoteOnlyRequest ? 'No payment today' : formatMoney(bookingDraft.subtotal, country)}
+            </Text>
           </View>
 
-          {bookingDraft.discount > 0 && (
+          {!isQuoteOnlyRequest && bookingDraft.discount > 0 && (
             <View style={styles.pricingRow}>
               <Text style={[styles.pricingLabel, styles.discountLabel]}>Discount</Text>
               <Text style={[styles.pricingValue, styles.discountValue]}>
@@ -366,58 +382,83 @@ export default function CheckoutScreen() {
             </View>
           )}
 
-          <View style={styles.divider} />
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>{formatMoney(bookingDraft.total, country)}</Text>
-          </View>
+          {!isQuoteOnlyRequest && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>{formatMoney(bookingDraft.total, country)}</Text>
+              </View>
+            </>
+          )}
         </View>
 
-        {/* Confirmation behavior */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardIconWrap, { backgroundColor: colors.accentSoft }]}>
-              <Icon name="card-outline" size={20} color={colors.accent} />
+              <Icon
+                name={isQuoteOnlyRequest ? 'clipboard-outline' : 'card-outline'}
+                size={20}
+                color={colors.accent}
+              />
             </View>
-            <Text style={styles.cardTitle}>Booking confirmation</Text>
+            <Text style={styles.cardTitle}>
+              {isQuoteOnlyRequest ? 'Request confirmation' : 'Booking confirmation'}
+            </Text>
           </View>
 
-          <View style={styles.paymentMethodRow}>
-            <View style={styles.paymentMethodLeft}>
-              <Icon name="card" size={24} color={colors.accent} />
-              <View>
-                <Text style={styles.paymentMethodText}>Secure payment via Razorpay</Text>
+          {isQuoteOnlyRequest ? (
+            <View style={styles.requestMethodRow}>
+              <Icon name="people-outline" size={24} color={colors.accent} />
+              <View style={styles.methodCopy}>
+                <Text style={styles.paymentMethodText}>Care team review</Text>
                 <Text style={styles.paymentMethodSubtext}>
-                  You'll finish payment in your browser, then come back here
+                  Submit now. CareBow will confirm pricing, provider, and final timing afterward.
                 </Text>
               </View>
             </View>
-          </View>
+          ) : (
+            <>
+              <View style={styles.paymentMethodRow}>
+                <View style={styles.paymentMethodLeft}>
+                  <Icon name="card" size={24} color={colors.accent} />
+                  <View style={styles.methodCopy}>
+                    <Text style={styles.paymentMethodText}>Secure payment via Razorpay</Text>
+                    <Text style={styles.paymentMethodSubtext}>
+                      You'll finish payment in your browser, then come back here
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-          <View style={styles.securityNote}>
-            <Icon name="shield-checkmark" size={14} color={colors.success} />
-            <Text style={styles.securityNoteText}>
-              Payment is handled by Razorpay. CareBow confirms the provider and final timing
-            </Text>
-          </View>
+              <View style={styles.securityNote}>
+                <Icon name="shield-checkmark" size={14} color={colors.success} />
+                <Text style={styles.securityNoteText}>
+                  Payment is handled by Razorpay. CareBow confirms the provider and final timing.
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
-        {/* Booking notice */}
         <View style={styles.bookingNotice}>
           <Icon name="information-circle-outline" size={16} color={colors.textTertiary} />
           <Text style={styles.bookingNoticeText}>
-            Submitting creates a real pending booking. It does not claim that a provider is
-            assigned.
+            {isQuoteOnlyRequest
+              ? 'Submitting creates a real pending request. It does not claim that a provider, final price, or final timing is confirmed.'
+              : 'Payment creates a real booking after server confirmation. Provider assignment may follow separately.'}
           </Text>
         </View>
       </ScrollView>
 
-      {/* Pay Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerPriceRow}>
-          <Text style={styles.footerPriceLabel}>Total</Text>
-          <Text style={styles.footerPriceValue}>{formatMoney(bookingDraft.total, country)}</Text>
+          <Text style={styles.footerPriceLabel}>
+            {isQuoteOnlyRequest ? 'Payment today' : 'Total'}
+          </Text>
+          <Text style={styles.footerPriceValue}>
+            {isQuoteOnlyRequest ? 'None' : formatMoney(bookingDraft.total, country)}
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.payButton, (isSubmitting || checkout.busy) && styles.buttonDisabled]}
@@ -426,7 +467,13 @@ export default function CheckoutScreen() {
           disabled={isSubmitting || checkout.busy}
         >
           <Icon
-            name={unconfirmedOrderId ? 'refresh' : 'calendar'}
+            name={
+              unconfirmedOrderId
+                ? 'refresh'
+                : isQuoteOnlyRequest
+                  ? 'send-outline'
+                  : 'calendar'
+            }
             size={18}
             color={colors.white}
           />
@@ -434,10 +481,14 @@ export default function CheckoutScreen() {
             {isSubmitting || checkout.busy
               ? unconfirmedOrderId
                 ? 'Checking payment…'
-                : 'Opening payment…'
+                : isQuoteOnlyRequest
+                  ? 'Submitting request…'
+                  : 'Opening payment…'
               : unconfirmedOrderId
                 ? 'Check payment status'
-                : 'Pay and book'}
+                : isQuoteOnlyRequest
+                  ? 'Submit request'
+                  : 'Pay and book'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -446,10 +497,7 @@ export default function CheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface2,
-  },
+  container: { flex: 1, backgroundColor: colors.surface2 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -467,15 +515,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: -8,
   },
-  headerTitle: {
-    ...typography.h3,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  headerTitle: { ...typography.h3 },
+  headerSpacer: { width: 40 },
+  scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -496,11 +538,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
-  errorTitle: {
-    ...typography.h2,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
+  errorTitle: { ...typography.h2, textAlign: 'center', marginBottom: spacing.xs },
   errorSubtitle: {
     ...typography.body,
     color: colors.textSecondary,
@@ -513,29 +551,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: radius.md,
   },
-  errorButtonText: {
-    ...typography.labelLarge,
-    color: colors.white,
-  },
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xxl,
-  },
-  successIconWrap: {
-    marginBottom: spacing.lg,
-  },
-  successTitle: {
-    ...typography.h1,
-    textAlign: 'center',
-    marginBottom: spacing.xs,
-  },
-  successSubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
+  errorButtonText: { ...typography.labelLarge, color: colors.white },
   card: {
     backgroundColor: colors.background,
     borderRadius: radius.lg,
@@ -558,9 +574,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardTitle: {
-    ...typography.h4,
-  },
+  cardTitle: { ...typography.h4 },
   summaryRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -571,21 +585,9 @@ const styles = StyleSheet.create({
     rowGap: spacing.xxs,
     columnGap: spacing.sm,
   },
-  summaryLabel: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-  },
-  summaryValue: {
-    ...typography.label,
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  notesText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
+  summaryLabel: { ...typography.bodySmall, color: colors.textSecondary },
+  summaryValue: { ...typography.label, textAlign: 'right', flex: 1, marginLeft: spacing.md },
+  notesText: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
   pricingRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -594,25 +596,11 @@ const styles = StyleSheet.create({
     rowGap: spacing.xxs,
     columnGap: spacing.sm,
   },
-  pricingLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  pricingValue: {
-    ...typography.body,
-  },
-  discountLabel: {
-    color: colors.success,
-  },
-  discountValue: {
-    color: colors.success,
-    fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.sm,
-  },
+  pricingLabel: { ...typography.body, color: colors.textSecondary },
+  pricingValue: { ...typography.body },
+  discountLabel: { color: colors.success },
+  discountValue: { color: colors.success, fontWeight: '600' },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   totalRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -621,13 +609,8 @@ const styles = StyleSheet.create({
     rowGap: spacing.xxs,
     columnGap: spacing.sm,
   },
-  totalLabel: {
-    ...typography.h4,
-  },
-  totalValue: {
-    ...typography.h2,
-    color: colors.accent,
-  },
+  totalLabel: { ...typography.h4 },
+  totalValue: { ...typography.h2, color: colors.accent },
   paymentMethodRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -638,26 +621,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.accent,
   },
-  paymentMethodLeft: {
+  requestMethodRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  paymentMethodText: {
-    ...typography.label,
-  },
-  paymentMethodSubtext: {
-    ...typography.caption,
-    marginTop: 2,
-  },
-  radioSelected: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  paymentMethodLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  methodCopy: { flex: 1 },
+  paymentMethodText: { ...typography.label },
+  paymentMethodSubtext: { ...typography.caption, marginTop: 2, color: colors.textSecondary },
   securityNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -667,22 +644,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
   },
-  securityNoteText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    flex: 1,
-  },
+  securityNoteText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   bookingNotice: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
   },
-  bookingNoticeText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    flex: 1,
-  },
+  bookingNoticeText: { ...typography.caption, color: colors.textTertiary, flex: 1 },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -704,13 +673,8 @@ const styles = StyleSheet.create({
     rowGap: spacing.xxs,
     columnGap: spacing.sm,
   },
-  footerPriceLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  footerPriceValue: {
-    ...typography.h3,
-  },
+  footerPriceLabel: { ...typography.body, color: colors.textSecondary },
+  footerPriceValue: { ...typography.h3 },
   payButton: {
     backgroundColor: colors.accent,
     borderRadius: radius.md,
@@ -721,15 +685,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     ...shadows.button,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  payButtonDisabled: {
-    backgroundColor: colors.textTertiary,
-    ...shadows.none,
-  },
-  payButtonText: {
-    ...typography.labelLarge,
-    color: colors.white,
-  },
+  buttonDisabled: { opacity: 0.6 },
+  payButtonText: { ...typography.labelLarge, color: colors.white },
 });
