@@ -1,130 +1,134 @@
 /**
- * Hosted checkout.
+ * Hosted Razorpay checkout.
  *
- * The app has no payment SDK, so paying means leaving: Razorpay's own page
- * collects the money in the system browser and the SERVER hears about it via
- * webhook. The app is not present at the moment of payment, which has one
- * consequence that shapes everything here — the app can never assert that a
- * payment succeeded. It can only ask.
- *
- *   start()             -> open the hosted URL, remember the order id
- *   (customer pays)     -> Razorpay's page, then the webhook
- *   app resumes         -> poll the server until it says what happened
- *
- * This lived inside CheckoutScreen, so it existed for exactly one flow. Paying
- * off a booking and buying a plan need the identical dance, and a second and
- * third copy of "poll, but never claim failure too early" is how one of them
- * ends up telling a customer their payment failed after it went through.
+ * The app never declares a payment successful. Razorpay collects in the system
+ * browser, the webhook updates the server, and this hook polls that server truth
+ * when the app becomes active again.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking } from 'react-native';
 import { paymentsApi, type PaymentStatusResponse } from '../services/api/endpoints/payments';
 
-/** ~12s of polling. The webhook normally lands in one or two. */
 const POLL_ATTEMPTS = 6;
 const POLL_INTERVAL_MS = 2000;
 
 export type CheckoutOutcome =
   | { status: 'paid'; payment: PaymentStatusResponse }
   | { status: 'failed' }
-  /**
-   * Still PENDING after polling. Deliberately NOT reported as failure: the
-   * webhook may simply be slow, and telling someone their payment failed when
-   * it went through is the worst outcome available.
-   */
   | { status: 'unconfirmed' };
 
 export type UseHostedCheckout = {
-  /** True from opening the browser until the outcome is known. */
   busy: boolean;
-  /**
-   * Open a hosted payment URL and resolve once the server has an answer.
-   * Resolves 'failed' immediately if the URL cannot be opened at all.
-   */
   start: (args: { orderId: string; paymentUrl: string }) => Promise<CheckoutOutcome>;
+};
+
+type PendingCheckout = {
+  orderId: string;
+  promise: Promise<CheckoutOutcome>;
+  resolve: (outcome: CheckoutOutcome) => void;
 };
 
 export function useHostedCheckout(): UseHostedCheckout {
   /**
-   * A ref, not state: the AppState listener below reads it on resume, and a
-   * stale closure would silently stop us checking whether they actually paid.
+   * The pending operation lives in a ref because AppState callbacks and rapid
+   * taps must see the current value synchronously; React state rerenders later.
    */
-  const pendingOrderId = useRef<string | null>(null);
-  const resolver = useRef<((outcome: CheckoutOutcome) => void) | null>(null);
+  const pending = useRef<PendingCheckout | null>(null);
   const [busy, setBusy] = useState(false);
 
   const finish = useCallback((outcome: CheckoutOutcome) => {
-    pendingOrderId.current = null;
+    const current = pending.current;
+    if (!current) return;
+
+    pending.current = null;
     setBusy(false);
-    const resolve = resolver.current;
-    resolver.current = null;
-    resolve?.(outcome);
+    current.resolve(outcome);
   }, []);
 
   const check = useCallback(async () => {
-    const orderId = pendingOrderId.current;
-    if (!orderId) return;
+    const current = pending.current;
+    if (!current) return;
+    const orderId = current.orderId;
 
     for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-      // The order id can be cleared by an unmount mid-poll.
-      if (pendingOrderId.current !== orderId) return;
+      if (pending.current?.orderId !== orderId) return;
+
       try {
-        const res = await paymentsApi.getPaymentStatus(orderId);
-        if (res.status === 'SUCCESS') {
-          finish({ status: 'paid', payment: res });
+        const response = await paymentsApi.getPaymentStatus(orderId);
+        if (response.status === 'SUCCESS') {
+          finish({ status: 'paid', payment: response });
           return;
         }
-        if (res.status === 'FAILED') {
+        if (response.status === 'FAILED') {
           finish({ status: 'failed' });
           return;
         }
       } catch {
-        // Network blip on resume; the next attempt covers it.
+        // A network blip is not a payment outcome. Keep polling.
       }
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    finish({ status: 'unconfirmed' });
+    // Never call a slow webhook a failed payment. The customer must be told to
+    // check the schedule/receipt before trying to pay again.
+    if (pending.current?.orderId === orderId) {
+      finish({ status: 'unconfirmed' });
+    }
   }, [finish]);
 
-  // The customer leaves the app to pay, so resume is the only signal we get.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && pendingOrderId.current) void check();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pending.current) void check();
     });
-    return () => sub.remove();
+    return () => subscription.remove();
   }, [check]);
 
-  // A screen unmounted mid-payment must not leave a promise nobody can settle.
   useEffect(
     () => () => {
-      pendingOrderId.current = null;
-      resolver.current = null;
+      // The old implementation nulled the resolver here, leaving start()'s
+      // promise permanently pending. Resolve conservatively instead.
+      const current = pending.current;
+      pending.current = null;
+      current?.resolve({ status: 'unconfirmed' });
     },
     []
   );
 
   const start = useCallback(
-    async ({ orderId, paymentUrl }: { orderId: string; paymentUrl: string }) => {
-      setBusy(true);
-      // Remembered before leaving: on resume we ask the server what happened
-      // rather than assuming anything about the outcome.
-      pendingOrderId.current = orderId;
+    ({ orderId, paymentUrl }: { orderId: string; paymentUrl: string }): Promise<CheckoutOutcome> => {
+      const current = pending.current;
+      if (current) {
+        // Two rapid taps for the same server order share one browser launch and
+        // one outcome. This is synchronous; it does not wait for a rerender.
+        if (current.orderId === orderId) return current.promise;
 
-      const outcome = new Promise<CheckoutOutcome>((resolve) => {
-        resolver.current = resolve;
-      });
-
-      try {
-        const canOpen = await Linking.canOpenURL(paymentUrl);
-        if (!canOpen) throw new Error('No browser available to complete payment');
-        await Linking.openURL(paymentUrl);
-      } catch {
-        finish({ status: 'failed' });
+        // A different checkout cannot replace one already in flight. Financially
+        // the safest answer is "unconfirmed", which tells the caller not to make
+        // another payment until the existing one is checked.
+        return Promise.resolve({ status: 'unconfirmed' });
       }
 
-      return outcome;
+      let resolveOutcome!: (outcome: CheckoutOutcome) => void;
+      const promise = new Promise<CheckoutOutcome>((resolve) => {
+        resolveOutcome = resolve;
+      });
+
+      pending.current = { orderId, promise, resolve: resolveOutcome };
+      setBusy(true);
+
+      void (async () => {
+        try {
+          const canOpen = await Linking.canOpenURL(paymentUrl);
+          if (!canOpen) throw new Error('No browser available to complete payment');
+          await Linking.openURL(paymentUrl);
+        } catch {
+          finish({ status: 'failed' });
+        }
+      })();
+
+      return promise;
     },
     [finish]
   );

@@ -1,26 +1,12 @@
 /**
- * Paid bookings.
+ * Paid bookings and plans.
  *
- * The app has no payment SDK, so checkout opens Razorpay's hosted page in the
- * system browser and the SERVER confirms via webhook. That means the app is not
- * present when payment completes — it finds out by polling getPaymentStatus
- * after the customer returns.
- *
- *   createBookingOrder({ hosted: true })  -> { orderId, paymentUrl }
- *   Linking.openURL(paymentUrl)           -> customer pays on Razorpay
- *   webhook (server)                      -> creates the Booking
- *   getPaymentStatus(orderId)             -> SUCCESS + booking, or still PENDING
- *
- * The app never tells the server a payment succeeded. It only ever asks.
+ * The server owns pricing and payment truth. Mobile opens Razorpay hosted
+ * checkout and later asks the server whether the webhook confirmed payment.
  */
 
 import ApiClient from '../ApiClient';
 
-/**
- * What the customer chose. The server prices this against its own catalog — the
- * app never sends an amount, because a client that names its own price is a
- * client that can pay one rupee for a nurse visit.
- */
 export type PaymentSelection =
   | { kind: 'fixed' }
   | { kind: 'package'; packageId: string }
@@ -43,25 +29,17 @@ export type CreateBookingOrderResponse = {
   success: boolean;
   error?: string;
   orderId?: string;
-  /** Minor units of `currency` (paise for INR). Display only — the server charges this. */
   amount?: number;
   currency?: string;
   serviceName?: string;
   selectionDescription?: string;
-  /** Razorpay-hosted checkout URL. Present when hosted: true. */
   paymentUrl?: string;
 };
 
 export type PaymentStatusResponse = {
   success: boolean;
   error?: string;
-  /** PENDING means the webhook has not arrived yet. */
   status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
-  /**
-   * What was being paid for. A plan upgrade has no booking, so without this a
-   * successful plan payment is indistinguishable from a booking that failed to
-   * appear.
-   */
   kind?: 'booking' | 'plan';
   planSlug?: string | null;
   amount?: number;
@@ -69,7 +47,6 @@ export type PaymentStatusResponse = {
   booking?: { id: string; status: string; scheduledAt: string } | null;
 };
 
-/** A booking that already exists and has not been paid for. */
 export type SettleBookingRequest = {
   bookingId: string;
   hosted?: boolean;
@@ -95,11 +72,6 @@ export type PlanOrderResponse = {
 export type Plan = {
   id: string;
   title: string;
-  /**
-   * Minor units of `currency`, priced by the server for THIS account. Not the
-   * config's list price: an account charged in USD is quoted in USD, and
-   * converting on the device would disagree with the Razorpay page.
-   */
   amount: number;
   currency: string;
   period?: string | null;
@@ -119,7 +91,6 @@ export type PlansResponse = {
 export type PaymentRecord = {
   id: string;
   kind: 'booking' | 'plan';
-  /** Minor units. */
   amount: number;
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
@@ -135,47 +106,67 @@ export type PaymentsListResponse = {
   payments?: PaymentRecord[];
 };
 
+/**
+ * React button state is not a synchronization primitive. Two taps can enter an
+ * async handler before the disabled state rerenders. Keep payment-order creation
+ * single-flight here so every screen gets the protection automatically.
+ *
+ * This dedupes only requests that are concurrently in flight. Once the first
+ * call settles the key is removed, so an intentional later retry still creates
+ * a fresh order.
+ */
+const inFlightOrderRequests = new Map<string, Promise<unknown>>();
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+
+  const object = value as Record<string, unknown>;
+  return `{${Object.keys(object)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(object[key])}`)
+    .join(',')}}`;
+}
+
+function singleFlight<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const existing = inFlightOrderRequests.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+
+  const promise = operation().finally(() => {
+    if (inFlightOrderRequests.get(key) === promise) {
+      inFlightOrderRequests.delete(key);
+    }
+  });
+
+  inFlightOrderRequests.set(key, promise);
+  return promise;
+}
+
 export const paymentsApi = {
-  /**
-   * Create a Razorpay order. With `hosted: true` the response carries a URL to
-   * open; the caller is responsible for opening it and polling afterwards.
-   */
-  createBookingOrder: async (
-    body: CreateBookingOrderRequest
-  ): Promise<CreateBookingOrderResponse> => {
-    const response = await ApiClient.post<CreateBookingOrderResponse>(
-      '/v1/payments/booking-order',
-      body
-    );
-    return response.data;
-  },
+  createBookingOrder: (body: CreateBookingOrderRequest): Promise<CreateBookingOrderResponse> =>
+    singleFlight(`booking:${stableSerialize(body)}`, async () => {
+      const response = await ApiClient.post<CreateBookingOrderResponse>(
+        '/v1/payments/booking-order',
+        body
+      );
+      return response.data;
+    }),
 
-  /**
-   * Pay for a booking that already exists.
-   *
-   * The amount is not sent and cannot be: the server charges what the booking
-   * was quoted at. Used for quote services billed after assessment, bookings an
-   * organisation raised, and anything the customer left unpaid.
-   */
-  createSettleOrder: async (body: SettleBookingRequest): Promise<CreateBookingOrderResponse> => {
-    const response = await ApiClient.post<CreateBookingOrderResponse>(
-      '/v1/payments/booking-order',
-      body
-    );
-    return response.data;
-  },
+  createSettleOrder: (body: SettleBookingRequest): Promise<CreateBookingOrderResponse> =>
+    singleFlight(`settle:${stableSerialize(body)}`, async () => {
+      const response = await ApiClient.post<CreateBookingOrderResponse>(
+        '/v1/payments/booking-order',
+        body
+      );
+      return response.data;
+    }),
 
-  /**
-   * Buy a plan. Same hosted-checkout shape as bookings, for the same reason:
-   * the app has no payment SDK, so Razorpay's page does the collecting and the
-   * webhook applies the upgrade.
-   */
-  createPlanOrder: async (body: PlanOrderRequest): Promise<PlanOrderResponse> => {
-    const response = await ApiClient.post<PlanOrderResponse>('/v1/payments/plan-order', body);
-    return response.data;
-  },
+  createPlanOrder: (body: PlanOrderRequest): Promise<PlanOrderResponse> =>
+    singleFlight(`plan:${stableSerialize(body)}`, async () => {
+      const response = await ApiClient.post<PlanOrderResponse>('/v1/payments/plan-order', body);
+      return response.data;
+    }),
 
-  /** Plans available to this account, with the current one marked. */
   getPlans: async (type?: string): Promise<PlansResponse> => {
     const response = await ApiClient.get<PlansResponse>(
       type ? `/v1/plans?type=${encodeURIComponent(type)}` : '/v1/plans'
@@ -183,16 +174,11 @@ export const paymentsApi = {
     return response.data;
   },
 
-  /** Receipts. Reads Payment rows, so refunds and failures show up as themselves. */
   listPayments: async (): Promise<PaymentsListResponse> => {
     const response = await ApiClient.get<PaymentsListResponse>('/v1/payments');
     return response.data;
   },
 
-  /**
-   * Ask the server what happened. Called after the customer returns from the
-   * browser; PENDING is normal for a few seconds while the webhook lands.
-   */
   getPaymentStatus: async (orderId: string): Promise<PaymentStatusResponse> => {
     const response = await ApiClient.get<PaymentStatusResponse>(
       `/v1/payments/${encodeURIComponent(orderId)}/status`
@@ -201,14 +187,6 @@ export const paymentsApi = {
   },
 };
 
-/**
- * Map the checkout draft's pricing choice onto what the server expects.
- *
- * Returns null when the draft cannot be priced — a packages service with no
- * package chosen. Returning null rather than guessing matters: the server
- * refuses an unknown package outright, and silently defaulting to one would be
- * how a customer gets charged for something they did not pick.
- */
 export function selectionFromDraft(draft: {
   pricingModel?: string | null;
   selectedPackageId?: string | null;
