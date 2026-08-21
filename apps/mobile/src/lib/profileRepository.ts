@@ -32,7 +32,8 @@ export function localGenderFromBackend(value: V1Profile['gender']): Gender {
 }
 
 export function localRelationshipFromBackend(value: string): Relationship {
-  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ');
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  const compact = normalized.replace(/\s+/g, '');
 
   if (normalized === 'self' || normalized === 'myself') return 'self';
   if (
@@ -46,9 +47,9 @@ export function localRelationshipFromBackend(value: string): Relationship {
   if (['parent', 'mother', 'father', 'mom', 'dad'].includes(normalized)) return 'parent';
   if (['child', 'son', 'daughter'].includes(normalized)) return 'child';
   if (['sibling', 'brother', 'sister'].includes(normalized)) return 'sibling';
-  if (['grandparent', 'grandmother', 'grandfather'].includes(normalized)) return 'grandparent';
-  if (['grandchild', 'grandson', 'granddaughter'].includes(normalized)) return 'grandchild';
-  if (normalized.includes('in law')) return 'in_law';
+  if (['grandparent', 'grandmother', 'grandfather'].includes(compact)) return 'grandparent';
+  if (['grandchild', 'grandson', 'granddaughter'].includes(compact)) return 'grandchild';
+  if (compact.includes('inlaw')) return 'in_law';
   return 'other';
 }
 
