@@ -2,33 +2,39 @@ import type { AgeGroup } from '@/types/askCarebow';
 
 export type ConversationContextType = 'me' | 'family';
 
-export type ConversationSelfMember = {
+export type ConversationPatientMember = {
   id: string;
   backendId?: string;
   dateOfBirth?: string;
+  relationship?: string;
 };
 
 /**
  * Choose the profile identifier that is safe to attach to an Ask CareBow
  * conversation.
  *
- * Family-mode intake currently collects relationship + age, not a specific
- * saved family profile. Reusing the account holder's default profile in that
- * case is unsafe: the backend would load the wrong patient's conditions,
- * medications, allergies and age. Return an empty id instead so family turns
- * stay on the deterministic local safety path until a real patient profile is
- * explicitly selected/resolved.
+ * "Default member" is not identity. A user can make Mom the app default, so a
+ * self conversation may bind only to a profile explicitly marked relationship
+ * `self`. Likewise family mode may bind only to the specific saved non-self
+ * profile the user selected on Ask CareBow. Ad-hoc family intake has no profile
+ * id and stays on the deterministic local safety path.
  *
- * For self-mode, prefer the real backend id. If onboarding only created the
- * local member, return that local id so ensureBackendProfile() can repair the
- * sync before the orchestrator is called.
+ * Prefer a real backend id. A local id is still acceptable because
+ * ensureBackendProfile() validates/repairs that exact saved profile before the
+ * orchestrator uses it.
  */
 export function resolveConversationMemberId(
   context: ConversationContextType,
-  selfMember?: ConversationSelfMember | null
+  selfMember?: ConversationPatientMember | null,
+  selectedFamilyMember?: ConversationPatientMember | null
 ): string {
-  if (context === 'family') return '';
-  return selfMember?.backendId ?? selfMember?.id ?? '';
+  if (context === 'me') {
+    if (!selfMember || selfMember.relationship !== 'self') return '';
+    return selfMember.backendId ?? selfMember.id ?? '';
+  }
+
+  if (!selectedFamilyMember || selectedFamilyMember.relationship === 'self') return '';
+  return selectedFamilyMember.backendId ?? selectedFamilyMember.id ?? '';
 }
 
 export function ageToAgeGroup(age: number): AgeGroup | undefined {
@@ -56,8 +62,9 @@ export function ageFromDateOfBirth(dateOfBirth?: string, now = new Date()): numb
 
 /**
  * Seed the on-device safety engine with the patient's age band before the
- * first symptom is processed. Family-mode uses the age the user just entered;
- * self-mode derives it from the saved profile DOB.
+ * first symptom is processed. Family-mode uses the age captured by AskScreen
+ * (for a saved profile that value is derived from its exact DOB); self-mode
+ * derives it from the saved self profile DOB.
  */
 export function resolveConversationAgeGroup(
   context: ConversationContextType,
