@@ -56,6 +56,8 @@ export type RootStackParamList = {
         relation: string;
         age: string;
         memberName: string;
+        memberId?: string; // Exact saved local/backend patient selected for this conversation
+        caregiverPresent?: string;
         attachedImages?: string; // JSON string of ImageAttachment[]
       }
     | undefined;

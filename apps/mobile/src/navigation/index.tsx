@@ -3,7 +3,7 @@
  * Main navigation container with auth flow handling
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
@@ -11,6 +11,7 @@ import { colors } from '@/theme';
 
 // Auth Store
 import { useAuthStore, isProviderUserType } from '@/store/useAuthStore';
+import { hydrateOwnedProfilesFromServer } from '@/lib/profileRepository';
 
 // Navigators
 import AuthNavigator from './AuthNavigator';
@@ -55,7 +56,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  */
 function MainTabsRouter() {
   const userType = useAuthStore((state) => state.userType);
-  if (userType === 'healthcare_provider' || userType === 'service_provider' || userType === 'service_partner') {
+  if (
+    userType === 'healthcare_provider' ||
+    userType === 'service_provider' ||
+    userType === 'service_partner'
+  ) {
     return <MemberTabNavigator />;
   }
   return <TabNavigator />;
@@ -76,7 +81,22 @@ export default function RootNavigator() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasCompletedOnboarding = useAuthStore((state) => state.hasCompletedOnboarding);
   const userType = useAuthStore((state) => state.userType);
+  const userId = useAuthStore((state) => state.user?.id);
   const hasHydrated = useAuthStore((state) => state._hasHydrated);
+
+  // Patient profiles are account data, not screen-local data. Hydrate once at
+  // the authenticated app boundary so Ask CareBow, bookings, and Profile all
+  // see the same server roster even on a fresh install/new phone. Logout already
+  // clears useProfileStore, so data cannot bleed into the next account.
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || !userId || isProviderUserType(userType)) return;
+
+    void hydrateOwnedProfilesFromServer(userId).catch((error) => {
+      // Offline startup must not brick navigation; features that require a real
+      // profile still validate/sync again at their server boundary.
+      console.warn('[RootNavigator] Patient profile hydration failed', error);
+    });
+  }, [hasHydrated, isAuthenticated, userId, userType]);
 
   // Show loading while store is hydrating
   if (!hasHydrated) {
@@ -100,10 +120,7 @@ export default function RootNavigator() {
   };
 
   return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName={getInitialRoute()}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={getInitialRoute()}>
       {/* Auth Flow - shown when not authenticated */}
       {!isAuthenticated ? (
         <Stack.Screen

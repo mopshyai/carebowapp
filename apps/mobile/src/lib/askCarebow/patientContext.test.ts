@@ -11,9 +11,38 @@ describe('Ask CareBow patient context', () => {
       resolveConversationMemberId('family', {
         id: 'local-self',
         backendId: 'backend-self',
+        relationship: 'self',
         dateOfBirth: '1990-01-01T00:00:00.000Z',
       })
     ).toBe('');
+  });
+
+  it('uses the explicitly selected saved family profile, never self', () => {
+    expect(
+      resolveConversationMemberId(
+        'family',
+        { id: 'local-self', backendId: 'backend-self', relationship: 'self' },
+        { id: 'local-mom', backendId: 'backend-mom', relationship: 'parent' }
+      )
+    ).toBe('backend-mom');
+
+    expect(
+      resolveConversationMemberId(
+        'family',
+        { id: 'local-self', backendId: 'backend-self', relationship: 'self' },
+        { id: 'local-self', backendId: 'backend-self', relationship: 'self' }
+      )
+    ).toBe('');
+  });
+
+  it('uses a local saved family id when that exact profile still needs backend repair', () => {
+    expect(
+      resolveConversationMemberId(
+        'family',
+        { id: 'local-self', relationship: 'self' },
+        { id: 'local-dad', relationship: 'parent' }
+      )
+    ).toBe('local-dad');
   });
 
   it('uses the backend self profile when it exists', () => {
@@ -21,12 +50,25 @@ describe('Ask CareBow patient context', () => {
       resolveConversationMemberId('me', {
         id: 'local-self',
         backendId: 'backend-self',
+        relationship: 'self',
       })
     ).toBe('backend-self');
   });
 
   it('uses the local self id when backend sync still needs repair', () => {
-    expect(resolveConversationMemberId('me', { id: 'local-self' })).toBe('local-self');
+    expect(resolveConversationMemberId('me', { id: 'local-self', relationship: 'self' })).toBe(
+      'local-self'
+    );
+  });
+
+  it('does not treat an app-default family profile as self identity', () => {
+    expect(
+      resolveConversationMemberId('me', {
+        id: 'local-mom',
+        backendId: 'backend-mom',
+        relationship: 'parent',
+      })
+    ).toBe('');
   });
 
   it.each([

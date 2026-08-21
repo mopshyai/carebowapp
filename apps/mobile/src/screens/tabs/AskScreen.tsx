@@ -33,10 +33,16 @@ import {
 import { RedFlagWarning, detectRedFlags } from '../../components/askCarebow/RedFlagWarning';
 import { TrialBanner, TrialSignupCard } from '../../components/askCarebow/TrialSignupCard';
 import { resolveAskInputText } from '../../lib/askCarebow/askInput';
+import {
+  getSavedFamilyMembers,
+  selectionForSavedFamilyMember,
+} from '../../lib/askCarebow/familyProfileSelection';
 import type { AppNavigationProp } from '../../navigation/types';
 import { useAskCarebowStore, useIsTrialActive, useTrialState } from '../../store/askCarebowStore';
 import { useMemoryCount } from '../../store/healthMemoryStore';
+import { useProfileStore } from '../../store/useProfileStore';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
+
 const relationships = [
   { value: '', label: 'Select relationship...' },
   { value: 'father', label: 'Father' },
@@ -60,6 +66,7 @@ export default function AskCareBowScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
   const [contextType, setContextType] = useState<'me' | 'family'>('me');
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState('');
   const [familyRelation, setFamilyRelation] = useState('');
   const [familyAge, setFamilyAge] = useState('');
   const [caregiverPresent, setCaregiverPresent] = useState<boolean>(true);
@@ -72,6 +79,17 @@ export default function AskCareBowScreen() {
   const symptomInputRef = useRef(symptomInput);
   const baseTextRef = useRef('');
   const inputModeRef = useRef(inputMode);
+
+  const members = useProfileStore((state) => state.members);
+  const savedFamilyMembers = useMemo(() => getSavedFamilyMembers(members), [members]);
+  const selectedFamilyMember = useMemo(
+    () => savedFamilyMembers.find((member) => member.id === selectedFamilyMemberId),
+    [savedFamilyMembers, selectedFamilyMemberId]
+  );
+  const selectedFamilySelection = useMemo(
+    () => (selectedFamilyMember ? selectionForSavedFamilyMember(selectedFamilyMember) : null),
+    [selectedFamilyMember]
+  );
 
   useEffect(() => {
     symptomInputRef.current = symptomInput;
@@ -274,16 +292,41 @@ export default function AskCareBowScreen() {
   const handleStart = () => {
     if (!effectiveSymptom) return;
 
+    let memberId: string | undefined;
+    let memberName = 'Me';
+    let relation = familyRelation;
+    let age = familyAge;
+
+    if (contextType === 'family' && selectedFamilyMemberId) {
+      if (!selectedFamilySelection) {
+        Alert.alert(
+          'Complete this family profile',
+          'CareBow needs a valid saved date of birth before it can safely use this patient profile.'
+        );
+        return;
+      }
+      memberId = selectedFamilySelection.memberId;
+      memberName = selectedFamilySelection.memberName;
+      relation = selectedFamilySelection.relation;
+      age = selectedFamilySelection.age;
+    } else if (contextType === 'family') {
+      memberName = familyRelation;
+    }
+
     // Clear any existing session before starting a new one
     clearCurrentSession();
 
-    // Navigate with all context including images
+    // The patient id is present only when the user explicitly chose a saved
+    // family profile. Ad-hoc relationship/age intake deliberately carries no
+    // id, so ConversationScreen cannot accidentally attach somebody else's
+    // clinical record.
     navigation.navigate('Conversation' as never, {
       symptom: effectiveSymptom,
       context: contextType,
-      relation: familyRelation,
-      age: familyAge,
-      memberName: contextType === 'family' ? familyRelation : 'Me',
+      relation,
+      age,
+      memberName,
+      memberId,
       // Pass caregiver presence for family mode
       caregiverPresent: contextType === 'family' ? String(caregiverPresent) : undefined,
       // Pass image URIs as JSON string (navigation params must be serializable)
@@ -297,7 +340,9 @@ export default function AskCareBowScreen() {
   };
 
   const canStart =
-    effectiveSymptom.length > 0 && (contextType === 'me' || (familyRelation && familyAge));
+    effectiveSymptom.length > 0 &&
+    (contextType === 'me' ||
+      (selectedFamilyMemberId ? Boolean(selectedFamilySelection) : Boolean(familyRelation && familyAge)));
 
   return (
     <View style={styles.container}>
@@ -406,71 +451,134 @@ export default function AskCareBowScreen() {
         {/* Family Context Fields */}
         {contextType === 'family' && (
           <View style={styles.familySection}>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                Relationship <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setShowRelationshipPicker(!showRelationshipPicker)}
-              >
-                <Text
-                  style={[
-                    styles.selectButtonText,
-                    !familyRelation && styles.selectButtonPlaceholder,
-                  ]}
-                >
-                  {familyRelation
-                    ? relationships.find((r) => r.value === familyRelation)?.label
-                    : 'Select relationship...'}
+            {savedFamilyMembers.length > 0 && (
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Use a saved family profile</Text>
+                <Text style={styles.fieldHint}>
+                  Choose the exact person so CareBow can use only that patient's saved health context.
                 </Text>
-                <Icon name="chevron-down" size={20} color={colors.textTertiary} />
-              </TouchableOpacity>
-              {showRelationshipPicker && (
-                <View style={styles.pickerDropdown}>
-                  {relationships.slice(1).map((rel) => (
-                    <TouchableOpacity
-                      key={rel.value}
-                      style={[
-                        styles.pickerOption,
-                        familyRelation === rel.value && styles.pickerOptionActive,
-                      ]}
-                      onPress={() => {
-                        setFamilyRelation(rel.value);
-                        setShowRelationshipPicker(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          familyRelation === rel.value && styles.pickerOptionTextActive,
-                        ]}
+                <View style={styles.savedProfilesList}>
+                  {savedFamilyMembers.map((member) => {
+                    const selected = member.id === selectedFamilyMemberId;
+                    const displayName = [member.firstName, member.lastName]
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <TouchableOpacity
+                        key={member.id}
+                        style={[styles.savedProfileButton, selected && styles.savedProfileButtonActive]}
+                        onPress={() => {
+                          setSelectedFamilyMemberId(member.id);
+                          setShowRelationshipPicker(false);
+                        }}
                       >
-                        {rel.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Icon
+                          name={selected ? 'checkmark-circle' : 'person-circle-outline'}
+                          size={18}
+                          color={selected ? colors.accent : colors.textSecondary}
+                        />
+                        <View style={styles.savedProfileText}>
+                          <Text style={styles.savedProfileName}>{displayName}</Text>
+                          <Text style={styles.savedProfileMeta}>{member.relationship}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={[
+                      styles.savedProfileButton,
+                      !selectedFamilyMemberId && styles.savedProfileButtonActive,
+                    ]}
+                    onPress={() => setSelectedFamilyMemberId('')}
+                  >
+                    <Icon
+                      name={!selectedFamilyMemberId ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={18}
+                      color={!selectedFamilyMemberId ? colors.accent : colors.textSecondary}
+                    />
+                    <View style={styles.savedProfileText}>
+                      <Text style={styles.savedProfileName}>Someone else</Text>
+                      <Text style={styles.savedProfileMeta}>Use relationship and age only</Text>
+                    </View>
+                  </TouchableOpacity>
                 </View>
-              )}
-            </View>
+                {selectedFamilyMemberId && !selectedFamilySelection && (
+                  <Text style={styles.profileRepairText}>
+                    This saved profile needs a valid date of birth before CareBow can use it safely.
+                  </Text>
+                )}
+              </View>
+            )}
 
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                Age <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.ageInput}
-                placeholder="Enter their age"
-                placeholderTextColor={colors.textTertiary}
-                value={familyAge}
-                onChangeText={setFamilyAge}
-                keyboardType="numeric"
-                maxLength={3}
-              />
-              <Text style={styles.fieldHint}>
-                Helps me provide safer guidance, especially for children and older adults.
-              </Text>
-            </View>
+            {!selectedFamilyMemberId && (
+              <>
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>
+                    Relationship <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.selectButton}
+                    onPress={() => setShowRelationshipPicker(!showRelationshipPicker)}
+                  >
+                    <Text
+                      style={[
+                        styles.selectButtonText,
+                        !familyRelation && styles.selectButtonPlaceholder,
+                      ]}
+                    >
+                      {familyRelation
+                        ? relationships.find((r) => r.value === familyRelation)?.label
+                        : 'Select relationship...'}
+                    </Text>
+                    <Icon name="chevron-down" size={20} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                  {showRelationshipPicker && (
+                    <View style={styles.pickerDropdown}>
+                      {relationships.slice(1).map((rel) => (
+                        <TouchableOpacity
+                          key={rel.value}
+                          style={[
+                            styles.pickerOption,
+                            familyRelation === rel.value && styles.pickerOptionActive,
+                          ]}
+                          onPress={() => {
+                            setFamilyRelation(rel.value);
+                            setShowRelationshipPicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.pickerOptionText,
+                              familyRelation === rel.value && styles.pickerOptionTextActive,
+                            ]}
+                          >
+                            {rel.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>
+                    Age <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.ageInput}
+                    placeholder="Enter their age"
+                    placeholderTextColor={colors.textTertiary}
+                    value={familyAge}
+                    onChangeText={setFamilyAge}
+                    keyboardType="numeric"
+                    maxLength={3}
+                  />
+                  <Text style={styles.fieldHint}>
+                    Helps me provide safer guidance, especially for children and older adults.
+                  </Text>
+                </View>
+              </>
+            )}
 
             {/* Caregiver Presence Toggle */}
             <View style={styles.fieldContainer}>
@@ -921,6 +1029,41 @@ const styles = StyleSheet.create({
   fieldHint: {
     ...typography.caption,
     color: colors.textTertiary,
+  },
+  savedProfilesList: {
+    gap: spacing.xs,
+    marginTop: spacing.xxs,
+  },
+  savedProfileButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  savedProfileButtonActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  savedProfileText: {
+    flex: 1,
+  },
+  savedProfileName: {
+    ...typography.label,
+    color: colors.textPrimary,
+  },
+  savedProfileMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'capitalize',
+  },
+  profileRepairText: {
+    ...typography.caption,
+    color: colors.error,
   },
   selectButton: {
     backgroundColor: colors.surface,
