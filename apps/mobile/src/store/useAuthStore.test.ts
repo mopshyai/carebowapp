@@ -43,9 +43,6 @@ jest.mock('@/services/api/endpoints/auth', () => {
     if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
       return { success: false, error: 'Password must be at least 8 characters' };
     }
-    // Mirrors the email-otp path (no tokens issued yet) so the store falls
-    // into "pendingVerificationEmail" rather than auto-login, matching what
-    // the "successful signup" test expects.
     return { success: true };
   });
 
@@ -56,8 +53,6 @@ jest.mock('@/services/api/endpoints/auth', () => {
     return {
       success: true,
       tokens: mockTokens,
-      // No `email` field on purpose: the store falls back to the in-memory
-      // `pendingVerificationEmail` via normalizeUser's fallbackEmail param.
       user: {
         id: 'user_verified',
         firstName: 'Test',
@@ -67,22 +62,15 @@ jest.mock('@/services/api/endpoints/auth', () => {
   });
 
   const resendVerificationCode = jest.fn(
-    async (): Promise<{ message: string }> => ({
-      message: 'Verification code sent',
-    })
+    async (): Promise<{ message: string }> => ({ message: 'Verification code sent' })
   );
 
   const requestPasswordReset = jest.fn(
-    async (): Promise<{ message: string }> => ({
-      message: 'Password reset email sent',
-    })
+    async (): Promise<{ message: string }> => ({ message: 'Password reset email sent' })
   );
 
   const resetPassword = jest.fn(
     async (_token: string, newPassword: string): Promise<{ message: string }> => {
-      // The store's resetPassword() has no success-flag branch — it treats
-      // any resolved promise as success and any thrown error as failure —
-      // so short passwords must reject rather than resolve.
       if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) {
         throw new Error('Password must be at least 8 characters');
       }
@@ -120,11 +108,20 @@ jest.mock('@/services/api/endpoints/auth', () => {
 import { useAuthStore } from './useAuthStore';
 import { ApiClient } from '@/services/api/ApiClient';
 
-// Reset store before each test
+// Unit tests must never wait on the production logout endpoint. `logout()`
+// intentionally attempts best-effort refresh-token revocation when a token is
+// present, so make that network boundary deterministic here. The endpoint-level
+// auth tests separately cover that the real logout call is made before local
+// token cleanup.
 beforeEach(async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response);
   const { logout, setHasHydrated } = useAuthStore.getState();
   await logout();
   setHasHydrated(true);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 // ============================================
@@ -171,13 +168,8 @@ describe('AuthStore Initial State', () => {
 describe('AuthStore Login', () => {
   it('sets loading state during login', async () => {
     const store = useAuthStore.getState();
-
-    // Start login (don't await)
     const loginPromise = store.login('test@example.com', 'password123');
-
-    // Check loading state
     expect(useAuthStore.getState().isLoading).toBe(true);
-
     await loginPromise;
   });
 
@@ -194,17 +186,12 @@ describe('AuthStore Login', () => {
     expect(state.accessToken).toBe('mock_access_token');
     expect(state.refreshToken).toBe('mock_refresh_token');
     expect(state.isLoading).toBe(false);
-
-    // Regression: login used to only update this store + SecureStorage,
-    // leaving ApiClient (what every actual API call reads its token from)
-    // on whatever it hydrated at boot — every authenticated request 401'd
-    // after a real login while the UI still showed the user as signed in.
     expect(ApiClient.getAccessToken()).toBe('mock_access_token');
   });
 
   it('failed login sets error', async () => {
     const store = useAuthStore.getState();
-    const result = await store.login('test@example.com', 'short'); // password < 8 chars
+    const result = await store.login('test@example.com', 'short');
 
     expect(result).toBe(false);
 
@@ -260,14 +247,11 @@ describe('AuthStore Signup', () => {
 
 describe('AuthStore Logout', () => {
   it('logout clears all auth state', async () => {
-    // First login
     const store = useAuthStore.getState();
     await store.login('test@example.com', 'password123');
 
-    // Verify logged in
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
-    // Logout (now async)
     await store.logout();
 
     const state = useAuthStore.getState();
@@ -319,7 +303,7 @@ describe('AuthStore Email Verification', () => {
     const store = useAuthStore.getState();
     store.setPendingVerificationEmail('verify@example.com');
 
-    const result = await store.verifyEmail('12345'); // 5 digits
+    const result = await store.verifyEmail('12345');
 
     expect(result).toBe(false);
     expect(useAuthStore.getState().error).toBeDefined();
@@ -416,17 +400,13 @@ describe('AuthStore User Management', () => {
     expect(state.user?.firstName).toBe('Updated');
     expect(state.user?.lastName).toBe('Name');
     expect(state.user?.email).toBe('test@example.com');
-    // updatedAt should be set (a valid ISO date string)
     expect(state.user?.updatedAt).toBeDefined();
     expect(new Date(state.user?.updatedAt || '').getTime()).not.toBeNaN();
   });
 
   it('updateUser does nothing when no user', () => {
     const store = useAuthStore.getState();
-
-    // Should not throw
     store.updateUser({ firstName: 'Test' });
-
     expect(useAuthStore.getState().user).toBeNull();
   });
 });
@@ -489,7 +469,6 @@ describe('AuthStore Selectors', () => {
 
     const state = useAuthStore.getState();
 
-    // Test selector-like access
     expect(state.isAuthenticated).toBe(true);
     expect(state.user).not.toBeNull();
     expect(state.isLoading).toBe(false);
