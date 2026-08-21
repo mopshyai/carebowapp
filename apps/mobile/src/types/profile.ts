@@ -87,7 +87,7 @@ export type MemberHealthInfo = {
 export type Allergy = {
   id: string;
   name: string;
-  severity: 'mild' | 'moderate' | 'severe';
+  severity: 'mild' | 'moderate' | 'severe' | 'unknown';
   notes?: string;
 };
 
@@ -95,7 +95,7 @@ export type Condition = {
   id: string;
   name: string;
   diagnosedDate?: string;
-  status: 'active' | 'managed' | 'resolved';
+  status: 'active' | 'managed' | 'resolved' | 'unknown';
   notes?: string;
 };
 
@@ -382,6 +382,8 @@ export function createDefaultPrivacySettings(): PrivacySettings {
     twoFactorEnabled: false,
     shareDataWithProviders: true,
     allowAnalytics: true,
+    dataExportRequestedAt: undefined,
+    accountDeletionRequestedAt: undefined,
   };
 }
 

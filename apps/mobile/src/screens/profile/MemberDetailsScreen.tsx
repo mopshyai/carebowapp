@@ -1,6 +1,6 @@
 /**
  * Member Details Screen
- * View and edit individual family member's information and health data
+ * View and edit individual family member's server-backed health data.
  */
 
 import React, { useState } from 'react';
@@ -21,10 +21,11 @@ import { colors, spacing, radius, typography, shadows, components } from '../../
 import { useProfileStore } from '../../store/useProfileStore';
 import {
   RELATIONSHIP_LABELS,
-  MOBILITY_LABELS,
-  MobilityStatus,
   WHY_WE_ASK,
+  generateId,
+  type MemberHealthInfo,
 } from '../../types/profile';
+import { persistMemberSnapshot } from '../../lib/profileRepository';
 
 type ModalType = 'allergy' | 'condition' | 'medication' | null;
 
@@ -36,19 +37,13 @@ export default function MemberDetailsScreen() {
 
   const getMemberById = useProfileStore((state) => state.getMemberById);
   const updateMember = useProfileStore((state) => state.updateMember);
-  const addAllergy = useProfileStore((state) => state.addAllergy);
-  const removeAllergy = useProfileStore((state) => state.removeAllergy);
-  const addCondition = useProfileStore((state) => state.addCondition);
-  const removeCondition = useProfileStore((state) => state.removeCondition);
-  const addMedication = useProfileStore((state) => state.addMedication);
-  const removeMedication = useProfileStore((state) => state.removeMedication);
-
   const member = getMemberById(id || '');
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalInput, setModalInput] = useState('');
   const [modalSecondInput, setModalSecondInput] = useState('');
   const [modalThirdInput, setModalThirdInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!member) {
     return (
@@ -61,56 +56,118 @@ export default function MemberDetailsScreen() {
     );
   }
 
-  const handleAddAllergy = () => {
-    if (!modalInput.trim()) {
-      Alert.alert('Error', 'Please enter an allergy name');
-      return;
-    }
-    addAllergy(member.id, {
-      name: modalInput.trim(),
-      severity: 'moderate',
-      notes: modalSecondInput.trim(),
-    });
-    setActiveModal(null);
-    setModalInput('');
-    setModalSecondInput('');
-  };
-
-  const handleAddCondition = () => {
-    if (!modalInput.trim()) {
-      Alert.alert('Error', 'Please enter a condition name');
-      return;
-    }
-    addCondition(member.id, {
-      name: modalInput.trim(),
-      status: 'active',
-      notes: modalSecondInput.trim(),
-    });
-    setActiveModal(null);
-    setModalInput('');
-    setModalSecondInput('');
-  };
-
-  const handleAddMedication = () => {
-    if (!modalInput.trim()) {
-      Alert.alert('Error', 'Please enter a medication name');
-      return;
-    }
-    addMedication(member.id, {
-      name: modalInput.trim(),
-      dosage: modalSecondInput.trim(),
-      frequency: modalThirdInput.trim() || 'As directed',
-    });
+  const resetModal = () => {
     setActiveModal(null);
     setModalInput('');
     setModalSecondInput('');
     setModalThirdInput('');
   };
 
+  const persistHealthInfo = async (healthInfo: MemberHealthInfo): Promise<boolean> => {
+    if (isSaving) return false;
+    setIsSaving(true);
+
+    try {
+      const nextMember = { ...member, healthInfo };
+      const backendId = await persistMemberSnapshot(nextMember);
+      // Server succeeded: only now mutate the device cache.
+      updateMember(member.id, { healthInfo, backendId });
+      return true;
+    } catch (error) {
+      Alert.alert(
+        'Could not save health information',
+        error instanceof Error
+          ? error.message
+          : 'CareBow could not save this change. Your profile was not changed.'
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddAllergy = async () => {
+    if (!modalInput.trim()) {
+      Alert.alert('Missing allergy', 'Please enter an allergy name.');
+      return;
+    }
+
+    const saved = await persistHealthInfo({
+      ...member.healthInfo,
+      allergies: [
+        ...member.healthInfo.allergies,
+        {
+          id: generateId(),
+          name: modalInput.trim(),
+          // The form does not ask for severity, so do not invent one.
+          severity: 'unknown',
+          notes: modalSecondInput.trim() || undefined,
+        },
+      ],
+    });
+
+    if (saved) resetModal();
+  };
+
+  const handleAddCondition = async () => {
+    if (!modalInput.trim()) {
+      Alert.alert('Missing condition', 'Please enter a condition name.');
+      return;
+    }
+
+    const saved = await persistHealthInfo({
+      ...member.healthInfo,
+      conditions: [
+        ...member.healthInfo.conditions,
+        {
+          id: generateId(),
+          name: modalInput.trim(),
+          // The form does not ask current status, so do not invent "active".
+          status: 'unknown',
+          notes: modalSecondInput.trim() || undefined,
+        },
+      ],
+    });
+
+    if (saved) resetModal();
+  };
+
+  const handleAddMedication = async () => {
+    if (!modalInput.trim()) {
+      Alert.alert('Missing medication', 'Please enter a medication name.');
+      return;
+    }
+
+    const saved = await persistHealthInfo({
+      ...member.healthInfo,
+      medications: [
+        ...member.healthInfo.medications,
+        {
+          id: generateId(),
+          name: modalInput.trim(),
+          dosage: modalSecondInput.trim(),
+          // Blank means unknown. "As directed" would be an invented medication instruction.
+          frequency: modalThirdInput.trim(),
+        },
+      ],
+    });
+
+    if (saved) resetModal();
+  };
+
   const handleRemoveAllergy = (allergyId: string, name: string) => {
     Alert.alert('Remove Allergy', `Remove "${name}" from allergies?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeAllergy(member.id, allergyId) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await persistHealthInfo({
+            ...member.healthInfo,
+            allergies: member.healthInfo.allergies.filter((allergy) => allergy.id !== allergyId),
+          });
+        },
+      },
     ]);
   };
 
@@ -120,7 +177,14 @@ export default function MemberDetailsScreen() {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => removeCondition(member.id, conditionId),
+        onPress: async () => {
+          await persistHealthInfo({
+            ...member.healthInfo,
+            conditions: member.healthInfo.conditions.filter(
+              (condition) => condition.id !== conditionId
+            ),
+          });
+        },
       },
     ]);
   };
@@ -131,7 +195,14 @@ export default function MemberDetailsScreen() {
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => removeMedication(member.id, medicationId),
+        onPress: async () => {
+          await persistHealthInfo({
+            ...member.healthInfo,
+            medications: member.healthInfo.medications.filter(
+              (medication) => medication.id !== medicationId
+            ),
+          });
+        },
       },
     ]);
   };
@@ -172,6 +243,13 @@ export default function MemberDetailsScreen() {
           </View>
         </View>
 
+        <View style={styles.cloudNote}>
+          <Icon name="cloud-done-outline" size={18} color={colors.info} />
+          <Text style={styles.cloudNoteText}>
+            Changes below are saved to your CareBow account before this device is updated.
+          </Text>
+        </View>
+
         {/* Allergies Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -179,7 +257,11 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Allergies</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.allergies}</Text>
             </View>
-            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('allergy')}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setActiveModal('allergy')}
+              disabled={isSaving}
+            >
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
@@ -193,9 +275,14 @@ export default function MemberDetailsScreen() {
                   </View>
                   <View style={styles.itemContent}>
                     <Text style={styles.itemName}>{allergy.name}</Text>
-                    <Text style={styles.itemMeta}>Severity: {allergy.severity}</Text>
+                    <Text style={styles.itemMeta}>
+                      Severity: {allergy.severity === 'unknown' ? 'Not specified' : allergy.severity}
+                    </Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleRemoveAllergy(allergy.id, allergy.name)}>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveAllergy(allergy.id, allergy.name)}
+                    disabled={isSaving}
+                  >
                     <Icon name="close-circle" size={24} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
@@ -215,7 +302,11 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Health Conditions</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.conditions}</Text>
             </View>
-            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('condition')}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setActiveModal('condition')}
+              disabled={isSaving}
+            >
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
@@ -229,10 +320,13 @@ export default function MemberDetailsScreen() {
                   </View>
                   <View style={styles.itemContent}>
                     <Text style={styles.itemName}>{condition.name}</Text>
-                    <Text style={styles.itemMeta}>Status: {condition.status}</Text>
+                    <Text style={styles.itemMeta}>
+                      Status: {condition.status === 'unknown' ? 'Not specified' : condition.status}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => handleRemoveCondition(condition.id, condition.name)}
+                    disabled={isSaving}
                   >
                     <Icon name="close-circle" size={24} color={colors.textTertiary} />
                   </TouchableOpacity>
@@ -253,32 +347,41 @@ export default function MemberDetailsScreen() {
               <Text style={styles.sectionTitle}>Medications</Text>
               <Text style={styles.sectionDescription}>{WHY_WE_ASK.medications}</Text>
             </View>
-            <TouchableOpacity style={styles.addButton} onPress={() => setActiveModal('medication')}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setActiveModal('medication')}
+              disabled={isSaving}
+            >
               <Icon name="add" size={20} color={colors.accent} />
             </TouchableOpacity>
           </View>
 
           {member.healthInfo.medications.length > 0 ? (
             <View style={styles.itemsList}>
-              {member.healthInfo.medications.map((medication) => (
-                <View key={medication.id} style={styles.itemCard}>
-                  <View style={[styles.itemIcon, { backgroundColor: colors.infoSoft }]}>
-                    <Icon name="medical" size={16} color={colors.info} />
+              {member.healthInfo.medications.map((medication) => {
+                const instructions = [medication.dosage, medication.frequency]
+                  .filter(Boolean)
+                  .join(' - ');
+                return (
+                  <View key={medication.id} style={styles.itemCard}>
+                    <View style={[styles.itemIcon, { backgroundColor: colors.infoSoft }]}>
+                      <Icon name="medical" size={16} color={colors.info} />
+                    </View>
+                    <View style={styles.itemContent}>
+                      <Text style={styles.itemName}>{medication.name}</Text>
+                      <Text style={styles.itemMeta}>
+                        {instructions || 'Dose and frequency not specified'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveMedication(medication.id, medication.name)}
+                      disabled={isSaving}
+                    >
+                      <Icon name="close-circle" size={24} color={colors.textTertiary} />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemName}>{medication.name}</Text>
-                    <Text style={styles.itemMeta}>
-                      {medication.dosage ? `${medication.dosage} - ` : ''}
-                      {medication.frequency}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveMedication(medication.id, medication.name)}
-                  >
-                    <Icon name="close-circle" size={24} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ) : (
             <View style={styles.emptyList}>
@@ -287,50 +390,17 @@ export default function MemberDetailsScreen() {
           )}
         </View>
 
-        {/* Mobility Status */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Mobility Status</Text>
-              <Text style={styles.sectionDescription}>{WHY_WE_ASK.mobility}</Text>
-            </View>
-          </View>
-
-          <View style={styles.mobilityOptions}>
-            {(Object.keys(MOBILITY_LABELS) as MobilityStatus[]).map((status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.mobilityOption,
-                  member.healthInfo.mobilityStatus === status && styles.mobilityOptionSelected,
-                ]}
-                onPress={() =>
-                  updateMember(member.id, {
-                    healthInfo: { ...member.healthInfo, mobilityStatus: status },
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.mobilityOptionText,
-                    member.healthInfo.mobilityStatus === status &&
-                      styles.mobilityOptionTextSelected,
-                  ]}
-                >
-                  {MOBILITY_LABELS[status]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* Mobility intentionally omitted for launch. The current Profile API
+            has no mobility field; showing an editable control here would imply
+            cloud persistence that does not exist. */}
       </ScrollView>
 
       {/* Add Modal */}
       <Modal visible={activeModal !== null} animationType="slide" presentationStyle="pageSheet">
         <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setActiveModal(null)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+            <TouchableOpacity onPress={resetModal} disabled={isSaving}>
+              <Text style={[styles.modalCancel, isSaving && styles.disabledText]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
               {activeModal === 'allergy' && 'Add Allergy'}
@@ -338,13 +408,16 @@ export default function MemberDetailsScreen() {
               {activeModal === 'medication' && 'Add Medication'}
             </Text>
             <TouchableOpacity
+              disabled={isSaving}
               onPress={() => {
-                if (activeModal === 'allergy') handleAddAllergy();
-                if (activeModal === 'condition') handleAddCondition();
-                if (activeModal === 'medication') handleAddMedication();
+                if (activeModal === 'allergy') void handleAddAllergy();
+                if (activeModal === 'condition') void handleAddCondition();
+                if (activeModal === 'medication') void handleAddMedication();
               }}
             >
-              <Text style={styles.modalSave}>Add</Text>
+              <Text style={[styles.modalSave, isSaving && styles.disabledText]}>
+                {isSaving ? 'Saving…' : 'Add'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -368,6 +441,7 @@ export default function MemberDetailsScreen() {
                 }
                 placeholderTextColor={colors.textTertiary}
                 autoFocus
+                editable={!isSaving}
               />
             </View>
 
@@ -383,6 +457,7 @@ export default function MemberDetailsScreen() {
                   activeModal === 'medication' ? 'e.g., 10mg, 500mg' : 'Any additional notes'
                 }
                 placeholderTextColor={colors.textTertiary}
+                editable={!isSaving}
               />
             </View>
 
@@ -395,8 +470,16 @@ export default function MemberDetailsScreen() {
                   onChangeText={setModalThirdInput}
                   placeholder="e.g., Once daily, Twice daily"
                   placeholderTextColor={colors.textTertiary}
+                  editable={!isSaving}
                 />
               </View>
+            )}
+
+            {(activeModal === 'allergy' || activeModal === 'condition') && (
+              <Text style={styles.fieldNote}>
+                Severity/status is shown as “Not specified” until CareBow has a backend field to
+                store that qualifier without losing it across devices.
+              </Text>
             )}
           </View>
         </View>
@@ -457,7 +540,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     gap: spacing.md,
     ...shadows.card,
   },
@@ -498,6 +581,20 @@ const styles = StyleSheet.create({
   completenessText: {
     ...typography.labelSmall,
     color: colors.accent,
+  },
+  cloudNote: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: colors.infoSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  cloudNoteText: {
+    ...typography.caption,
+    color: colors.info,
+    flex: 1,
   },
   section: {
     backgroundColor: colors.surface,
@@ -567,31 +664,6 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontStyle: 'italic',
   },
-  mobilityOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  mobilityOption: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  mobilityOptionSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentMuted,
-  },
-  mobilityOptionText: {
-    ...typography.label,
-    color: colors.textSecondary,
-  },
-  mobilityOptionTextSelected: {
-    color: colors.accent,
-  },
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: colors.surface2,
@@ -617,6 +689,9 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.accent,
   },
+  disabledText: {
+    opacity: 0.45,
+  },
   modalContent: {
     padding: spacing.lg,
   },
@@ -631,5 +706,10 @@ const styles = StyleSheet.create({
   input: {
     ...components.input,
     color: colors.textPrimary,
+  },
+  fieldNote: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    lineHeight: 18,
   },
 });

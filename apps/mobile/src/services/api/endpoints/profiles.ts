@@ -1,10 +1,22 @@
 import { ApiClient } from '../ApiClient';
 
+export type V1ProfileGender = 'MALE' | 'FEMALE' | 'OTHER';
+
 export interface V1Profile {
   id: string;
+  userId: string;
   name: string;
+  dateOfBirth: string;
+  gender: V1ProfileGender;
   relationship: string;
   photoUrl?: string | null;
+  bloodGroup?: string | null;
+  allergies?: string | null;
+  conditions?: string | null;
+  medications?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  isActive?: boolean;
 }
 
 interface V1ProfilesResponse {
@@ -30,17 +42,19 @@ export interface V1ProfileDeleteResponse {
   error?: string;
 }
 
+export type V1ProfileWrite = {
+  name: string;
+  dateOfBirth: string;
+  gender: V1ProfileGender;
+  relationship: string;
+  bloodGroup?: string;
+  allergies?: string;
+  conditions?: string;
+  medications?: string;
+};
+
 export const profilesApi = {
-  createProfile: async (data: {
-    name: string;
-    dateOfBirth: string;
-    gender: 'MALE' | 'FEMALE' | 'OTHER';
-    relationship: string;
-    bloodGroup?: string;
-    allergies?: string;
-    conditions?: string;
-    medications?: string;
-  }): Promise<V1Profile> => {
+  createProfile: async (data: V1ProfileWrite): Promise<V1Profile> => {
     const response = await ApiClient.post<V1ProfileResponse>('/v1/profiles', data);
     if (!response.data.success || !response.data.profile) {
       throw new Error(response.data.error || 'Unable to create profile');
@@ -61,19 +75,13 @@ export const profilesApi = {
 
   updateProfile: async (
     profileId: string,
-    data: Partial<{
-      name: string;
-      dateOfBirth: string;
-      gender: string;
-      relationship: string;
-      bloodGroup: string;
-      allergies: string;
-      conditions: string;
-      medications: string;
-      emergencyContactName: string;
-      emergencyContactPhone: string;
-      photoUrl: string;
-    }>
+    data: Partial<
+      V1ProfileWrite & {
+        emergencyContactName: string;
+        emergencyContactPhone: string;
+        photoUrl: string;
+      }
+    >
   ): Promise<V1ProfileResponse> => {
     const response = await ApiClient.put<V1ProfileResponse>(`/v1/profiles/${profileId}`, data);
     return response.data;
