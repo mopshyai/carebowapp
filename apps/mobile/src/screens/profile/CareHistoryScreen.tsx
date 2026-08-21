@@ -21,6 +21,7 @@ export default function CareHistoryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const sessions = useAskCarebowStore((state) => state.sessions);
+  const resumeSession = useAskCarebowStore((state) => state.resumeSession);
   const [tab, setTab] = useState<Tab>('all');
   const bookings = useBookingsStore((s) => s.bookings);
   const status = useBookingsStore((s) => s.status);
@@ -138,9 +139,14 @@ export default function CareHistoryScreen() {
                   onPress={() => {
                     if (item.kind === 'booking') {
                       navigation.navigate('OrderDetails', { id: item.bookingId });
-                    } else {
-                      navigation.navigate('Conversation', { sessionId: item.sessionId });
+                      return;
                     }
+
+                    // Restore the persisted session before the Conversation screen
+                    // mounts. Passing a sessionId alone previously opened whatever
+                    // session happened to be active instead of the history row.
+                    resumeSession(item.sessionId);
+                    navigation.navigate('Conversation');
                   }}
                 >
                   <View style={styles.iconWrap}>
