@@ -54,27 +54,6 @@ function isFreshReferral(context: CareReferralContext | null): context is CareRe
   return Date.now() - createdAt <= REFERRAL_TTL_MS;
 }
 
-/**
- * Provider-facing handoff generated from the completed clinical assessment.
- * The user can add their own notes below it, while CareBow keeps the triage
- * context attached to the booking instead of making the provider start blind.
- */
-export function formatCareReferralNotes(context: CareReferralContext): string {
-  const symptoms = context.symptoms
-    .map((symptom) => symptom.trim())
-    .filter(Boolean)
-    .slice(0, 8);
-
-  const lines = [
-    'CareBow assessment referral',
-    `Triage: ${context.triageLevel.replace('_', ' ')}`,
-    symptoms.length > 0 ? `Symptoms: ${symptoms.join(', ')}` : null,
-    context.episodeId ? `CareBow episode: ${context.episodeId}` : null,
-  ].filter((line): line is string => Boolean(line));
-
-  return lines.join('\n');
-}
-
 // Create initial booking draft from service
 const createInitialDraft = (
   service: Service,
@@ -114,7 +93,9 @@ const createInitialDraft = (
     selectedPackageLabel: initialPackageLabel,
     hours: initialHours,
     days: initialDays,
-    requestNotes: referralContext ? formatCareReferralNotes(referralContext) : '',
+    // Customer notes stay customer-owned. The backend adds the sanitized
+    // provider-facing assessment handoff from referralContext separately.
+    requestNotes: '',
     referralContext,
     subtotal: priceCalc.subtotal,
     discount: priceCalc.discount,
