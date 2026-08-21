@@ -36,8 +36,12 @@ export default function CheckoutScreen() {
   const { serviceId } = (route.params as { serviceId: string }) || {};
 
   // Store hooks
-  const { bookingDraft } = useCartStore();
+  const { bookingDraft, clearBookingDraft } = useCartStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // If Razorpay returned but the webhook is still pending, keep the exact order
+  // id locked to this checkout. The next tap checks that order; it must never
+  // create a second payment for the same booking while the first is unresolved.
+  const [unconfirmedOrderId, setUnconfirmedOrderId] = useState<string | null>(null);
 
   /**
    * Paying means leaving the app for Razorpay's page, so the outcome comes from
@@ -57,10 +61,64 @@ export default function CheckoutScreen() {
     });
   };
 
+  const showPaidConfirmation = () => {
+    setUnconfirmedOrderId(null);
+    // A confirmed payment already produced the server booking. Remove the draft
+    // immediately so this screen cannot issue a second payment for it.
+    clearBookingDraft();
+    Alert.alert(
+      'Payment received',
+      'Your booking is confirmed. The care team will be in touch with provider details.',
+      [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }],
+      { cancelable: false }
+    );
+  };
+
+  const recheckUnconfirmedOrder = async (orderId: string) => {
+    try {
+      const status = await paymentsApi.getPaymentStatus(orderId);
+      if (!status.success) {
+        throw new Error(status.error || 'Could not confirm payment status');
+      }
+
+      if (status.status === 'SUCCESS') {
+        showPaidConfirmation();
+        return;
+      }
+
+      if (status.status === 'FAILED' || status.status === 'REFUNDED') {
+        setUnconfirmedOrderId(null);
+        Alert.alert(
+          status.status === 'REFUNDED' ? 'Payment refunded' : 'Payment not completed',
+          status.status === 'REFUNDED'
+            ? 'This payment was refunded. You can start a new payment if you still want the booking.'
+            : 'Nothing was confirmed for this order. You can try payment again.'
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Still confirming your payment',
+        'CareBow is still waiting for Razorpay confirmation. This checkout is locked so you cannot accidentally pay twice.',
+        [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
+      );
+    } catch {
+      Alert.alert(
+        'Could not confirm payment yet',
+        'Do not pay again. Check your connection or your schedule, then use “Check payment status” again.'
+      );
+    }
+  };
+
   const handleBooking = async () => {
     if (!bookingDraft?.memberId || !bookingDraft.date || !bookingDraft.startTime) return;
     setIsSubmitting(true);
     try {
+      if (unconfirmedOrderId) {
+        await recheckUnconfirmedOrder(unconfirmedOrderId);
+        return;
+      }
+
       const scheduledAt = new Date(
         `${bookingDraft.date}T${bookingDraft.startTime}:00`
       ).toISOString();
@@ -136,20 +194,16 @@ export default function CheckoutScreen() {
       });
 
       if (outcome.status === 'paid') {
-        Alert.alert(
-          'Payment received',
-          'Your booking is confirmed. The care team will be in touch with provider details.',
-          [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
-        );
+        showPaidConfirmation();
       } else if (outcome.status === 'failed') {
         Alert.alert('Payment not completed', 'Nothing was charged. You can try again.');
       } else {
-        // Still pending. Never call this a failure — the webhook may just be
-        // slow, and "your payment failed" after it went through is worse than
-        // asking someone to look.
+        // Lock this checkout to the same server order. A slow webhook is not a
+        // reason to mint another payment link and risk charging the customer twice.
+        setUnconfirmedOrderId(order.orderId);
         Alert.alert(
           'Still confirming your payment',
-          'If you completed payment it will appear in your schedule shortly. Check there before paying again.',
+          'If you completed payment it will appear in your schedule shortly. This checkout will only recheck the same payment until CareBow knows the result.',
           [{ text: 'View schedule', onPress: () => navigation.navigate('Schedule') }]
         );
       }
@@ -159,9 +213,6 @@ export default function CheckoutScreen() {
         error instanceof Error ? error.message : 'Check your connection and try again.'
       );
     } finally {
-      // Safe now that start() resolves only once the outcome is known. It used
-      // to clear the moment the browser opened, which re-enabled the pay button
-      // while a payment was in flight.
       setIsSubmitting(false);
     }
   };
@@ -374,9 +425,19 @@ export default function CheckoutScreen() {
           activeOpacity={0.8}
           disabled={isSubmitting || checkout.busy}
         >
-          <Icon name="calendar" size={18} color={colors.white} />
+          <Icon
+            name={unconfirmedOrderId ? 'refresh' : 'calendar'}
+            size={18}
+            color={colors.white}
+          />
           <Text style={styles.payButtonText}>
-            {isSubmitting || checkout.busy ? 'Opening payment…' : 'Pay and book'}
+            {isSubmitting || checkout.busy
+              ? unconfirmedOrderId
+                ? 'Checking payment…'
+                : 'Opening payment…'
+              : unconfirmedOrderId
+                ? 'Check payment status'
+                : 'Pay and book'}
           </Text>
         </TouchableOpacity>
       </View>
