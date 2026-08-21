@@ -25,9 +25,9 @@ export default function TelemedicineBookingScreen() {
         </Text>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('Services', { category: 'healthcare' })}
+          onPress={() => navigation.navigate('Services', { category: 'video-consult' })}
         >
-          <Text style={styles.buttonText}>Browse live services</Text>
+          <Text style={styles.buttonText}>Browse live consultations</Text>
         </TouchableOpacity>
       </View>
     </View>
