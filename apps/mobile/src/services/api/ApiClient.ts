@@ -1,6 +1,6 @@
 /**
  * API Client
- * Central HTTP client for all backend API calls
+ * Central HTTP client for all backend API calls.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,39 +8,25 @@ import { API_BASE_URL, API_TIMEOUT } from '@env';
 import { SecureStorage } from '@/services/storage/SecureStorage';
 import { HttpMethod, RequestConfig, ApiResponse, ApiError, AuthTokens } from './types';
 
-// ============================================
-// CONFIGURATION
-// ============================================
-
-// Read from '@env', not process.env. react-native-dotenv (see babel.config.js)
-// inlines `@env` imports at build time; it does NOT populate process.env, which
-// in React Native only ever carries NODE_ENV. This file previously read
-// process.env.API_BASE_URL, so the value in .env was silently ignored and the
-// fallback below was always what shipped.
 const API_CONFIG = {
-  // Live backend on Hostinger VPS. The `www` is mandatory: the bare domain
-  // 302/307-redirects to www, and RN fetch drops POST bodies on redirect.
-  //
-  // No version suffix here — endpoints carry their own prefix, because the app
-  // calls both versioned (/v1/auth/login) and unversioned (/auth/enabled-methods,
-  // /ask-carebow/message) paths. A baseUrl ending in /v1 would break both.
+  // The live backend uses www. The bare domain redirects, and React Native can
+  // lose POST bodies while following that redirect.
   baseUrl: API_BASE_URL || 'https://www.carebow.com/api',
-  timeout: Number(API_TIMEOUT) || 30000, // 30 seconds
+  timeout: Number(API_TIMEOUT) || 30000,
   retries: 2,
 };
 
 const STORAGE_KEYS = {
-  // Token material must never live here. These two legacy keys are retained
-  // only so initialize()/setTokens()/clearTokens() can erase copies written by
-  // older builds.
+  // Legacy keys are deletion-only. Raw tokens belong in Keychain/Keystore.
   LEGACY_ACCESS_TOKEN: '@carebow/access_token',
   LEGACY_REFRESH_TOKEN: '@carebow/refresh_token',
   TOKEN_EXPIRY: '@carebow/token_expiry',
 };
 
-// ============================================
-// API CLIENT CLASS
-// ============================================
+interface ClearTokenOptions {
+  /** Best-effort revoke the current refresh token before deleting local credentials. */
+  revokeRemote?: boolean;
+}
 
 class ApiClientImpl {
   private baseUrl: string;
@@ -48,8 +34,8 @@ class ApiClientImpl {
   private defaultRetries: number;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
-  private tokenExpiry: number = 0;
-  private isRefreshing: boolean = false;
+  private tokenExpiry = 0;
+  private isRefreshing = false;
   private refreshPromise: Promise<boolean> | null = null;
 
   constructor() {
@@ -58,19 +44,13 @@ class ApiClientImpl {
     this.defaultRetries = API_CONFIG.retries;
   }
 
-  /** For callers that need to build a request this class doesn't wrap (e.g. sseClient.ts's raw XHR streaming). */
   getBaseUrl(): string {
     return this.baseUrl;
   }
 
-  /** Same rationale as getBaseUrl — current in-memory token, not read fresh from storage. */
   getAccessToken(): string | null {
     return this.accessToken;
   }
-
-  // ========================================
-  // INITIALIZATION
-  // ========================================
 
   async initialize(): Promise<void> {
     try {
@@ -83,8 +63,6 @@ class ApiClientImpl {
       this.refreshToken = refreshToken;
       this.tokenExpiry = expiry ? parseInt(expiry, 10) : 0;
 
-      // Cleanup for upgrades from builds where ApiClient duplicated raw access
-      // and refresh tokens into AsyncStorage. Expiry is not secret and can stay.
       await Promise.all([
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
         AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
@@ -97,40 +75,74 @@ class ApiClientImpl {
         });
       }
     } catch (error) {
-      if (__DEV__) {
-        console.error('[ApiClient] Failed to initialize:', error);
-      }
+      this.accessToken = null;
+      this.refreshToken = null;
+      this.tokenExpiry = 0;
+      if (__DEV__) console.error('[ApiClient] Failed to initialize:', error);
     }
   }
 
-  // ========================================
-  // TOKEN MANAGEMENT
-  // ========================================
-
+  /**
+   * Persist a token pair before making it active in memory.
+   *
+   * Previously the new bearer tokens were assigned first and secure persistence
+   * happened second. A failed Keychain/Keystore write could therefore make login
+   * report failure while the HTTP client remained authenticated in memory.
+   */
   async setTokens(tokens: AuthTokens): Promise<void> {
-    this.accessToken = tokens.accessToken;
-    this.refreshToken = tokens.refreshToken;
-    this.tokenExpiry = tokens.expiresAt;
+    try {
+      const storedSecurely = await SecureStorage.setAuthTokens(
+        tokens.accessToken,
+        tokens.refreshToken
+      );
+      if (!storedSecurely) {
+        throw new Error('Failed to persist authentication tokens securely');
+      }
 
-    const storedSecurely = await SecureStorage.setAuthTokens(tokens.accessToken, tokens.refreshToken);
-    if (!storedSecurely) {
-      // Do not silently claim a durable authenticated session when token
-      // persistence failed. Keep in-memory state for the current process, but
-      // surface the failure to the caller so login/refresh can fail closed.
-      throw new Error('Failed to persist authentication tokens securely');
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, tokens.expiresAt.toString()),
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
+      ]);
+
+      // Commit to the live client only after durable persistence succeeds.
+      this.accessToken = tokens.accessToken;
+      this.refreshToken = tokens.refreshToken;
+      this.tokenExpiry = tokens.expiresAt;
+    } catch (error) {
+      // Never retain either a previous identity or a half-committed new one.
+      this.accessToken = null;
+      this.refreshToken = null;
+      this.tokenExpiry = 0;
+      await Promise.all([
+        SecureStorage.clearAuthTokens(),
+        AsyncStorage.removeItem(STORAGE_KEYS.TOKEN_EXPIRY),
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
+        AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
+      ]);
+      throw error;
     }
-
-    await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.TOKEN_EXPIRY, tokens.expiresAt.toString()),
-      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
-      AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
-    ]);
   }
 
-  async clearTokens(): Promise<void> {
+  /**
+   * Clear the local session and, by default, make a best-effort server logout.
+   *
+   * Local deletion must always happen even when the device is offline. A failed
+   * remote revoke is intentionally non-fatal; password reset/change provides the
+   * stronger all-device recovery path.
+   */
+  async clearTokens(options: ClearTokenOptions = {}): Promise<void> {
+    const accessToken = this.accessToken;
+    const refreshToken = this.refreshToken;
+
+    // Disable authenticated requests immediately, before any network wait.
     this.accessToken = null;
     this.refreshToken = null;
     this.tokenExpiry = 0;
+
+    if (options.revokeRemote !== false && refreshToken) {
+      await this.revokeRemoteRefreshToken(accessToken, refreshToken);
+    }
 
     await Promise.all([
       SecureStorage.clearAuthTokens(),
@@ -138,6 +150,37 @@ class ApiClientImpl {
       AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_ACCESS_TOKEN),
       AsyncStorage.removeItem(STORAGE_KEYS.LEGACY_REFRESH_TOKEN),
     ]);
+  }
+
+  private async revokeRemoteRefreshToken(
+    accessToken: string | null,
+    refreshToken: string
+  ): Promise<void> {
+    try {
+      const response = await this.executeWithTimeout(
+        fetch(`${this.baseUrl}/v1/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ refreshToken }),
+        }),
+        Math.min(this.defaultTimeout, 5000)
+      );
+
+      if (__DEV__ && !response.ok) {
+        console.log('[ApiClient] Remote logout did not confirm revocation', {
+          status: response.status,
+        });
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[ApiClient] Remote logout unavailable; local session still cleared', {
+          message: (error as Error)?.message,
+        });
+      }
+    }
   }
 
   isAuthenticated(): boolean {
@@ -149,18 +192,13 @@ class ApiClientImpl {
   }
 
   private isTokenExpired(): boolean {
-    // Add 60 second buffer before expiry
-    // tokenExpiry is stored as Unix timestamp in seconds
-    const bufferMs = 60 * 1000; // 60 seconds
+    const bufferMs = 60 * 1000;
     return Date.now() >= this.tokenExpiry * 1000 - bufferMs;
   }
 
   private async refreshAccessToken(): Promise<boolean> {
-    if (!this.refreshToken) {
-      return false;
-    }
+    if (!this.refreshToken) return false;
 
-    // Prevent multiple simultaneous refresh attempts
     if (this.isRefreshing && this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -178,8 +216,6 @@ class ApiClientImpl {
 
   private async doRefreshToken(): Promise<boolean> {
     try {
-      // v1 rotation: send the refresh token in the body AND the (expired)
-      // access token in the Authorization header so the server can bind them.
       const response = await fetch(`${this.baseUrl}/v1/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -190,37 +226,32 @@ class ApiClientImpl {
       });
 
       if (!response.ok) {
-        await this.clearTokens();
+        await this.clearTokens({ revokeRemote: false });
         return false;
       }
 
-      // v1 returns tokens top-level with expiresIn (relative seconds).
       const data = await response.json();
       const accessToken = data.accessToken ?? data.tokens?.accessToken;
       const refreshToken = data.refreshToken ?? data.tokens?.refreshToken;
       if (!accessToken || !refreshToken) {
-        await this.clearTokens();
+        await this.clearTokens({ revokeRemote: false });
         return false;
       }
+
       const expiresAt =
         data.tokens?.expiresAt ??
         (data.expiresIn
           ? Math.floor(Date.now() / 1000) + data.expiresIn
           : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+
       await this.setTokens({ accessToken, refreshToken, expiresAt });
       return true;
     } catch (error) {
-      if (__DEV__) {
-        console.error('[ApiClient] Token refresh failed:', error);
-      }
-      await this.clearTokens();
+      if (__DEV__) console.error('[ApiClient] Token refresh failed:', error);
+      await this.clearTokens({ revokeRemote: false });
       return false;
     }
   }
-
-  // ========================================
-  // HTTP METHODS
-  // ========================================
 
   async get<T>(endpoint: string, config?: RequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>('GET', endpoint, undefined, config);
@@ -246,10 +277,6 @@ class ApiClientImpl {
     return this.request<T>('DELETE', endpoint, undefined, config);
   }
 
-  // ========================================
-  // CORE REQUEST METHOD
-  // ========================================
-
   private async request<T>(
     method: HttpMethod,
     endpoint: string,
@@ -258,19 +285,15 @@ class ApiClientImpl {
   ): Promise<ApiResponse<T>> {
     const { headers = {}, params, timeout, skipAuth, retries = this.defaultRetries } = config || {};
 
-    // Build URL with query params
     let url = `${this.baseUrl}${endpoint}`;
     if (params) {
       const queryString = Object.entries(params)
-        .filter(([_, v]) => v !== undefined)
-        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
         .join('&');
-      if (queryString) {
-        url += `?${queryString}`;
-      }
+      if (queryString) url += `?${queryString}`;
     }
 
-    // Check and refresh token if needed
     if (!skipAuth && this.accessToken && this.isTokenExpired()) {
       const refreshed = await this.refreshAccessToken();
       if (!refreshed) {
@@ -282,7 +305,6 @@ class ApiClientImpl {
       }
     }
 
-    // Build headers
     const requestHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -290,10 +312,9 @@ class ApiClientImpl {
     };
 
     if (!skipAuth && this.accessToken) {
-      requestHeaders['Authorization'] = `Bearer ${this.accessToken}`;
+      requestHeaders.Authorization = `Bearer ${this.accessToken}`;
     }
 
-    // Build request options
     const requestOptions: RequestInit = {
       method,
       headers: requestHeaders,
@@ -303,7 +324,6 @@ class ApiClientImpl {
       requestOptions.body = JSON.stringify(data);
     }
 
-    // Execute request with retry logic
     let lastError: Error | null = null;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -312,22 +332,18 @@ class ApiClientImpl {
           timeout || this.defaultTimeout
         );
 
-        // Parse response
         const responseHeaders: Record<string, string> = {};
         response.headers.forEach((value: string, key: string) => {
           responseHeaders[key] = value;
         });
 
-        // Handle non-2xx responses
         if (!response.ok) {
           const errorData = await this.safeParseJson(response);
 
-          // Handle 401 - try to refresh token once
           if (response.status === 401 && !skipAuth && this.refreshToken && attempt === 0) {
             const refreshed = await this.refreshAccessToken();
             if (refreshed) {
-              // Retry the request with new token
-              requestHeaders['Authorization'] = `Bearer ${this.accessToken}`;
+              requestHeaders.Authorization = `Bearer ${this.accessToken}`;
               continue;
             }
           }
@@ -335,9 +351,7 @@ class ApiClientImpl {
           throw ApiError.fromResponse(response.status, errorData);
         }
 
-        // Parse successful response
         const responseData = await this.safeParseJson(response);
-
         return {
           data: responseData as T,
           status: response.status,
@@ -355,7 +369,6 @@ class ApiClientImpl {
           });
         }
 
-        // Don't retry on certain errors
         if (error instanceof ApiError) {
           if (
             [
@@ -371,9 +384,8 @@ class ApiClientImpl {
           }
         }
 
-        // Wait before retrying
         if (attempt < retries) {
-          await this.delay(Math.pow(2, attempt) * 1000); // Exponential backoff
+          await this.delay(Math.pow(2, attempt) * 1000);
         }
       }
     }
@@ -381,15 +393,9 @@ class ApiClientImpl {
     throw lastError || ApiError.networkError();
   }
 
-  // ========================================
-  // UTILITIES
-  // ========================================
-
   private async executeWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(ApiError.timeout());
-      }, timeoutMs);
+      const timer = setTimeout(() => reject(ApiError.timeout()), timeoutMs);
 
       promise
         .then((result) => {
@@ -421,10 +427,6 @@ class ApiClientImpl {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // ========================================
-  // FILE UPLOAD
-  // ========================================
-
   async uploadFile(
     endpoint: string,
     file: { uri: string; type: string; name: string },
@@ -443,12 +445,9 @@ class ApiClientImpl {
       });
     }
 
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-    };
-
+    const headers: Record<string, string> = { Accept: 'application/json' };
     if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -462,18 +461,14 @@ class ApiClientImpl {
       throw ApiError.fromResponse(response.status, errorData);
     }
 
-    const data = await response.json();
+    const responseData = await response.json();
     return {
-      data,
+      data: responseData,
       status: response.status,
       headers: {},
     };
   }
 }
-
-// ============================================
-// SINGLETON EXPORT
-// ============================================
 
 export const ApiClient = new ApiClientImpl();
 export default ApiClient;
