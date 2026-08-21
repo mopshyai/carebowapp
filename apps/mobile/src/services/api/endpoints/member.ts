@@ -7,6 +7,33 @@ import { ApiClient } from '../ApiClient';
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
+export interface V1ConsultationNote {
+  id: string;
+  chiefComplaint: string;
+  findings?: string | null;
+  diagnosis: string;
+  treatmentPlan?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface V1Prescription {
+  id: string;
+  medicines?: Array<{
+    name?: string;
+    dose?: string;
+    frequency?: string;
+    duration?: string;
+    [key: string]: unknown;
+  }> | null;
+  labTests?: string[];
+  advice?: string | null;
+  nextReview?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: unknown;
+}
+
 export interface V1Booking {
   id: string;
   scheduledAt: string;
@@ -22,6 +49,8 @@ export interface V1Booking {
   profile?: { name: string } | null;
   provider?: { name: string; image?: string | null } | null;
   user?: { name?: string; email?: string; phoneNumber?: string | null } | null;
+  consultationNote?: V1ConsultationNote | null;
+  prescription?: V1Prescription | null;
 }
 
 export interface V1CancelResponse {
@@ -106,6 +135,7 @@ export const memberApi = {
     return response.data;
   },
 
+  /** Fetch one booking plus any provider-authored consultation/prescription outcome. */
   getBooking: async (
     bookingId: string
   ): Promise<{ success: boolean; error?: string; booking?: V1Booking }> => {
