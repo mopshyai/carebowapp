@@ -5,6 +5,8 @@
  * checkout and later asks the server whether the webhook confirmed payment.
  */
 
+import type { CareReferralContext } from '@/data/types';
+import { useCartStore } from '@/store/useCartStore';
 import ApiClient from '../ApiClient';
 
 export type PaymentSelection =
@@ -23,6 +25,8 @@ export type CreateBookingOrderRequest = {
   selection: PaymentSelection;
   hosted?: boolean;
   callbackUrl?: string;
+  /** Ask CareBow assessment handoff. Server sanitizes and snapshots this. */
+  careContext?: CareReferralContext;
 };
 
 export type CreateBookingOrderResponse = {
@@ -142,15 +146,29 @@ function singleFlight<T>(key: string, operation: () => Promise<T>): Promise<T> {
   return promise;
 }
 
+function withBookingReferral(body: CreateBookingOrderRequest): CreateBookingOrderRequest {
+  if (body.careContext) return body;
+
+  const referralContext = useCartStore.getState().bookingDraft?.referralContext;
+  if (!referralContext) return body;
+
+  return {
+    ...body,
+    careContext: referralContext,
+  };
+}
+
 export const paymentsApi = {
-  createBookingOrder: (body: CreateBookingOrderRequest): Promise<CreateBookingOrderResponse> =>
-    singleFlight(`booking:${stableSerialize(body)}`, async () => {
+  createBookingOrder: (body: CreateBookingOrderRequest): Promise<CreateBookingOrderResponse> => {
+    const requestBody = withBookingReferral(body);
+    return singleFlight(`booking:${stableSerialize(requestBody)}`, async () => {
       const response = await ApiClient.post<CreateBookingOrderResponse>(
         '/v1/payments/booking-order',
-        body
+        requestBody
       );
       return response.data;
-    }),
+    });
+  },
 
   createSettleOrder: (body: SettleBookingRequest): Promise<CreateBookingOrderResponse> =>
     singleFlight(`settle:${stableSerialize(body)}`, async () => {
