@@ -4,6 +4,7 @@
  */
 
 export type FollowUpStatus = 'scheduled' | 'done' | 'cancelled';
+export type FollowUpOutcome = 'better' | 'same' | 'worse';
 
 /**
  * Follow-up check-in intent
@@ -17,6 +18,7 @@ export interface FollowUpIntent {
   status: FollowUpStatus;
   createdAt: string;
   completedAt?: string;
+  outcome?: FollowUpOutcome;
 }
 
 /**
