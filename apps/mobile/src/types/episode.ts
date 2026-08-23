@@ -4,9 +4,17 @@
  */
 
 import { TriageLevel } from '../utils/triageCTAMapping';
+import type { FollowUpOutcome } from './followUp';
 
 export type ForWhom = 'me' | 'family';
 export type AgeGroup = 'child' | 'adult' | 'senior';
+export type EpisodeCareStatus =
+  | 'monitoring'
+  | 'care_requested'
+  | 'care_confirmed'
+  | 'care_in_progress'
+  | 'care_completed'
+  | 'care_cancelled';
 
 /**
  * Health Episode - A conversation thread about a health concern
@@ -23,6 +31,13 @@ export interface Episode {
   lastMessageSnippet: string;
   messageCount: number;
   isActive: boolean;
+
+  // Continuity of care. These fields are derived from user follow-ups and
+  // server-owned bookings; they do not replace backend booking truth.
+  careStatus?: EpisodeCareStatus;
+  linkedBookingId?: string;
+  lastFollowUpOutcome?: FollowUpOutcome;
+  lastFollowUpAt?: string;
 }
 
 /**
@@ -37,9 +52,6 @@ export interface EpisodeMessage {
   attachments?: MessageAttachment[];
 }
 
-/**
- * Attachment on a message (images, etc.)
- */
 export interface MessageAttachment {
   id: string;
   type: 'image' | 'document';
@@ -47,9 +59,6 @@ export interface MessageAttachment {
   mimeType?: string;
 }
 
-/**
- * Create a new Episode
- */
 export function createEpisode(params: {
   title: string;
   forWhom: ForWhom;
@@ -69,12 +78,10 @@ export function createEpisode(params: {
     lastMessageSnippet: params.firstMessage.slice(0, 100),
     messageCount: 1,
     isActive: true,
+    careStatus: 'monitoring',
   };
 }
 
-/**
- * Create a new Message
- */
 export function createMessage(params: {
   episodeId: string;
   role: 'user' | 'assistant' | 'system';
