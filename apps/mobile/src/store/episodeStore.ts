@@ -9,27 +9,41 @@ import { useShallow } from 'zustand/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Episode,
+  EpisodeCareStatus,
   EpisodeMessage,
   ForWhom,
   createEpisode,
   createMessage,
   MessageAttachment,
 } from '../types/episode';
+import type { FollowUpOutcome } from '../types/followUp';
 import { TriageLevel } from '../utils/triageCTAMapping';
 import { generateEpisodeTitle, getAgeGroupFromAge } from '../utils/episodeTitleGenerator';
 
-// ============================================
-// STORE TYPES
-// ============================================
+type ServerBookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+
+function careStatusFromBooking(status: ServerBookingStatus): EpisodeCareStatus {
+  switch (status) {
+    case 'PENDING':
+      return 'care_requested';
+    case 'CONFIRMED':
+      return 'care_confirmed';
+    case 'IN_PROGRESS':
+      return 'care_in_progress';
+    case 'COMPLETED':
+      return 'care_completed';
+    case 'CANCELLED':
+      return 'care_cancelled';
+  }
+}
 
 type EpisodeState = {
   episodes: Episode[];
-  messages: Record<string, EpisodeMessage[]>; // keyed by episodeId
+  messages: Record<string, EpisodeMessage[]>;
   activeEpisodeId: string | null;
 };
 
 type EpisodeActions = {
-  // Episode management
   startEpisode: (params: {
     symptomText: string;
     forWhom: ForWhom;
@@ -39,10 +53,11 @@ type EpisodeActions = {
 
   updateEpisode: (episodeId: string, updates: Partial<Episode>) => void;
   setTriageLevel: (episodeId: string, triageLevel: TriageLevel) => void;
+  recordFollowUpOutcome: (episodeId: string, outcome: FollowUpOutcome) => void;
+  linkBooking: (episodeId: string, bookingId: string, status: ServerBookingStatus) => void;
   closeEpisode: (episodeId: string) => void;
   deleteEpisode: (episodeId: string) => void;
 
-  // Message management
   addMessage: (params: {
     episodeId: string;
     role: 'user' | 'assistant' | 'system';
@@ -50,31 +65,23 @@ type EpisodeActions = {
     attachments?: MessageAttachment[];
   }) => EpisodeMessage;
 
-  // Getters
   getEpisode: (episodeId: string) => Episode | undefined;
   getMessages: (episodeId: string) => EpisodeMessage[];
   getActiveEpisode: () => Episode | undefined;
   getAllEpisodes: () => Episode[];
   getRecentEpisodes: (limit?: number) => Episode[];
 
-  // Session management
   setActiveEpisode: (episodeId: string | null) => void;
   resumeEpisode: (episodeId: string) => void;
 };
 
-// ============================================
-// STORE IMPLEMENTATION
-// ============================================
-
 export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
   persist(
     (set, get) => ({
-      // Initial state
       episodes: [],
       messages: {},
       activeEpisodeId: null,
 
-      // Start a new episode
       startEpisode: ({ symptomText, forWhom, age, relationship }) => {
         const ageGroup = getAgeGroupFromAge(age);
         const title = generateEpisodeTitle(symptomText, forWhom, ageGroup, relationship);
@@ -87,7 +94,6 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
           firstMessage: symptomText,
         });
 
-        // Create initial user message
         const firstMessage = createMessage({
           episodeId: episode.id,
           role: 'user',
@@ -96,17 +102,13 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
 
         set((state) => ({
           episodes: [episode, ...state.episodes],
-          messages: {
-            ...state.messages,
-            [episode.id]: [firstMessage],
-          },
+          messages: { ...state.messages, [episode.id]: [firstMessage] },
           activeEpisodeId: episode.id,
         }));
 
         return episode;
       },
 
-      // Update episode
       updateEpisode: (episodeId, updates) => {
         set((state) => ({
           episodes: state.episodes.map((ep) =>
@@ -115,20 +117,32 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
         }));
       },
 
-      // Set triage level
       setTriageLevel: (episodeId, triageLevel) => {
         get().updateEpisode(episodeId, { triageLevel });
       },
 
-      // Close episode
-      closeEpisode: (episodeId) => {
-        get().updateEpisode(episodeId, { isActive: false });
-        if (get().activeEpisodeId === episodeId) {
-          set({ activeEpisodeId: null });
-        }
+      recordFollowUpOutcome: (episodeId, outcome) => {
+        get().updateEpisode(episodeId, {
+          lastFollowUpOutcome: outcome,
+          lastFollowUpAt: new Date().toISOString(),
+        });
       },
 
-      // Delete episode
+      linkBooking: (episodeId, bookingId, status) => {
+        const episode = get().getEpisode(episodeId);
+        if (!episode) return;
+
+        get().updateEpisode(episodeId, {
+          linkedBookingId: bookingId,
+          careStatus: careStatusFromBooking(status),
+        });
+      },
+
+      closeEpisode: (episodeId) => {
+        get().updateEpisode(episodeId, { isActive: false });
+        if (get().activeEpisodeId === episodeId) set({ activeEpisodeId: null });
+      },
+
       deleteEpisode: (episodeId) => {
         set((state) => {
           const { [episodeId]: _, ...remainingMessages } = state.messages;
@@ -140,7 +154,6 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
         });
       },
 
-      // Add message to episode
       addMessage: ({ episodeId, role, text, attachments }) => {
         const message = createMessage({ episodeId, role, text, attachments });
 
@@ -167,46 +180,25 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
         return message;
       },
 
-      // Getters
-      getEpisode: (episodeId) => {
-        return get().episodes.find((ep) => ep.id === episodeId);
-      },
-
-      getMessages: (episodeId) => {
-        return get().messages[episodeId] || [];
-      },
-
+      getEpisode: (episodeId) => get().episodes.find((ep) => ep.id === episodeId),
+      getMessages: (episodeId) => get().messages[episodeId] || [],
       getActiveEpisode: () => {
         const { activeEpisodeId, episodes } = get();
         if (!activeEpisodeId) return undefined;
         return episodes.find((ep) => ep.id === activeEpisodeId);
       },
+      getAllEpisodes: () => get().episodes,
+      getRecentEpisodes: (limit = 10) =>
+        [...get().episodes]
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+          .slice(0, limit),
 
-      getAllEpisodes: () => {
-        return get().episodes;
-      },
-
-      getRecentEpisodes: (limit = 10) => {
-        return get()
-          .episodes.sort(
-            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-          )
-          .slice(0, limit);
-      },
-
-      // Session management
-      setActiveEpisode: (episodeId) => {
-        set({ activeEpisodeId: episodeId });
-      },
-
+      setActiveEpisode: (episodeId) => set({ activeEpisodeId: episodeId }),
       resumeEpisode: (episodeId) => {
         const episode = get().getEpisode(episodeId);
         if (episode) {
           set({ activeEpisodeId: episodeId });
-          // Mark as active if it was closed
-          if (!episode.isActive) {
-            get().updateEpisode(episodeId, { isActive: true });
-          }
+          if (!episode.isActive) get().updateEpisode(episodeId, { isActive: true });
         }
       },
     }),
@@ -217,23 +209,9 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
   )
 );
 
-// ============================================
-// SELECTOR HOOKS
-// ============================================
-
-// Returns same object ref from .find() - no shallow needed
 export const useActiveEpisode = () => useEpisodeStore((state) => state.getActiveEpisode());
-
-// Returns same array ref from state - no shallow needed
 export const useAllEpisodes = () => useEpisodeStore((state) => state.episodes);
-
-/**
- * FIX: getRecentEpisodes creates NEW array via .sort().slice() on every call.
- * Use useShallow to compare array contents, not references.
- */
 export const useRecentEpisodes = (limit?: number) =>
   useEpisodeStore(useShallow((state) => state.getRecentEpisodes(limit)));
-
-// Returns same array ref from state.messages[id], or undefined - no shallow needed
 export const useEpisodeMessages = (episodeId: string) =>
   useEpisodeStore((state) => state.messages[episodeId]);
