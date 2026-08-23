@@ -85,9 +85,7 @@ function getCarePlan(triageLevel: TriageLevel): CarePlanStep[] {
           text: 'Track symptom changes and escalate sooner if severity or red-flag symptoms increase.',
         },
       ];
-    case 'routine':
     case 'self_care':
-    default:
       return [
         {
           icon: 'home-outline',
@@ -321,7 +319,9 @@ export function TriageActionBar({
               <Icon name="clipboard-outline" size={18} color={colors.accent} />
               <Text style={styles.carePlanTitle}>Your care plan</Text>
             </View>
-            <Text style={styles.carePlanSubtitle}>Keep this episode moving until you feel better or get care.</Text>
+            <Text style={styles.carePlanSubtitle}>
+              Keep this episode moving until you feel better or get care.
+            </Text>
           </View>
 
           <View style={styles.carePlanSteps}>
@@ -462,7 +462,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundSecondary || colors.surface,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   carePlanCopy: {
     flex: 1,
