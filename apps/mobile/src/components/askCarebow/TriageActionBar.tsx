@@ -6,8 +6,10 @@
  * - ConversationScreen owns care-orchestration navigation when it supplies onAction.
  * - This component only falls back to local navigation when used standalone.
  *
- * This prevents the previous double-navigation bug where the action bar navigated
- * and then the parent navigated again for the same clinical recommendation.
+ * Care-plan rule:
+ * - A triage result must not end as a color/label plus buttons.
+ * - For non-emergency results, show the user what to do now, what to do next,
+ *   and what change should trigger escalation.
  */
 
 import React, { useState } from 'react';
@@ -32,16 +34,78 @@ import { useCartStore } from '../../store/useCartStore';
 interface TriageActionBarProps {
   triageLevel: TriageLevel;
   episodeId?: string;
-  /** Symptoms for home remedies recommendations */
   symptoms?: string[];
-  /** Profile the remedies request is filtered for (pregnancy, diabetes, age, allergies) */
   profileId?: string;
-  /**
-   * When present, the parent owns service navigation so the clinical episode can
-   * be carried into the booking flow. Local navigation is only a fallback for
-   * standalone usages of this component.
-   */
   onAction?: (action: string) => void;
+}
+
+type CarePlanStep = {
+  icon: string;
+  label: string;
+  text: string;
+};
+
+function getCarePlan(triageLevel: TriageLevel): CarePlanStep[] {
+  switch (triageLevel) {
+    case 'emergency':
+      return [];
+    case 'urgent':
+      return [
+        {
+          icon: 'medical-outline',
+          label: 'Now',
+          text: 'Arrange medical evaluation as soon as possible today.',
+        },
+        {
+          icon: 'chatbubbles-outline',
+          label: 'Next',
+          text: 'Use the recommended doctor option below and keep this episode with the booking.',
+        },
+        {
+          icon: 'warning-outline',
+          label: 'Escalate',
+          text: 'If symptoms become severe, rapidly worsen, or new red flags appear, seek emergency care.',
+        },
+      ];
+    case 'soon':
+      return [
+        {
+          icon: 'calendar-outline',
+          label: 'Now',
+          text: 'Follow the guidance above and avoid delaying care if symptoms are worsening.',
+        },
+        {
+          icon: 'person-outline',
+          label: 'Next',
+          text: 'Plan a clinician review soon; CareBow can carry this assessment into the booking.',
+        },
+        {
+          icon: 'eye-outline',
+          label: 'Watch',
+          text: 'Track symptom changes and escalate sooner if severity or red-flag symptoms increase.',
+        },
+      ];
+    case 'routine':
+    case 'self_care':
+    default:
+      return [
+        {
+          icon: 'home-outline',
+          label: 'Now',
+          text: 'Use the self-care guidance above and give your body time to recover.',
+        },
+        {
+          icon: 'time-outline',
+          label: 'Next',
+          text: 'Schedule a CareBow check-in so this episode is reviewed instead of forgotten.',
+        },
+        {
+          icon: 'trending-up-outline',
+          label: 'Watch',
+          text: 'Get medical help if symptoms persist, worsen, or a concerning new symptom appears.',
+        },
+      ];
+  }
 }
 
 export function TriageActionBar({
@@ -59,6 +123,7 @@ export function TriageActionBar({
 
   const config = getCTAConfig(triageLevel);
   const tertiary = getTertiaryAction();
+  const carePlan = getCarePlan(triageLevel);
 
   const captureCareReferral = (action: string) => {
     const careIntent =
@@ -133,18 +198,9 @@ export function TriageActionBar({
 
   const handleSetReminder = () => {
     Alert.alert('Set Reminder', 'When would you like to be reminded to check your symptoms?', [
-      {
-        text: 'In 1 hour',
-        onPress: () => scheduleReminderWithDelay(60),
-      },
-      {
-        text: 'In 4 hours',
-        onPress: () => scheduleReminderWithDelay(240),
-      },
-      {
-        text: 'Tomorrow',
-        onPress: () => scheduleReminderWithDelay(24 * 60),
-      },
+      { text: 'In 1 hour', onPress: () => scheduleReminderWithDelay(60) },
+      { text: 'In 4 hours', onPress: () => scheduleReminderWithDelay(240) },
+      { text: 'Tomorrow', onPress: () => scheduleReminderWithDelay(24 * 60) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -259,10 +315,34 @@ export function TriageActionBar({
       )}
 
       {!isEmergency && (
-        <View style={styles.hintRow}>
-          <Icon name="time-outline" size={12} color={colors.textTertiary} />
-          <Text style={styles.hintText}>{config.hint}</Text>
-        </View>
+        <>
+          <View style={styles.carePlanHeader}>
+            <View style={styles.carePlanTitleRow}>
+              <Icon name="clipboard-outline" size={18} color={colors.accent} />
+              <Text style={styles.carePlanTitle}>Your care plan</Text>
+            </View>
+            <Text style={styles.carePlanSubtitle}>Keep this episode moving until you feel better or get care.</Text>
+          </View>
+
+          <View style={styles.carePlanSteps}>
+            {carePlan.map((step) => (
+              <View key={step.label} style={styles.carePlanStep}>
+                <View style={styles.carePlanIcon}>
+                  <Icon name={step.icon} size={16} color={colors.accent} />
+                </View>
+                <View style={styles.carePlanCopy}>
+                  <Text style={styles.carePlanStepLabel}>{step.label}</Text>
+                  <Text style={styles.carePlanStepText}>{step.text}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.hintRow}>
+            <Icon name="time-outline" size={12} color={colors.textTertiary} />
+            <Text style={styles.hintText}>{config.hint}</Text>
+          </View>
+        </>
       )}
 
       {isEmergency ? (
@@ -285,28 +365,18 @@ export function TriageActionBar({
               activeOpacity={0.7}
             >
               <Icon name={config.secondary.icon} size={18} color={colors.textPrimary} />
-              <Text style={[styles.buttonText, styles.buttonTextDark]}>
-                {config.secondary.label}
-              </Text>
+              <Text style={[styles.buttonText, styles.buttonTextDark]}>{config.secondary.label}</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={[
-              styles.button,
-              getButtonStyle(config.primary.variant),
-              styles.primaryButtonFlex,
-            ]}
+            style={[styles.button, getButtonStyle(config.primary.variant), styles.primaryButtonFlex]}
             onPress={() => handleAction(config.primary.action)}
             activeOpacity={0.8}
           >
-            <Icon
-              name={config.primary.icon}
-              size={18}
-              color={getIconColor(config.primary.variant)}
-            />
+            <Icon name={config.primary.icon} size={18} color={getIconColor(config.primary.variant)} />
             <Text style={[styles.buttonText, getButtonTextStyle(config.primary.variant)]}>
               {config.primary.label}
             </Text>
@@ -318,11 +388,7 @@ export function TriageActionBar({
               onPress={() => handleAction(config.secondary!.action)}
               activeOpacity={0.7}
             >
-              <Icon
-                name={config.secondary.icon}
-                size={18}
-                color={getIconColor(config.secondary.variant)}
-              />
+              <Icon name={config.secondary.icon} size={18} color={getIconColor(config.secondary.variant)} />
             </TouchableOpacity>
           )}
         </View>
@@ -364,6 +430,54 @@ const styles = StyleSheet.create({
     borderColor: colors.error,
     borderWidth: 2,
   },
+  carePlanHeader: {
+    marginBottom: spacing.sm,
+  },
+  carePlanTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xxs,
+  },
+  carePlanTitle: {
+    ...typography.label,
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
+  carePlanSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  carePlanSteps: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  carePlanStep: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  carePlanIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundSecondary || colors.surface,
+  },
+  carePlanCopy: {
+    flex: 1,
+  },
+  carePlanStepLabel: {
+    ...typography.caption,
+    color: colors.accent,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  carePlanStepText: {
+    ...typography.bodySmall,
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
   emergencyNoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -383,13 +497,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.sm,
   },
-  fullWidthButton: {
-    width: '100%',
-  },
-  emergencyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  fullWidthButton: { width: '100%' },
+  emergencyButtonText: { fontSize: 16, fontWeight: '600' },
   emergencySecondaryButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -402,15 +511,8 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
     marginBottom: spacing.sm,
   },
-  hintText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
+  hintText: { ...typography.caption, color: colors.textTertiary },
+  buttonRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -421,35 +523,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     minHeight: 48,
   },
-  primaryButtonFlex: {
-    flex: 1,
-  },
-  emergencyButton: {
-    backgroundColor: colors.error,
-    ...shadows.button,
-  },
-  urgentButton: {
-    backgroundColor: colors.warning,
-    ...shadows.button,
-  },
-  primaryButton: {
-    backgroundColor: colors.accent,
-    ...shadows.button,
-  },
+  primaryButtonFlex: { flex: 1 },
+  emergencyButton: { backgroundColor: colors.error, ...shadows.button },
+  urgentButton: { backgroundColor: colors.warning, ...shadows.button },
+  primaryButton: { backgroundColor: colors.accent, ...shadows.button },
   secondaryButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  buttonText: {
-    ...typography.label,
-  },
-  buttonTextLight: {
-    color: colors.textInverse,
-  },
-  buttonTextDark: {
-    color: colors.textSecondary,
-  },
+  buttonText: { ...typography.label },
+  buttonTextLight: { color: colors.textInverse },
+  buttonTextDark: { color: colors.textSecondary },
   tertiaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -457,8 +542,5 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
     paddingVertical: spacing.xs,
   },
-  tertiaryText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
+  tertiaryText: { ...typography.caption, color: colors.textTertiary },
 });
