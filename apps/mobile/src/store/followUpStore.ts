@@ -9,21 +9,17 @@ import { useShallow } from 'zustand/shallow';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   FollowUpIntent,
+  FollowUpOutcome,
   FollowUpStatus,
   createFollowUpIntent,
 } from '../types/followUp';
 import { scheduleLocalNotification, cancelLocalNotification } from '../utils/notifications';
-
-// ============================================
-// STORE TYPES
-// ============================================
 
 type FollowUpState = {
   followUps: FollowUpIntent[];
 };
 
 type FollowUpActions = {
-  // Create follow-up
   scheduleFollowUp: (params: {
     episodeId: string;
     episodeTitle: string;
@@ -31,15 +27,12 @@ type FollowUpActions = {
     reasonSnippet: string;
   }) => FollowUpIntent;
 
-  // Update status
   markFollowUpDone: (followUpId: string) => void;
+  recordFollowUpOutcome: (followUpId: string, outcome: FollowUpOutcome) => void;
   cancelFollowUp: (followUpId: string) => void;
-
-  // Delete
   deleteFollowUp: (followUpId: string) => void;
   deleteFollowUpsForEpisode: (episodeId: string) => void;
 
-  // Getters
   getFollowUp: (followUpId: string) => FollowUpIntent | undefined;
   getFollowUpsForEpisode: (episodeId: string) => FollowUpIntent[];
   getScheduledFollowUps: () => FollowUpIntent[];
@@ -47,17 +40,11 @@ type FollowUpActions = {
   hasScheduledFollowUp: (episodeId: string) => boolean;
 };
 
-// ============================================
-// STORE IMPLEMENTATION
-// ============================================
-
 export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
   persist(
     (set, get) => ({
-      // Initial state
       followUps: [],
 
-      // Schedule a new follow-up
       scheduleFollowUp: ({ episodeId, episodeTitle, daysFromNow, reasonSnippet }) => {
         const followUp = createFollowUpIntent({
           episodeId,
@@ -66,13 +53,10 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
           reasonSnippet,
         });
 
-        // Cancel any existing scheduled follow-up for this episode
         const existing = get().followUps.find(
           (f) => f.episodeId === episodeId && f.status === 'scheduled'
         );
-        if (existing) {
-          cancelLocalNotification(existing.id);
-        }
+        if (existing) cancelLocalNotification(existing.id);
 
         set((state) => ({
           followUps: [
@@ -83,7 +67,6 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
           ],
         }));
 
-        // Schedule notification via Notifee
         scheduleLocalNotification({
           id: followUp.id,
           title: 'CareBow Check-in',
@@ -99,7 +82,6 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
         return followUp;
       },
 
-      // Mark as done
       markFollowUpDone: (followUpId) => {
         set((state) => ({
           followUps: state.followUps.map((f) =>
@@ -111,7 +93,22 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
         cancelLocalNotification(followUpId);
       },
 
-      // Cancel follow-up
+      recordFollowUpOutcome: (followUpId, outcome) => {
+        set((state) => ({
+          followUps: state.followUps.map((f) =>
+            f.id === followUpId
+              ? {
+                  ...f,
+                  status: 'done' as FollowUpStatus,
+                  completedAt: new Date().toISOString(),
+                  outcome,
+                }
+              : f
+          ),
+        }));
+        cancelLocalNotification(followUpId);
+      },
+
       cancelFollowUp: (followUpId) => {
         set((state) => ({
           followUps: state.followUps.map((f) =>
@@ -121,52 +118,31 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
         cancelLocalNotification(followUpId);
       },
 
-      // Delete follow-up
       deleteFollowUp: (followUpId) => {
         const followUp = get().followUps.find((f) => f.id === followUpId);
-        if (followUp) {
-          cancelLocalNotification(followUpId);
-        }
-        set((state) => ({
-          followUps: state.followUps.filter((f) => f.id !== followUpId),
-        }));
+        if (followUp) cancelLocalNotification(followUpId);
+        set((state) => ({ followUps: state.followUps.filter((f) => f.id !== followUpId) }));
       },
 
-      // Delete all follow-ups for an episode
       deleteFollowUpsForEpisode: (episodeId) => {
         const toDelete = get().followUps.filter((f) => f.episodeId === episodeId);
         toDelete.forEach((f) => cancelLocalNotification(f.id));
-
         set((state) => ({
           followUps: state.followUps.filter((f) => f.episodeId !== episodeId),
         }));
       },
 
-      // Getters
-      getFollowUp: (followUpId) => {
-        return get().followUps.find((f) => f.id === followUpId);
-      },
-
-      getFollowUpsForEpisode: (episodeId) => {
-        return get().followUps.filter((f) => f.episodeId === episodeId);
-      },
-
-      getScheduledFollowUps: () => {
-        return get().followUps.filter((f) => f.status === 'scheduled');
-      },
-
-      getUpcomingFollowUps: (limit = 5) => {
-        return get()
+      getFollowUp: (followUpId) => get().followUps.find((f) => f.id === followUpId),
+      getFollowUpsForEpisode: (episodeId) =>
+        get().followUps.filter((f) => f.episodeId === episodeId),
+      getScheduledFollowUps: () => get().followUps.filter((f) => f.status === 'scheduled'),
+      getUpcomingFollowUps: (limit = 5) =>
+        get()
           .followUps.filter((f) => f.status === 'scheduled')
           .sort((a, b) => new Date(a.followUpAt).getTime() - new Date(b.followUpAt).getTime())
-          .slice(0, limit);
-      },
-
-      hasScheduledFollowUp: (episodeId) => {
-        return get().followUps.some(
-          (f) => f.episodeId === episodeId && f.status === 'scheduled'
-        );
-      },
+          .slice(0, limit),
+      hasScheduledFollowUp: (episodeId) =>
+        get().followUps.some((f) => f.episodeId === episodeId && f.status === 'scheduled'),
     }),
     {
       name: 'carebow-followups',
@@ -175,28 +151,13 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
   )
 );
 
-// ============================================
-// SELECTOR HOOKS
-// ============================================
-
-/**
- * FIX: Use `useShallow` (Zustand v5) to compare array contents, not references.
- *
- * ROOT CAUSE: getUpcomingFollowUps/getScheduledFollowUps create new array refs
- * via filter().sort().slice(). Without shallow equality, useSyncExternalStore
- * detects ref inequality → synchronous re-render → infinite loop.
- */
-
 export const useScheduledFollowUps = () =>
   useFollowUpStore(
     useShallow((state) => state.followUps.filter((f) => f.status === 'scheduled'))
   );
 
 export const useUpcomingFollowUps = (limit?: number) =>
-  useFollowUpStore(
-    useShallow((state) => state.getUpcomingFollowUps(limit))
-  );
+  useFollowUpStore(useShallow((state) => state.getUpcomingFollowUps(limit)));
 
-// Returns boolean (primitive) - no shallow needed
 export const useHasScheduledFollowUp = (episodeId: string) =>
   useFollowUpStore((state) => state.hasScheduledFollowUp(episodeId));
