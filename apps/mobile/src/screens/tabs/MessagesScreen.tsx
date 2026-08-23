@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp } from '../../navigation/types';
@@ -12,11 +12,11 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useAllEpisodes, useEpisodeStore } from '../../store/episodeStore';
 import { useUpcomingFollowUps, useFollowUpStore } from '../../store/followUpStore';
+import { useAskCarebowStore } from '../../store/askCarebowStore';
 import { EpisodeCard, FollowUpCard } from '../../components/episodes';
 import { Episode } from '../../types/episode';
+import type { FollowUpOutcome } from '../../types/followUp';
 
-// Doctor conversations. Empty until a real messaging backend is wired — the app
-// Conversations remain empty until the messaging backend returns real threads.
 interface DoctorConversation {
   id: string;
   name: string;
@@ -28,45 +28,76 @@ interface DoctorConversation {
   online: boolean;
   avatarColor: string;
 }
+
+// Empty until the real care-team messaging backend returns threads.
 const doctorConversations: DoctorConversation[] = [];
+
+const FOLLOW_UP_MESSAGES: Record<FollowUpOutcome, string> = {
+  better: "I'm feeling better since my last CareBow check-in.",
+  same: "My symptoms are about the same since my last CareBow check-in.",
+  worse: "My symptoms are worse since my last CareBow check-in.",
+};
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
   const episodes = useAllEpisodes();
-  const { resumeEpisode } = useEpisodeStore();
+  const { resumeEpisode, recordFollowUpOutcome: recordEpisodeFollowUpOutcome } = useEpisodeStore();
   const upcomingFollowUps = useUpcomingFollowUps(5);
-  const { markFollowUpDone } = useFollowUpStore();
+  const { markFollowUpDone, recordFollowUpOutcome } = useFollowUpStore();
+  const clearCurrentSession = useAskCarebowStore((state) => state.clearCurrentSession);
 
-  // Sort episodes by most recent
   const sortedEpisodes = [...episodes].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 
-  const handleEpisodePress = (episode: Episode) => {
+  const handleEpisodePress = (episode: Episode, symptomOverride?: string) => {
     resumeEpisode(episode.id);
-    navigation.navigate('Conversation' as never, {
+    navigation.navigate('Conversation', {
       episodeId: episode.id,
-      symptom: episode.lastMessageSnippet,
+      symptom: symptomOverride ?? episode.lastMessageSnippet,
       context: episode.forWhom,
       relation: episode.relationship,
     });
   };
 
-  const handleFollowUpPress = (episodeId: string) => {
+  const submitFollowUp = (episode: Episode, followUpId: string, outcome: FollowUpOutcome) => {
+    recordFollowUpOutcome(followUpId, outcome);
+    recordEpisodeFollowUpOutcome(episode.id, outcome);
+
+    // Force ConversationScreen to initialize from this existing episode and
+    // process the follow-up statement as a new turn. The historical session is
+    // still preserved in the session list; only the transient active pointer is cleared.
+    clearCurrentSession();
+    handleEpisodePress(episode, FOLLOW_UP_MESSAGES[outcome]);
+  };
+
+  const handleFollowUpPress = (episodeId: string, followUpId: string) => {
     const episode = episodes.find((e) => e.id === episodeId);
-    if (episode) {
-      handleEpisodePress(episode);
-    }
+    if (!episode) return;
+
+    Alert.alert(
+      'How are you feeling now?',
+      'Compared with when you last spoke with Ask CareBow:',
+      [
+        { text: 'Better', onPress: () => submitFollowUp(episode, followUpId, 'better') },
+        { text: 'About the same', onPress: () => submitFollowUp(episode, followUpId, 'same') },
+        {
+          text: 'Worse',
+          style: 'destructive',
+          onPress: () => submitFollowUp(episode, followUpId, 'worse'),
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleDoctorPress = (doctorId: string) => {
-    navigation.navigate('Thread' as never, { id: doctorId });
+    navigation.navigate('Thread', { id: doctorId });
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>My Care</Text>
         <Text style={styles.headerSubtitle}>Your health conversations</Text>
@@ -77,10 +108,9 @@ export default function MessagesScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 96 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Ask CareBow Banner */}
         <TouchableOpacity
           style={styles.askBanner}
-          onPress={() => navigation.navigate('Ask' as never)}
+          onPress={() => navigation.navigate('Ask')}
           activeOpacity={0.8}
         >
           <View style={styles.askBannerIcon}>
@@ -93,7 +123,6 @@ export default function MessagesScreen() {
           <Icon name="add-circle" size={24} color={colors.accent} />
         </TouchableOpacity>
 
-        {/* Follow-ups Section */}
         {upcomingFollowUps.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -108,7 +137,7 @@ export default function MessagesScreen() {
                 <FollowUpCard
                   key={followUp.id}
                   followUp={followUp}
-                  onPress={() => handleFollowUpPress(followUp.episodeId)}
+                  onPress={() => handleFollowUpPress(followUp.episodeId, followUp.id)}
                   onMarkDone={() => markFollowUpDone(followUp.id)}
                 />
               ))}
@@ -116,7 +145,6 @@ export default function MessagesScreen() {
           </View>
         )}
 
-        {/* Health Episodes Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Health Episodes</Text>
@@ -146,7 +174,6 @@ export default function MessagesScreen() {
           )}
         </View>
 
-        {/* Doctor Conversations Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Doctor Messages</Text>
           <View style={styles.doctorList}>
@@ -202,10 +229,7 @@ export default function MessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface2,
-  },
+  container: { flex: 1, backgroundColor: colors.surface2 },
   header: {
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
@@ -213,21 +237,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: {
-    ...typography.h1,
-    color: colors.textPrimary,
-  },
+  headerTitle: { ...typography.h1, color: colors.textPrimary },
   headerSubtitle: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xxs,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: spacing.lg,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: spacing.lg },
   askBanner: {
     backgroundColor: colors.accentMuted,
     borderWidth: 1,
@@ -248,20 +265,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.button,
   },
-  askBannerContent: {
-    flex: 1,
-  },
-  askBannerTitle: {
-    ...typography.label,
-    color: colors.textPrimary,
-  },
-  askBannerText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  section: {
-    marginBottom: spacing.xl,
-  },
+  askBannerContent: { flex: 1 },
+  askBannerTitle: { ...typography.label, color: colors.textPrimary },
+  askBannerText: { ...typography.caption, color: colors.textSecondary },
+  section: { marginBottom: spacing.xl },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -282,12 +289,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxs,
     borderRadius: radius.xs,
   },
-  episodesList: {
-    gap: spacing.sm,
-  },
-  followUpsList: {
-    gap: spacing.xs,
-  },
+  episodesList: { gap: spacing.sm },
+  followUpsList: { gap: spacing.xs },
   followUpBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -297,10 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxs,
     borderRadius: radius.xs,
   },
-  followUpBadgeText: {
-    ...typography.tiny,
-    color: colors.accent,
-  },
+  followUpBadgeText: { ...typography.tiny, color: colors.accent },
   emptyEpisodes: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -321,9 +321,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xxs,
   },
-  doctorList: {
-    gap: spacing.sm,
-  },
+  doctorList: { gap: spacing.sm },
   doctorCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -333,9 +331,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  avatarContainer: {
-    position: 'relative',
-  },
+  avatarContainer: { position: 'relative' },
   avatar: {
     width: 44,
     height: 44,
@@ -343,10 +339,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: {
-    ...typography.label,
-    color: colors.textInverse,
-  },
+  avatarText: { ...typography.label, color: colors.textInverse },
   onlineIndicator: {
     position: 'absolute',
     bottom: 0,
@@ -358,30 +351,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  doctorContent: {
-    flex: 1,
-  },
+  doctorContent: { flex: 1 },
   doctorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  doctorInfo: {
-    flex: 1,
-  },
-  doctorName: {
-    ...typography.label,
-    color: colors.textPrimary,
-  },
-  doctorRole: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
-  doctorMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
+  doctorInfo: { flex: 1 },
+  doctorName: { ...typography.label, color: colors.textPrimary },
+  doctorRole: { ...typography.caption, color: colors.textTertiary },
+  doctorMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   unreadBadge: {
     width: 20,
     height: 20,
@@ -390,18 +369,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  unreadText: {
-    ...typography.tiny,
-    color: colors.textInverse,
-  },
+  unreadText: { ...typography.tiny, color: colors.textInverse },
   lastMessage: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xxs,
   },
-  timestamp: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    marginTop: spacing.xxs,
-  },
+  timestamp: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.xxs },
 });
