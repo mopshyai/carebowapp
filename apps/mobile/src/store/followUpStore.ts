@@ -14,6 +14,9 @@ import {
   createFollowUpIntent,
 } from '../types/followUp';
 import { scheduleLocalNotification, cancelLocalNotification } from '../utils/notifications';
+import { askCarebowOrchestratorApi } from '../services/api/endpoints/askCarebowOrchestrator';
+import { getCachedBackendSessionId } from '../lib/askCarebow/orchestratorClient';
+import { useAskCarebowStore } from './askCarebowStore';
 import { useEpisodeStore } from './episodeStore';
 
 type FollowUpState = {
@@ -41,15 +44,31 @@ type FollowUpActions = {
   hasScheduledFollowUp: (episodeId: string) => boolean;
 };
 
+async function persistServerOutcome(followUp: FollowUpIntent, outcome: FollowUpOutcome) {
+  if (!followUp.localChatSessionId) return;
+
+  try {
+    const backendSessionId = await getCachedBackendSessionId(followUp.localChatSessionId);
+    if (!backendSessionId) return;
+    await askCarebowOrchestratorApi.recordFollowUpOutcome(backendSessionId, outcome);
+  } catch {
+    // Local outcome remains durable/offline-first. A missing summary can occur
+    // briefly because server summarization runs after the clinical response.
+    // We never roll back a patient's answer because synchronization is delayed.
+  }
+}
+
 export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
   persist(
     (set, get) => ({
       followUps: [],
 
       scheduleFollowUp: ({ episodeId, episodeTitle, daysFromNow, reasonSnippet }) => {
+        const localChatSessionId = useAskCarebowStore.getState().currentSession?.id;
         const followUp = createFollowUpIntent({
           episodeId,
           episodeTitle,
+          localChatSessionId,
           daysFromNow,
           reasonSnippet,
         });
@@ -118,6 +137,7 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
 
         if (followUp) {
           useEpisodeStore.getState().recordFollowUpOutcome(followUp.episodeId, outcome);
+          void persistServerOutcome(followUp, outcome);
         }
       },
 
