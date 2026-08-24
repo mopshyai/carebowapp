@@ -5,6 +5,7 @@
 
 export type FollowUpStatus = 'scheduled' | 'done' | 'cancelled';
 export type FollowUpOutcome = 'better' | 'same' | 'worse';
+export type FollowUpServerSyncStatus = 'pending' | 'synced' | 'not_applicable';
 
 /**
  * Follow-up check-in intent
@@ -21,6 +22,12 @@ export interface FollowUpIntent {
   createdAt: string;
   completedAt?: string;
   outcome?: FollowUpOutcome;
+  /**
+   * Outcome synchronization is persisted so a temporary network failure does
+   * not silently strand the final result on one device.
+   */
+  serverSyncStatus?: FollowUpServerSyncStatus;
+  serverSyncedAt?: string;
 }
 
 /**
