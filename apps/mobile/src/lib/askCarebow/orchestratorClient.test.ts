@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getOrchestratorReply, streamOrchestratorReply } from './orchestratorClient';
+import {
+  clearKnownBackendSessions,
+  getOrchestratorReply,
+  streamOrchestratorReply,
+} from './orchestratorClient';
 import { askCarebowOrchestratorApi } from '@/services/api/endpoints/askCarebowOrchestrator';
 import { ApiClient } from '@/services/api/ApiClient';
 import { postSSE } from '@/services/api/sseClient';
@@ -24,9 +28,13 @@ const mockedPostSSE = postSSE as jest.Mock;
 
 const REQUEST_ID = 'ask_test_turn_123';
 
+beforeEach(async () => {
+  clearKnownBackendSessions();
+  await AsyncStorage.clear();
+});
+
 describe('getOrchestratorReply', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     mockedCreateSession.mockReset();
     mockedSendMessage.mockReset();
   });
@@ -138,8 +146,7 @@ describe('getOrchestratorReply', () => {
 });
 
 describe('streamOrchestratorReply', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
+  beforeEach(() => {
     mockedCreateSession.mockReset();
     mockedPostSSE.mockReset();
     mockedGetBaseUrl.mockReset().mockReturnValue('https://api.example.com');
