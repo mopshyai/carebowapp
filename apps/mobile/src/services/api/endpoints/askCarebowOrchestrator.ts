@@ -16,6 +16,8 @@ export interface ChatOrchestratorMessageResponse {
   recommendation: string;
 }
 
+export type ServerFollowUpOutcome = 'better' | 'same' | 'worse';
+
 export const askCarebowOrchestratorApi = {
   createSession: async (profileId: string): Promise<ChatSession> => {
     const response = await ApiClient.post<{ session: ChatSession }>('/chat/sessions', {
@@ -32,6 +34,17 @@ export const askCarebowOrchestratorApi = {
     const response = await ApiClient.post<ChatOrchestratorMessageResponse>(
       `/chat/sessions/${sessionId}/messages`,
       { content, requestId }
+    );
+    return response.data;
+  },
+
+  recordFollowUpOutcome: async (
+    sessionId: string,
+    outcome: ServerFollowUpOutcome
+  ): Promise<{ success: boolean; careStatus?: string }> => {
+    const response = await ApiClient.post<{ success: boolean; careStatus?: string }>(
+      `/chat/sessions/${sessionId}/follow-up-outcome`,
+      { outcome }
     );
     return response.data;
   },
