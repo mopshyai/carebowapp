@@ -21,6 +21,16 @@ function sessionCacheKey(localSessionId: string): string {
 }
 
 /**
+ * Clears only the process-local acceleration layer. Persisted mappings remain in
+ * AsyncStorage and can be rehydrated for the same signed-in account/session.
+ * Call this at identity boundaries (logout/account switch) and in test setup so
+ * one user's/session's exact server handoff cannot survive in process memory.
+ */
+export function clearKnownBackendSessions(): void {
+  inMemoryBackendSessions.clear();
+}
+
+/**
  * Synchronous lookup for the active care handoff. Every successful orchestrator
  * turn populates this map before the result is shown, so a subsequent booking CTA
  * can carry the exact server ChatSession without waiting on AsyncStorage.
