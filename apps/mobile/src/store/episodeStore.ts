@@ -11,6 +11,7 @@ import {
   Episode,
   EpisodeCareStatus,
   EpisodeMessage,
+  EpisodeProviderOutcome,
   ForWhom,
   createEpisode,
   createMessage,
@@ -25,15 +26,15 @@ type ServerBookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED'
 function careStatusFromBooking(status: ServerBookingStatus): EpisodeCareStatus {
   switch (status) {
     case 'PENDING':
-      return 'care_requested';
+      return 'booking_pending';
     case 'CONFIRMED':
-      return 'care_confirmed';
+      return 'booked';
     case 'IN_PROGRESS':
       return 'care_in_progress';
     case 'COMPLETED':
-      return 'care_completed';
+      return 'awaiting_follow_up';
     case 'CANCELLED':
-      return 'care_cancelled';
+      return 'cancelled';
   }
 }
 
@@ -53,8 +54,11 @@ type EpisodeActions = {
 
   updateEpisode: (episodeId: string, updates: Partial<Episode>) => void;
   setTriageLevel: (episodeId: string, triageLevel: TriageLevel) => void;
+  markActionRecommended: (episodeId: string) => void;
+  markSelfCare: (episodeId: string) => void;
   recordFollowUpOutcome: (episodeId: string, outcome: FollowUpOutcome) => void;
   linkBooking: (episodeId: string, bookingId: string, status: ServerBookingStatus) => void;
+  recordProviderOutcome: (episodeId: string, outcome: EpisodeProviderOutcome) => void;
   closeEpisode: (episodeId: string) => void;
   deleteEpisode: (episodeId: string) => void;
 
@@ -118,13 +122,58 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
       },
 
       setTriageLevel: (episodeId, triageLevel) => {
-        get().updateEpisode(episodeId, { triageLevel });
+        get().updateEpisode(episodeId, {
+          triageLevel,
+          careStatus: triageLevel === 'emergency' ? 'escalated' : 'assessed',
+          ...(triageLevel === 'emergency' ? { escalatedAt: new Date().toISOString() } : {}),
+        });
+      },
+
+      markActionRecommended: (episodeId) => {
+        const episode = get().getEpisode(episodeId);
+        if (!episode || episode.careStatus === 'escalated') return;
+        get().updateEpisode(episodeId, { careStatus: 'action_recommended' });
+      },
+
+      markSelfCare: (episodeId) => {
+        const episode = get().getEpisode(episodeId);
+        if (!episode || episode.careStatus === 'escalated') return;
+        get().updateEpisode(episodeId, { careStatus: 'self_care' });
       },
 
       recordFollowUpOutcome: (episodeId, outcome) => {
+        const now = new Date().toISOString();
+        const episode = get().getEpisode(episodeId);
+        if (!episode) return;
+
+        if (outcome === 'worse') {
+          get().updateEpisode(episodeId, {
+            lastFollowUpOutcome: outcome,
+            lastFollowUpAt: now,
+            careStatus: 'escalated',
+            escalatedAt: now,
+            isActive: true,
+          });
+          return;
+        }
+
+        if (outcome === 'better') {
+          get().updateEpisode(episodeId, {
+            lastFollowUpOutcome: outcome,
+            lastFollowUpAt: now,
+            careStatus: 'resolved',
+            resolvedAt: now,
+            isActive: false,
+          });
+          if (get().activeEpisodeId === episodeId) set({ activeEpisodeId: null });
+          return;
+        }
+
         get().updateEpisode(episodeId, {
           lastFollowUpOutcome: outcome,
-          lastFollowUpAt: new Date().toISOString(),
+          lastFollowUpAt: now,
+          careStatus: 'awaiting_follow_up',
+          isActive: true,
         });
       },
 
@@ -135,11 +184,28 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
         get().updateEpisode(episodeId, {
           linkedBookingId: bookingId,
           careStatus: careStatusFromBooking(status),
+          isActive: status !== 'CANCELLED',
+        });
+      },
+
+      recordProviderOutcome: (episodeId, outcome) => {
+        const episode = get().getEpisode(episodeId);
+        if (!episode) return;
+        get().updateEpisode(episodeId, {
+          providerOutcome: outcome,
+          linkedBookingId: outcome.bookingId,
+          careStatus: 'awaiting_follow_up',
+          isActive: true,
         });
       },
 
       closeEpisode: (episodeId) => {
-        get().updateEpisode(episodeId, { isActive: false });
+        const now = new Date().toISOString();
+        get().updateEpisode(episodeId, {
+          isActive: false,
+          careStatus: 'resolved',
+          resolvedAt: now,
+        });
         if (get().activeEpisodeId === episodeId) set({ activeEpisodeId: null });
       },
 
@@ -198,13 +264,41 @@ export const useEpisodeStore = create<EpisodeState & EpisodeActions>()(
         const episode = get().getEpisode(episodeId);
         if (episode) {
           set({ activeEpisodeId: episodeId });
-          if (!episode.isActive) get().updateEpisode(episodeId, { isActive: true });
+          if (!episode.isActive) {
+            get().updateEpisode(episodeId, {
+              isActive: true,
+              careStatus: episode.careStatus === 'resolved' ? 'assessing' : episode.careStatus,
+              resolvedAt: episode.careStatus === 'resolved' ? undefined : episode.resolvedAt,
+            });
+          }
         }
       },
     }),
     {
       name: 'carebow-episodes',
       storage: createJSONStorage(() => AsyncStorage),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<EpisodeState> | undefined;
+        return {
+          ...current,
+          ...saved,
+          episodes: (saved?.episodes ?? []).map((episode) => ({
+            ...episode,
+            careStatus:
+              episode.careStatus === ('monitoring' as EpisodeCareStatus)
+                ? 'assessing'
+                : episode.careStatus === ('care_requested' as EpisodeCareStatus)
+                  ? 'booking_pending'
+                  : episode.careStatus === ('care_confirmed' as EpisodeCareStatus)
+                    ? 'booked'
+                    : episode.careStatus === ('care_completed' as EpisodeCareStatus)
+                      ? 'awaiting_follow_up'
+                      : episode.careStatus === ('care_cancelled' as EpisodeCareStatus)
+                        ? 'cancelled'
+                        : episode.careStatus || 'assessing',
+          })) as Episode[],
+        } as EpisodeState & EpisodeActions;
+      },
     }
   )
 );
