@@ -9,15 +9,33 @@ import type { FollowUpOutcome } from './followUp';
 export type ForWhom = 'me' | 'family';
 export type AgeGroup = 'child' | 'adult' | 'senior';
 export type EpisodeCareStatus =
-  | 'monitoring'
-  | 'care_requested'
-  | 'care_confirmed'
+  | 'assessing'
+  | 'assessed'
+  | 'self_care'
+  | 'action_recommended'
+  | 'booking_pending'
+  | 'booked'
   | 'care_in_progress'
-  | 'care_completed'
-  | 'care_cancelled';
+  | 'awaiting_follow_up'
+  | 'resolved'
+  | 'escalated'
+  | 'cancelled';
+
+export interface EpisodeProviderOutcome {
+  bookingId: string;
+  providerName?: string;
+  diagnosis?: string;
+  treatmentPlan?: string | null;
+  advice?: string | null;
+  labTests?: string[];
+  nextReview?: string | null;
+  recordedAt: string;
+}
 
 /**
- * Health Episode - A conversation thread about a health concern
+ * Health Episode - a longitudinal thread about one health concern.
+ * The episode remains active across assessment, booking, provider care and
+ * follow-up; it closes only when the concern is resolved or explicitly closed.
  */
 export interface Episode {
   id: string;
@@ -32,17 +50,16 @@ export interface Episode {
   messageCount: number;
   isActive: boolean;
 
-  // Continuity of care. These fields are derived from user follow-ups and
-  // server-owned bookings; they do not replace backend booking truth.
-  careStatus?: EpisodeCareStatus;
+  careStatus: EpisodeCareStatus;
   linkedBookingId?: string;
+  providerOutcome?: EpisodeProviderOutcome;
   lastFollowUpOutcome?: FollowUpOutcome;
   lastFollowUpAt?: string;
+  resolvedAt?: string;
+  escalatedAt?: string;
 }
 
-/**
- * Message within an Episode
- */
+/** Message within an Episode */
 export interface EpisodeMessage {
   id: string;
   episodeId: string;
@@ -78,7 +95,7 @@ export function createEpisode(params: {
     lastMessageSnippet: params.firstMessage.slice(0, 100),
     messageCount: 1,
     isActive: true,
-    careStatus: 'monitoring',
+    careStatus: 'assessing',
   };
 }
 

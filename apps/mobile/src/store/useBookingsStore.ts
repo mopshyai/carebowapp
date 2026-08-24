@@ -2,8 +2,8 @@
  * Bookings — a cache of server state, not a second source of truth.
  *
  * The server owns ids, prices, taxes, totals and status. This store caches that
- * truth and now also reconciles an Ask CareBow referral back to its local health
- * episode when the server returns provider-facing referral notes.
+ * truth and reconciles Ask CareBow referrals and provider outcomes back to the
+ * local longitudinal health episode.
  */
 
 import { create } from 'zustand';
@@ -29,7 +29,25 @@ function referralEpisodeId(booking: V1Booking): string | null {
 function reconcileBookingToEpisode(booking: V1Booking): void {
   const episodeId = referralEpisodeId(booking);
   if (!episodeId) return;
-  useEpisodeStore.getState().linkBooking(episodeId, booking.id, booking.status);
+
+  const episodeStore = useEpisodeStore.getState();
+  episodeStore.linkBooking(episodeId, booking.id, booking.status);
+
+  if (booking.consultationNote || booking.prescription) {
+    episodeStore.recordProviderOutcome(episodeId, {
+      bookingId: booking.id,
+      providerName: booking.provider?.name,
+      diagnosis: booking.consultationNote?.diagnosis,
+      treatmentPlan: booking.consultationNote?.treatmentPlan,
+      advice: booking.prescription?.advice,
+      labTests: booking.prescription?.labTests,
+      nextReview: booking.prescription?.nextReview,
+      recordedAt:
+        booking.consultationNote?.updatedAt ||
+        booking.prescription?.updatedAt ||
+        new Date().toISOString(),
+    });
+  }
 }
 
 function reconcileBookingsToEpisodes(bookings: V1Booking[]): void {

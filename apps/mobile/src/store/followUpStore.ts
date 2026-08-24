@@ -14,6 +14,7 @@ import {
   createFollowUpIntent,
 } from '../types/followUp';
 import { scheduleLocalNotification, cancelLocalNotification } from '../utils/notifications';
+import { useEpisodeStore } from './episodeStore';
 
 type FollowUpState = {
   followUps: FollowUpIntent[];
@@ -67,6 +68,11 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
           ],
         }));
 
+        const episode = useEpisodeStore.getState().getEpisode(episodeId);
+        if (episode && episode.careStatus !== 'escalated' && episode.careStatus !== 'resolved') {
+          useEpisodeStore.getState().updateEpisode(episodeId, { careStatus: 'awaiting_follow_up' });
+        }
+
         scheduleLocalNotification({
           id: followUp.id,
           title: 'CareBow Check-in',
@@ -94,6 +100,8 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
       },
 
       recordFollowUpOutcome: (followUpId, outcome) => {
+        const followUp = get().followUps.find((f) => f.id === followUpId);
+
         set((state) => ({
           followUps: state.followUps.map((f) =>
             f.id === followUpId
@@ -107,6 +115,10 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
           ),
         }));
         cancelLocalNotification(followUpId);
+
+        if (followUp) {
+          useEpisodeStore.getState().recordFollowUpOutcome(followUp.episodeId, outcome);
+        }
       },
 
       cancelFollowUp: (followUpId) => {
