@@ -5,6 +5,7 @@
 
 export type FollowUpStatus = 'scheduled' | 'done' | 'cancelled';
 export type FollowUpOutcome = 'better' | 'same' | 'worse';
+export type FollowUpServerSyncStatus = 'pending' | 'synced' | 'not_applicable';
 
 /**
  * Follow-up check-in intent
@@ -13,12 +14,20 @@ export interface FollowUpIntent {
   id: string;
   episodeId: string;
   episodeTitle: string;
+  /** Local Ask CareBow session whose backend mapping owns the clinical summary. */
+  localChatSessionId?: string;
   followUpAt: string; // ISO date string
   reasonSnippet: string;
   status: FollowUpStatus;
   createdAt: string;
   completedAt?: string;
   outcome?: FollowUpOutcome;
+  /**
+   * Outcome synchronization is persisted so a temporary network failure does
+   * not silently strand the final result on one device.
+   */
+  serverSyncStatus?: FollowUpServerSyncStatus;
+  serverSyncedAt?: string;
 }
 
 /**
@@ -44,6 +53,7 @@ export const FOLLOW_UP_OPTIONS: FollowUpOption[] = [
 export function createFollowUpIntent(params: {
   episodeId: string;
   episodeTitle: string;
+  localChatSessionId?: string;
   daysFromNow: number;
   reasonSnippet: string;
 }): FollowUpIntent {
@@ -56,6 +66,7 @@ export function createFollowUpIntent(params: {
     id: `followup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     episodeId: params.episodeId,
     episodeTitle: params.episodeTitle,
+    localChatSessionId: params.localChatSessionId,
     followUpAt: followUpDate.toISOString(),
     reasonSnippet: params.reasonSnippet,
     status: 'scheduled',

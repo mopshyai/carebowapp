@@ -14,20 +14,56 @@ import { createLogger } from '../../utils/logger';
 const logger = createLogger('OrchestratorClient');
 
 const SESSION_CACHE_PREFIX = '@carebow/orchestrator_session/';
+const inMemoryBackendSessions = new Map<string, string>();
 
 function sessionCacheKey(localSessionId: string): string {
   return `${SESSION_CACHE_PREFIX}${localSessionId}`;
+}
+
+/**
+ * Clears only the process-local acceleration layer. Persisted mappings remain in
+ * AsyncStorage and can be rehydrated for the same signed-in account/session.
+ * Call this at identity boundaries (logout/account switch) and in test setup so
+ * one user's/session's exact server handoff cannot survive in process memory.
+ */
+export function clearKnownBackendSessions(): void {
+  inMemoryBackendSessions.clear();
+}
+
+/**
+ * Synchronous lookup for the active care handoff. Every successful orchestrator
+ * turn populates this map before the result is shown, so a subsequent booking CTA
+ * can carry the exact server ChatSession without waiting on AsyncStorage.
+ */
+export function getKnownBackendSessionId(localSessionId: string): string | null {
+  return inMemoryBackendSessions.get(localSessionId) ?? null;
+}
+
+export async function getCachedBackendSessionId(localSessionId: string): Promise<string | null> {
+  const known = getKnownBackendSessionId(localSessionId);
+  if (known) return known;
+
+  const cached = await AsyncStorage.getItem(sessionCacheKey(localSessionId));
+  if (cached) inMemoryBackendSessions.set(localSessionId, cached);
+  return cached;
 }
 
 async function getOrCreateBackendSessionId(
   localSessionId: string,
   profileId: string
 ): Promise<string> {
+  const known = getKnownBackendSessionId(localSessionId);
+  if (known) return known;
+
   const key = sessionCacheKey(localSessionId);
   const cached = await AsyncStorage.getItem(key);
-  if (cached) return cached;
+  if (cached) {
+    inMemoryBackendSessions.set(localSessionId, cached);
+    return cached;
+  }
 
   const session = await askCarebowOrchestratorApi.createSession(profileId);
+  inMemoryBackendSessions.set(localSessionId, session.id);
   await AsyncStorage.setItem(key, session.id);
   return session.id;
 }
@@ -36,6 +72,7 @@ export interface OrchestratorReply {
   text: string;
   isEmergency: boolean;
   urgencyLevel: string;
+  backendSessionId: string;
 }
 
 export async function getOrchestratorReply(params: {
@@ -60,6 +97,7 @@ export async function getOrchestratorReply(params: {
       text: result.assistantMessage.content,
       isEmergency: result.isEmergency,
       urgencyLevel: result.urgencyLevel,
+      backendSessionId,
     };
   } catch {
     return null;
@@ -118,6 +156,7 @@ export async function streamOrchestratorReply(params: {
       text: finalEvent.assistantMessage.content,
       isEmergency: finalEvent.isEmergency ?? false,
       urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
+      backendSessionId,
     };
   } catch {
     return null;

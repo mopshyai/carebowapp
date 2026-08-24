@@ -9,12 +9,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookingDraft, CareReferralContext, CartItem, Service } from '@/data/types';
 import { calculatePrice } from '@/data/services';
+import { getKnownBackendSessionId } from '@/lib/askCarebow/orchestratorClient';
+import { useAskCarebowStore } from './askCarebowStore';
 
 type CartStore = {
-  // Cart items
   items: CartItem[];
-
-  // Current booking draft (for ServiceDetails -> Checkout flow)
   bookingDraft: BookingDraft | null;
 
   // A short-lived handoff created when Ask CareBow recommends a service.
@@ -24,27 +23,22 @@ type CartStore = {
   setCareReferralContext: (context: CareReferralContext) => void;
   clearCareReferralContext: () => void;
 
-  // Booking draft actions
   initBookingDraft: (service: Service) => void;
   updateBookingDraft: (updates: Partial<BookingDraft>) => void;
   clearBookingDraft: () => void;
   calculateDraftPricing: () => void;
 
-  // Cart actions
   addItemFromDraft: () => CartItem | null;
   addItem: (item: Omit<CartItem, 'id'>) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, qty: number) => void;
   clearCart: () => void;
 
-  // Getters
   getTotalItems: () => number;
   getTotalPrice: () => number;
 };
 
 const REFERRAL_TTL_MS = 30 * 60 * 1000;
-
-// Generate unique ID
 const generateId = () => `cart_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 function isFreshReferral(context: CareReferralContext | null): context is CareReferralContext {
@@ -54,7 +48,6 @@ function isFreshReferral(context: CareReferralContext | null): context is CareRe
   return Date.now() - createdAt <= REFERRAL_TTL_MS;
 }
 
-// Create initial booking draft from service
 const createInitialDraft = (
   service: Service,
   referralContext: CareReferralContext | null = null
@@ -64,7 +57,6 @@ const createInitialDraft = (
   let initialHours: number | null = null;
   let initialDays: number | null = null;
 
-  // Set initial values based on pricing type
   if (service.pricing.type === 'packages' && service.pricing.packages.length > 0) {
     initialPackageId = service.pricing.packages[0].id;
     initialPackageLabel = service.pricing.packages[0].label;
@@ -93,8 +85,6 @@ const createInitialDraft = (
     selectedPackageLabel: initialPackageLabel,
     hours: initialHours,
     days: initialDays,
-    // Customer notes stay customer-owned. The backend adds the sanitized
-    // provider-facing assessment handoff from referralContext separately.
     requestNotes: '',
     referralContext,
     subtotal: priceCalc.subtotal,
@@ -112,7 +102,17 @@ export const useCartStore = create<CartStore>()(
       pendingReferralContext: null,
 
       setCareReferralContext: (context) => {
-        set({ pendingReferralContext: context });
+        const localChatSessionId = useAskCarebowStore.getState().currentSession?.id;
+        const backendChatSessionId =
+          context.backendChatSessionId ||
+          (localChatSessionId ? getKnownBackendSessionId(localChatSessionId) || undefined : undefined);
+
+        set({
+          pendingReferralContext: {
+            ...context,
+            backendChatSessionId,
+          },
+        });
       },
 
       clearCareReferralContext: () => {
@@ -130,7 +130,6 @@ export const useCartStore = create<CartStore>()(
         });
       },
 
-      // Update booking draft with partial updates
       updateBookingDraft: (updates) => {
         set((state) => {
           if (!state.bookingDraft) return state;
@@ -141,28 +140,21 @@ export const useCartStore = create<CartStore>()(
             },
           };
         });
-        // Recalculate pricing after update
         get().calculateDraftPricing();
       },
 
-      // Clear booking draft
       clearBookingDraft: () => {
         set({ bookingDraft: null });
       },
 
-      // Recalculate pricing for current draft
       calculateDraftPricing: () => {
         set((state) => {
           const draft = state.bookingDraft;
           if (!draft) return state;
-
-          // Pricing is recalculated by ServiceDetails from the live service
-          // model. Keeping this action avoids changing existing callers.
           return state;
         });
       },
 
-      // Add current draft to cart
       addItemFromDraft: () => {
         const draft = get().bookingDraft;
         if (!draft) return null;
@@ -198,54 +190,37 @@ export const useCartStore = create<CartStore>()(
         return cartItem;
       },
 
-      // Add item directly
       addItem: (item) => {
         const newItem: CartItem = {
           ...item,
           id: generateId(),
         };
-
-        set((state) => ({
-          items: [...state.items, newItem],
-        }));
+        set((state) => ({ items: [...state.items, newItem] }));
       },
 
-      // Remove item
       removeItem: (itemId) => {
         set((state) => ({
           items: state.items.filter((item) => item.id !== itemId),
         }));
       },
 
-      // Update quantity (for future multi-quantity support)
       updateQuantity: (itemId, qty) => {
         if (qty <= 0) {
           get().removeItem(itemId);
           return;
         }
-        // Currently services are qty=1, but keeping this for future
       },
 
-      // Clear cart
       clearCart: () => {
         set({ items: [], bookingDraft: null, pendingReferralContext: null });
       },
 
-      // Get total items count
-      getTotalItems: () => {
-        return get().items.length;
-      },
-
-      // Get total price
-      getTotalPrice: () => {
-        return get().items.reduce((total, item) => total + item.total, 0);
-      },
+      getTotalItems: () => get().items.length,
+      getTotalPrice: () => get().items.reduce((total, item) => total + item.total, 0),
     }),
     {
       name: '@carebow/cart',
       storage: createJSONStorage(() => AsyncStorage),
-      // Persist only ordinary cart items. Clinical referral state and the
-      // active booking draft are intentionally session-scoped.
       partialize: (state) => ({
         items: state.items,
       }),

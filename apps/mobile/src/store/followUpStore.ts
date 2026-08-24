@@ -14,6 +14,9 @@ import {
   createFollowUpIntent,
 } from '../types/followUp';
 import { scheduleLocalNotification, cancelLocalNotification } from '../utils/notifications';
+import { askCarebowOrchestratorApi } from '../services/api/endpoints/askCarebowOrchestrator';
+import { getCachedBackendSessionId } from '../lib/askCarebow/orchestratorClient';
+import { useAskCarebowStore } from './askCarebowStore';
 import { useEpisodeStore } from './episodeStore';
 
 type FollowUpState = {
@@ -30,6 +33,8 @@ type FollowUpActions = {
 
   markFollowUpDone: (followUpId: string) => void;
   recordFollowUpOutcome: (followUpId: string, outcome: FollowUpOutcome) => void;
+  syncFollowUpOutcome: (followUpId: string) => Promise<void>;
+  syncPendingOutcomes: () => Promise<void>;
   cancelFollowUp: (followUpId: string) => void;
   deleteFollowUp: (followUpId: string) => void;
   deleteFollowUpsForEpisode: (episodeId: string) => void;
@@ -41,15 +46,25 @@ type FollowUpActions = {
   hasScheduledFollowUp: (episodeId: string) => boolean;
 };
 
+// Prevent duplicate network writes inside one running app process. Persisted
+// status remains `pending`, so a crash cannot strand an item in a `syncing` state.
+const syncingFollowUpIds = new Set<string>();
+
 export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
   persist(
     (set, get) => ({
       followUps: [],
 
       scheduleFollowUp: ({ episodeId, episodeTitle, daysFromNow, reasonSnippet }) => {
+        // Any new user activity is a useful opportunity to flush an older
+        // offline follow-up outcome before adding another reminder.
+        void get().syncPendingOutcomes();
+
+        const localChatSessionId = useAskCarebowStore.getState().currentSession?.id;
         const followUp = createFollowUpIntent({
           episodeId,
           episodeTitle,
+          localChatSessionId,
           daysFromNow,
           reasonSnippet,
         });
@@ -101,6 +116,7 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
 
       recordFollowUpOutcome: (followUpId, outcome) => {
         const followUp = get().followUps.find((f) => f.id === followUpId);
+        if (!followUp) return;
 
         set((state) => ({
           followUps: state.followUps.map((f) =>
@@ -110,15 +126,78 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
                   status: 'done' as FollowUpStatus,
                   completedAt: new Date().toISOString(),
                   outcome,
+                  serverSyncStatus: f.localChatSessionId ? 'pending' : 'not_applicable',
+                  serverSyncedAt: undefined,
                 }
               : f
           ),
         }));
         cancelLocalNotification(followUpId);
 
-        if (followUp) {
-          useEpisodeStore.getState().recordFollowUpOutcome(followUp.episodeId, outcome);
+        useEpisodeStore.getState().recordFollowUpOutcome(followUp.episodeId, outcome);
+        void get().syncFollowUpOutcome(followUpId);
+      },
+
+      syncFollowUpOutcome: async (followUpId) => {
+        if (syncingFollowUpIds.has(followUpId)) return;
+
+        const followUp = get().followUps.find((f) => f.id === followUpId);
+        if (!followUp?.outcome) return;
+        if (followUp.serverSyncStatus === 'synced' || followUp.serverSyncStatus === 'not_applicable') {
+          return;
         }
+
+        if (!followUp.localChatSessionId) {
+          set((state) => ({
+            followUps: state.followUps.map((f) =>
+              f.id === followUpId ? { ...f, serverSyncStatus: 'not_applicable' } : f
+            ),
+          }));
+          return;
+        }
+
+        syncingFollowUpIds.add(followUpId);
+        try {
+          const backendSessionId = await getCachedBackendSessionId(followUp.localChatSessionId);
+          if (!backendSessionId) return;
+
+          const result = await askCarebowOrchestratorApi.recordFollowUpOutcome(
+            backendSessionId,
+            followUp.outcome
+          );
+          if (!result.success) return;
+
+          set((state) => ({
+            followUps: state.followUps.map((f) =>
+              f.id === followUpId
+                ? {
+                    ...f,
+                    serverSyncStatus: 'synced',
+                    serverSyncedAt: new Date().toISOString(),
+                  }
+                : f
+            ),
+          }));
+        } catch {
+          // Deliberately leave the persisted status as pending. The store retries
+          // after rehydration and on subsequent follow-up activity.
+        } finally {
+          syncingFollowUpIds.delete(followUpId);
+        }
+      },
+
+      syncPendingOutcomes: async () => {
+        const pendingIds = get()
+          .followUps.filter(
+            (f) =>
+              Boolean(f.outcome) &&
+              Boolean(f.localChatSessionId) &&
+              f.serverSyncStatus !== 'synced' &&
+              f.serverSyncStatus !== 'not_applicable'
+          )
+          .map((f) => f.id);
+
+        await Promise.all(pendingIds.map((id) => get().syncFollowUpOutcome(id)));
       },
 
       cancelFollowUp: (followUpId) => {
@@ -159,6 +238,11 @@ export const useFollowUpStore = create<FollowUpState & FollowUpActions>()(
     {
       name: 'carebow-followups',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state, error) => {
+        if (!error && state) {
+          void state.syncPendingOutcomes();
+        }
+      },
     }
   )
 );
