@@ -19,6 +19,10 @@ function sessionCacheKey(localSessionId: string): string {
   return `${SESSION_CACHE_PREFIX}${localSessionId}`;
 }
 
+export async function getCachedBackendSessionId(localSessionId: string): Promise<string | null> {
+  return AsyncStorage.getItem(sessionCacheKey(localSessionId));
+}
+
 async function getOrCreateBackendSessionId(
   localSessionId: string,
   profileId: string
@@ -36,6 +40,7 @@ export interface OrchestratorReply {
   text: string;
   isEmergency: boolean;
   urgencyLevel: string;
+  backendSessionId: string;
 }
 
 export async function getOrchestratorReply(params: {
@@ -60,6 +65,7 @@ export async function getOrchestratorReply(params: {
       text: result.assistantMessage.content,
       isEmergency: result.isEmergency,
       urgencyLevel: result.urgencyLevel,
+      backendSessionId,
     };
   } catch {
     return null;
@@ -118,6 +124,7 @@ export async function streamOrchestratorReply(params: {
       text: finalEvent.assistantMessage.content,
       isEmergency: finalEvent.isEmergency ?? false,
       urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
+      backendSessionId,
     };
   } catch {
     return null;
