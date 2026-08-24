@@ -13,6 +13,8 @@ export interface FollowUpIntent {
   id: string;
   episodeId: string;
   episodeTitle: string;
+  /** Local Ask CareBow session whose backend mapping owns the clinical summary. */
+  localChatSessionId?: string;
   followUpAt: string; // ISO date string
   reasonSnippet: string;
   status: FollowUpStatus;
@@ -44,6 +46,7 @@ export const FOLLOW_UP_OPTIONS: FollowUpOption[] = [
 export function createFollowUpIntent(params: {
   episodeId: string;
   episodeTitle: string;
+  localChatSessionId?: string;
   daysFromNow: number;
   reasonSnippet: string;
 }): FollowUpIntent {
@@ -56,6 +59,7 @@ export function createFollowUpIntent(params: {
     id: `followup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     episodeId: params.episodeId,
     episodeTitle: params.episodeTitle,
+    localChatSessionId: params.localChatSessionId,
     followUpAt: followUpDate.toISOString(),
     reasonSnippet: params.reasonSnippet,
     status: 'scheduled',
