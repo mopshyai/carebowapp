@@ -103,6 +103,8 @@ export type ServiceItem = Service;
 export type CareReferralContext = {
   source: 'ask_carebow';
   episodeId?: string;
+  /** Exact server ChatSession for cross-device outcome/follow-up traceability. */
+  backendChatSessionId?: string;
   profileId?: string;
   triageLevel: 'emergency' | 'urgent' | 'soon' | 'self_care';
   symptoms: string[];
