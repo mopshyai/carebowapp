@@ -50,6 +50,7 @@ describe('getOrchestratorReply', () => {
       text: 'Sore throats are usually viral...',
       isEmergency: false,
       urgencyLevel: 'P4',
+      backendSessionId: 'session-1',
     });
     expect(mockedCreateSession).toHaveBeenCalledWith('profile-1');
     expect(mockedSendMessage).toHaveBeenCalledWith(
@@ -172,6 +173,7 @@ describe('streamOrchestratorReply', () => {
       text: 'Sore throats are usually viral...',
       isEmergency: false,
       urgencyLevel: 'P4',
+      backendSessionId: 'session-1',
     });
     expect(mockedPostSSE).toHaveBeenCalledWith(
       'https://api.example.com/chat/sessions/session-1/messages',
