@@ -8,11 +8,17 @@ import { ApiError } from '../types';
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type ProviderBookingTransition = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-export type ProviderFulfillmentKind = 'standard' | 'lab' | 'pharmacy' | 'equipment' | 'ambulance';
+export type ProviderFulfillmentKind =
+  | 'standard'
+  | 'lab'
+  | 'pharmacy'
+  | 'equipment'
+  | 'ambulance'
+  | 'unknown';
 
 export interface V1ProviderFulfillment {
   kind: ProviderFulfillmentKind;
-  targetType: 'LabResult' | 'MedicineOrder' | 'RentalOrder' | 'AmbulanceTrip' | null;
+  targetType: string | null;
   targetId: string | null;
   status: string | null;
   genericLifecycleAllowed: boolean;
