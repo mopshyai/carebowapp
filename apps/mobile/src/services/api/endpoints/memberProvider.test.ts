@@ -24,6 +24,25 @@ describe('mobile provider booking API', () => {
     });
   });
 
+  it('loads provider detail from the bounded provider projection', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        success: true,
+        booking: {
+          id: 'booking_1',
+          familyNotes: 'Please call on arrival',
+          careHandoff: { source: 'ask_carebow', symptoms: ['fever'], lines: [] },
+        },
+      },
+    });
+
+    const result = await memberApi.getProviderBooking('booking_1');
+
+    expect(get).toHaveBeenCalledWith('/v1/provider/bookings/booking_1');
+    expect(result.booking?.familyNotes).toBe('Please call on arrival');
+    expect(result.booking?.careHandoff?.symptoms).toEqual(['fever']);
+  });
+
   it('sends only the canonical booking id and requested provider transition', async () => {
     patch.mockResolvedValueOnce({
       data: { success: true, booking: { id: 'booking_1', status: 'CONFIRMED' } },
