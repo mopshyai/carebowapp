@@ -7,10 +7,20 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
+import type { AppNavigationProp } from '@/navigation/types';
 import { memberApi, V1Booking } from '@/services/api/endpoints/member';
 import { inventoryApi } from '@/services/api/endpoints/inventory';
 
@@ -97,6 +107,7 @@ const VARIANT: Record<
 
 export default function MemberListScreen({ variant }: { variant: MemberListVariant }) {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation() as AppNavigationProp;
   const cfg = VARIANT[variant];
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -117,8 +128,10 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
   }, [cfg]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  const canOpenBooking = variant !== 'inventory';
 
   return (
     <View style={styles.container}>
@@ -145,7 +158,16 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
             />
           }
           renderItem={({ item }) => (
-            <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.row}
+              disabled={!canOpenBooking}
+              activeOpacity={canOpenBooking ? 0.75 : 1}
+              onPress={() => {
+                if (canOpenBooking) navigation.navigate('MemberBookingDetails', { id: item.id });
+              }}
+              accessibilityRole={canOpenBooking ? 'button' : undefined}
+              accessibilityLabel={canOpenBooking ? `Open ${item.title}` : undefined}
+            >
               <View style={styles.rowIcon}>
                 <Icon name={cfg.icon} size={18} color={colors.accent} />
               </View>
@@ -153,7 +175,10 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
                 <Text style={styles.rowTitle}>{item.title}</Text>
                 {item.subtitle ? <Text style={styles.rowSubtitle}>{item.subtitle}</Text> : null}
               </View>
-            </View>
+              {canOpenBooking ? (
+                <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+              ) : null}
+            </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
