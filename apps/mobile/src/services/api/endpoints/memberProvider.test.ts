@@ -9,9 +9,20 @@ import { ApiError } from '../types';
 import { memberApi } from './member';
 
 const patch = ApiClient.patch as jest.Mock;
+const get = ApiClient.get as jest.Mock;
 
-describe('memberApi.updateProviderBookingStatus', () => {
+describe('mobile provider booking API', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it('loads provider work from the assignment-scoped endpoint', async () => {
+    get.mockResolvedValueOnce({ data: { success: true, bookings: [] } });
+
+    await memberApi.getProviderBookings('PENDING');
+
+    expect(get).toHaveBeenCalledWith('/v1/provider/bookings', {
+      params: { status: 'PENDING' },
+    });
+  });
 
   it('sends only the canonical booking id and requested provider transition', async () => {
     patch.mockResolvedValueOnce({
