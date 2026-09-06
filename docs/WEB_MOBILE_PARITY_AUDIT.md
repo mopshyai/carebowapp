@@ -217,9 +217,27 @@ None open from this pass.
 - **GitHub CI is read and green.** Both branches are pushed. Backend
   `ask-carebow-core-hardening-20260902` (PR #136, draft) is green on all five CI jobs plus
   Runtime Image; mobile `audit/web-mobile-parity` (PR #130, draft) is green on Lint & Type
-  Check, Test and Security Audit. The Android and iOS build jobs are **skipped by the
-  workflow on pull requests**, so no mobile release build has been proven by CI — that is a
-  coverage gap, not a passing build.
+  Check, Test and Security Audit.
+- **Mobile release builds now build, and CI now runs them.** They had been gated to pushes
+  on `main`, so no release build was ever validated before merge — a PR could be green on
+  lint and tests and still break `assembleRelease` or `xcodebuild -configuration Release`,
+  with the failure only appearing after landing. Both were proven locally on this branch
+  first, then the gate was removed:
+
+  | Build                                                    | Result                          | Artifact                                                      |
+  | -------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------- |
+  | Android `assembleRelease`, local `keystore.properties`   | ✅ `BUILD SUCCESSFUL in 2m 28s` | 61 MB APK signed `CN=CareBow`                                 |
+  | Android `assembleRelease`, CI ephemeral env-var keystore | ✅ `BUILD SUCCESSFUL in 48s`    | same APK signed `CN=CI` — proves the branch CI actually takes |
+  | iOS `xcodebuild -configuration Release`                  | ✅ `** BUILD SUCCEEDED **`      | `CareBow.app` (Release-iphonesimulator)                       |
+
+  Both signing paths were exercised deliberately: `build.gradle` prefers
+  `keystore.properties` over the environment, so a local run silently uses the real upload
+  key and never touches the code path CI depends on.
+
+  Cost note: `build-ios` runs on `macos-latest`, billed at 10x minutes, on every PR to
+  `main`/`develop`. `needs: [lint, test]` short-circuits it when the cheap checks fail. If
+  that is too expensive, add a paths filter to the iOS job rather than restoring main-only.
+
 - **Payment chaos matrix, webhook side: 7/7.** It found a real defect — the care-request
   capture re-checked patient access only at order creation, so a payer who lost access
   mid-checkout still got a `CONFIRMED` request. Fixed and regression-guarded.
