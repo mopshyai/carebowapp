@@ -78,6 +78,13 @@ export const careRequestsApi = {
     return response.data.careRequests ?? [];
   },
 
+  get: async (id: string): Promise<CareRequest | null> => {
+    const response = await ApiClient.get<CareRequestsResponse>('/chat/care-requests', {
+      params: { id },
+    });
+    return response.data.careRequests?.[0] ?? null;
+  },
+
   approveQuote: async (id: string): Promise<CareRequestMutationResponse> => {
     const response = await ApiClient.patch<CareRequestMutationResponse>('/chat/care-requests', {
       id,
