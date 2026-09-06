@@ -20,6 +20,7 @@ import {
 import { isProviderUserType, useAuthStore } from '@/store/useAuthStore';
 import { colors, radius, spacing, typography, shadows } from '@/theme';
 import ProviderClinicalDocumentationCard from './ProviderClinicalDocumentationCard';
+import ProviderFulfillmentCard from './ProviderFulfillmentCard';
 
 const providerActionForStatus = (
   status: V1Booking['status']
@@ -92,10 +93,11 @@ export default function MemberBookingDetailsScreen() {
     void load();
   }, [load]);
 
-  const providerAction = useMemo(
-    () => (booking && isProviderUserType(userType) ? providerActionForStatus(booking.status) : null),
-    [booking, userType]
-  );
+  const providerAction = useMemo(() => {
+    if (!booking || !isProviderUserType(userType)) return null;
+    if (booking.fulfillment?.genericLifecycleAllowed === false) return null;
+    return providerActionForStatus(booking.status);
+  }, [booking, userType]);
 
   const runProviderAction = async () => {
     if (!booking || !providerAction || transitioning) return;
@@ -187,6 +189,8 @@ export default function MemberBookingDetailsScreen() {
             </Text>
           </View>
         </View>
+
+        <ProviderFulfillmentCard booking={booking} onUpdated={load} />
 
         {providerAction ? (
           <View style={styles.actionCard}>
