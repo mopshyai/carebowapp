@@ -19,6 +19,7 @@ import {
 } from '@/services/api/endpoints/member';
 import { isProviderUserType, useAuthStore } from '@/store/useAuthStore';
 import { colors, radius, spacing, typography, shadows } from '@/theme';
+import ProviderClinicalDocumentationCard from './ProviderClinicalDocumentationCard';
 
 const providerActionForStatus = (
   status: V1Booking['status']
@@ -72,9 +73,6 @@ export default function MemberBookingDetailsScreen() {
     setLoading(true);
     setError(null);
     try {
-      // This screen belongs to the provider/member navigator. Use the bounded
-      // provider projection instead of the generic Booking detail route so raw
-      // referral delimiters and broad Profile data never become UI dependencies.
       const response = await memberApi.getProviderBooking(id);
       if (!response.success || !response.booking) {
         setBooking(null);
@@ -173,6 +171,7 @@ export default function MemberBookingDetailsScreen() {
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.heroCard}>
           <View style={styles.heroIcon}>
@@ -315,60 +314,7 @@ export default function MemberBookingDetailsScreen() {
           ) : null}
         </View>
 
-        {booking.consultationNote ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Consultation note</Text>
-            <DetailRow
-              icon="chatbox-ellipses-outline"
-              label="Chief complaint"
-              value={booking.consultationNote.chiefComplaint}
-            />
-            <DetailRow
-              icon="document-text-outline"
-              label="Diagnosis"
-              value={booking.consultationNote.diagnosis}
-            />
-            {booking.consultationNote.findings ? (
-              <DetailRow icon="search-outline" label="Findings" value={booking.consultationNote.findings} />
-            ) : null}
-            {booking.consultationNote.treatmentPlan ? (
-              <DetailRow
-                icon="checkmark-done-outline"
-                label="Treatment plan"
-                value={booking.consultationNote.treatmentPlan}
-              />
-            ) : null}
-          </View>
-        ) : null}
-
-        {booking.prescription ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Prescription / plan</Text>
-            {booking.prescription.medicines?.length ? (
-              <DetailRow
-                icon="medkit-outline"
-                label="Medicines"
-                value={booking.prescription.medicines
-                  .map((medicine) =>
-                    [medicine.name, medicine.dose, medicine.frequency, medicine.duration]
-                      .filter(Boolean)
-                      .join(' · ')
-                  )
-                  .join('\n')}
-              />
-            ) : null}
-            {booking.prescription.labTests?.length ? (
-              <DetailRow
-                icon="flask-outline"
-                label="Lab tests"
-                value={booking.prescription.labTests.join(', ')}
-              />
-            ) : null}
-            {booking.prescription.advice ? (
-              <DetailRow icon="information-circle-outline" label="Advice" value={booking.prescription.advice} />
-            ) : null}
-          </View>
-        ) : null}
+        <ProviderClinicalDocumentationCard booking={booking} onSaved={load} />
 
         {(phone || email) && (
           <View style={styles.card}>
