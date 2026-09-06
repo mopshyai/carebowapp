@@ -7,6 +7,7 @@ import { ApiClient } from '../ApiClient';
 import { ApiError } from '../types';
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type ProviderBookingTransition = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 export interface V1ConsultationNote {
   id: string;
@@ -75,6 +76,14 @@ export interface V1BookingsResponse {
   success: boolean;
   error?: string;
   bookings?: V1Booking[];
+}
+
+export interface V1ProviderTransitionResponse {
+  success: boolean;
+  error?: string;
+  booking?: V1Booking;
+  unchanged?: boolean;
+  refund?: { status: 'ISSUED' | 'NONE' | 'PENDING'; amount?: number };
 }
 
 export interface V1ProviderProfile {
@@ -194,6 +203,29 @@ export const memberApi = {
       }
       // A genuine network/server failure is not a booking fact. Let it throw so
       // the caller reloads from the server rather than reporting a state.
+      throw error;
+    }
+  },
+
+  /**
+   * Advance an assigned provider Booking through the canonical server lifecycle.
+   * The JWT route performs provider authorization and owns every status write.
+   */
+  updateProviderBookingStatus: async (
+    bookingId: string,
+    status: ProviderBookingTransition
+  ): Promise<V1ProviderTransitionResponse> => {
+    try {
+      const response = await ApiClient.patch<V1ProviderTransitionResponse>('/v1/provider/bookings', {
+        bookingId,
+        status,
+      });
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiError && error.status && error.status < 500) {
+        const body = (error.body ?? {}) as Partial<V1ProviderTransitionResponse>;
+        return { success: false, error: body.error ?? error.message };
+      }
       throw error;
     }
   },
