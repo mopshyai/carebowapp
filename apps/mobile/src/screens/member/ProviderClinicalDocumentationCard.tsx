@@ -464,6 +464,7 @@ const styles = StyleSheet.create({
   field: { gap: spacing.xs },
   fieldLabel: { ...typography.caption, color: colors.textSecondary },
   input: {
+    ...typography.bodySmall,
     minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
@@ -472,7 +473,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.surface,
     color: colors.textPrimary,
-    ...typography.bodySmall,
   },
   multilineInput: { minHeight: 88 },
   medicineCard: {
