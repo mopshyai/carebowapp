@@ -163,11 +163,36 @@ credentials — a standalone integration, not a finishing touch.
 
 ## Cross-Platform E2E Matrix
 
-⚠️ **Not executed.** Requires a real test customer account, a test patient profile, operations/
-admin access and Razorpay test-mode keys — none of which exist in this environment. Scenarios A–I
-(mobile↔web booking parity, Ask CareBow custom request, quote→payment→webhook, materialization,
-cancel, reschedule, profile sync, access revocation) remain **pending**, as does the payment
-failure matrix (14 cases) and provider/operations continuity. No E2E result is claimed.
+**Partially executed.** `carebow-main/e2e/` drives the real Next.js server against a real
+PostgreSQL database over HTTP, with a real JWT on `/api/v1/*` and a real session cookie on
+the web routes. **18 / 18 checks passed.** Full log with canonical IDs:
+`carebow-main/docs/WEB_MOBILE_E2E_EVIDENCE.md`.
+
+| Scenario                                         | Status | Proven                                                                                                                                                                                                      |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A/B — same Booking across mobile and web         | ✅     | identical id / profile / service / status / schedule                                                                                                                                                        |
+| G — reschedule parity                            | ✅     | same Booking id, web sees the mobile move, no duplicate row, provider released, CONFIRMED and custom jobs return requiresOperations, terminal states refused, stranger 404, past time 400, retry idempotent |
+| H — profile parity                               | ✅     | web-side edit read back through the mobile route on the same Profile id                                                                                                                                     |
+| I — access revocation                            | ✅     | granted family account reads the shared CareRequest; after revocation it can neither read it nor act on the Booking                                                                                         |
+| C — CareRequest identity                         | 🟡     | server-generated cuid proven; Ask CareBow phrasing on a handset not run                                                                                                                                     |
+| D — quote → approve → Razorpay → webhook         | ⚠️     | needs Razorpay TEST keys + operations account                                                                                                                                                               |
+| E — materialize custom care → provider lifecycle | ⚠️     | needs provider/ops accounts on a running stack                                                                                                                                                              |
+| F — cancel + refund parity                       | ⚠️     | needs Razorpay TEST keys                                                                                                                                                                                    |
+| Payment chaos matrix (16 cases)                  | ⚠️     | needs Razorpay TEST keys                                                                                                                                                                                    |
+
+What this does **not** establish: behaviour on a physical device, anything through Razorpay
+or its webhooks, and anything about production data.
+
+## Production Catalog — classified
+
+Production publishes 38 services; all 27 canonical rows are present and correct. The 11
+extras are one legacy `cmoptp…` batch, all quote-priced, surviving because `Service.slug`
+is nullable and the seed upserts strictly by slug. Seven are unambiguous duplicates of a
+canonical service; four need a product decision. Full classification and a tested,
+reversible remedy (`isAvailable=false`, never delete) live in
+`carebow-main/docs/PRODUCTION_CATALOG_RECONCILIATION.md` and
+`carebow-main/scripts/catalog-deprecate-legacy-duplicates.sql`.
+⚠️ Not executed against production — needs a DB session.
 
 ## P0
 
@@ -175,10 +200,11 @@ None open from this pass.
 
 ## P1
 
-- Production catalog carries 11 legacy quote-only duplicates alongside the canonical 27 (above).
-- Cross-platform E2E matrix unexecuted — the definition of done cannot be met without it.
-- Payment failure matrix unexecuted; no proof against double-charge or false `CONFIRMED`.
+- Production catalog: 7 duplicate rows still published; remedy scripted and tested, **awaiting production DB execution**.
+- E2E scenarios D, E, F unexecuted — payment, materialization and refund parity remain unproven.
+- Payment chaos matrix unexecuted; no proof against double-charge or false `CONFIRMED`.
 - Provider/operations continuity unproven end to end.
+- GitHub CI still unread and branches unpushed (environment authentication).
 
 ## P2
 
