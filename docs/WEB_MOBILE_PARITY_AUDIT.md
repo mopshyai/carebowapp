@@ -206,7 +206,26 @@ None open from this pass.
 - Production catalog: 7 duplicate rows still published; remedy scripted and tested against a
   reproduction of production, **awaiting production DB execution**.
 - Razorpay-API half of the payment matrix unexecuted (order/link creation, outbound refunds).
-- GitHub CI still unread and branches unpushed (environment authentication).
+- The four ambiguous legacy services are decided: equipment catch-all, full-day caregiver
+  and ambulance are kept as intentional offerings; Diet Consultation is kept but was
+  mis-categorised as `MEDITATION`, which maps to `YOGA_INSTRUCTOR`. A `DIETITIAN` service
+  category now exists backend-side; the **production row is still `MEDITATION`** and needs
+  the same DB session as the duplicate hide.
+
+### Closed this pass
+
+- **GitHub CI is read and green.** Both branches are pushed. Backend
+  `ask-carebow-core-hardening-20260902` (PR #136, draft) is green on all five CI jobs plus
+  Runtime Image; mobile `audit/web-mobile-parity` (PR #130, draft) is green on Lint & Type
+  Check, Test and Security Audit. The Android and iOS build jobs are **skipped by the
+  workflow on pull requests**, so no mobile release build has been proven by CI — that is a
+  coverage gap, not a passing build.
+- **Payment chaos matrix, webhook side: 7/7.** It found a real defect — the care-request
+  capture re-checked patient access only at order creation, so a payer who lost access
+  mid-checkout still got a `CONFIRMED` request. Fixed and regression-guarded.
+- **Provider/operations continuity proven end to end: 12/12**, over the web transport.
+- **Post-integration regression: 37/37** across all four suites on a database built from
+  scratch.
 
 ## P2
 
