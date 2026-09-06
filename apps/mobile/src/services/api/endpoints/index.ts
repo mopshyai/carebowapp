@@ -7,6 +7,7 @@ export { servicesApi } from './services';
 export { askCareBowApi } from './askCareBow';
 export { careRequestsApi } from './careRequests';
 export { memberApi } from './member';
+export { providerFulfillmentApi } from './providerFulfillment';
 export { profilesApi } from './profiles';
 export { safetyApi } from './safety';
 export { inventoryApi } from './inventory';
@@ -26,6 +27,16 @@ export type {
   V1ProviderProfileResponse,
   BookingStatus,
 } from './member';
+export type {
+  LabResultStatus,
+  FulfillmentStatus,
+  TripStatus,
+  LabTestValue,
+  AssignedLabTest,
+  AssignedMedicineOrder,
+  AssignedRentalOrder,
+  AssignedAmbulanceTrip,
+} from './providerFulfillment';
 export type { V1Profile, V1ProfileResponse, V1ProfileShareResponse } from './profiles';
 export type { SosReportPayload, SosReportResponse } from './safety';
 export type {
