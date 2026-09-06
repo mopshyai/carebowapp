@@ -1,122 +1,190 @@
 # CareBow Web ↔ Mobile Platform Parity Audit
 
-In progress, 2026-09-06. Source audit, not a claim of deployed or E2E parity.
+Living document. Last updated 2026-09-06 (second pass: shared reschedule lifecycle,
+local CI replay, production catalog read).
+
+**Status legend** — applied per row, never aspirationally:
+
+| Mark | Meaning                                                  |
+| ---- | -------------------------------------------------------- |
+| ✅   | implemented **and** verified by something that can fail  |
+| 🟡   | implemented, but end-to-end behaviour not proven         |
+| ⚠️   | cannot be verified from this environment (blocker named) |
+| 🔴   | missing or broken                                        |
+| ⚫   | obsolete / deliberately removed                          |
 
 ## Architecture
 
-Web `carebow-main` is Next.js 15 / React 19 and owns the API server. Mobile `carebowapp` is React Native 0.76 / React 18 with Zustand caches and an HTTP ApiClient. Neither a mobile store nor a static catalog is authoritative for bookings, patients, or payments.
+Web `carebow-main` is Next.js 15 / React 19 and owns the API server. Mobile `carebowapp` is
+React Native 0.76 / React 18 with Zustand caches and an HTTP ApiClient. Neither a mobile store
+nor a static catalog is authoritative for bookings, patients, or payments.
 
-## Shared Backend
-
-Both clients target the Next.js API. Web main is `c0d2a3447bcf5f859ff7acfba9a8f3285ad2f648`; mobile branch `codex/run-github-main-20260821` is `0d9384b51ec7406c93f1b0b61804ccbb8749aedc`. Both fetched and 0 ahead / 0 behind origin/main. Existing changes preserved: mobile privacy manifest, profile repository/tests, care plans, checkout, order details, personal info, Ask screen, untracked store assets; web bookings/payment/settle tests and implementations.
-
-The newer durable CareRequest is NOT on web main. It lives on `origin/ask-carebow-core-hardening-20260902` at `2a59ce3`. Integration is isolated at `/private/tmp/carebow-platform-web`, branch `codex/web-mobile-parity-20260906`. Existing web working changes applied cleanly to that worktree, originals untouched. No push, deployment, or migration against a live database.
+Backend parity branch: `codex/web-mobile-parity-20260906` (based on
+`origin/ask-carebow-core-hardening-20260902`). Mobile parity branch:
+`audit/web-mobile-parity`. The name `parity/mobile-care-request-integration` does not exist in
+this environment and should not be used.
 
 ## Database Source of Truth
 
-Prisma 7 with PostgreSQL (`DATABASE_URL`), using the pg driver adapter. Prisma CLI and runtime share that environment key. Actual deployed database identity and contents remain unverified. See `WEB_MOBILE_SOURCE_INVENTORY.md` for models, routes and complete seed payload. Never infer production rows from seeds.
+Prisma 7 + PostgreSQL via the pg driver adapter. The schema is multi-file: `prisma/schema.prisma`
+plus `prisma/models/*.prisma` (loaded because `prisma.config.ts` sets `schema: 'prisma/'`).
+A stale generated client — not a missing model — is what made `CareRequest`,
+`CareRequestBookingLink`, `AskCarebowCheckoutIntent`, `AskCarebowBookingLink` and
+`AskCarebowClinicalEscalation` appear absent from `PrismaClient`. `prisma generate` fixes it.
 
-## Authentication Model
+## Booking Reschedule — resolved
 
-Web uses opaque database Session cookies; mobile uses access JWTs plus database refresh tokens, both resolving User. Shared chat auth accepts both. ProfileAccess handles dependent sharing. UserAccessProfile roles differ from patient Profile. UserProfile/FamilyMember in mobile are cached account/patient representations; preserve existing self-profile bridge edits. JWT roles are overlaid from token claims: role revocation freshness requires verification.
+Previously recorded here as "mobile action missing". The real defect was worse and is now fixed:
+mobile called `POST /v1/bookings/:id/reschedule`, **the backend had no such route**, and the only
+implementation of the reschedule rules lived inline inside the Ask CareBow booking tool.
 
-## Domain Models
+`rescheduleBookingByCustomer()` in `src/lib/booking-lifecycle.ts` is now the single implementation.
+Mobile (`POST|PATCH /api/v1/bookings/:bookingId/reschedule`, body `{ scheduledAt }` only) and
+Ask CareBow (`update_booking` action `RESCHEDULE`) both call it. Rules:
 
-User -> Profile / ProfileAccess -> ChatSession / ChatMessage, Booking, medical records. Service -> Booking; Payment snapshots intent. ProviderProfile and provider credentials attach to User. Organisation/OrgMember handle provider organizations. CareRequest includes user/profile/session IDs, quote, payment reference, sourcing and escalation state; CareRequestBookingLink links fulfillment to Booking. Numerous new request links are scalar IDs without database relations; application authorization and orphan handling matter.
-
-## Service Catalog
-
-Canonical published Service rows in PostgreSQL; `prisma/mobile-catalog.json` and `seed-catalog.ts` supply rich services. Mobile has an independent local catalog and currently filters out backend rows lacking rich display details. `backendServiceResolver.ts` has obsolete fuzzy/first-row matching and no callers found. Local IDs must never be substituted for canonical IDs. Catalog prices are authored in USD; server pricing determines settlement currency. A legacy raw basePrice must not become an invented fixed payable amount.
+- owner-only; another account's booking is 404, not 403
+- profile access re-checked at reschedule time (revoked family grant cannot move care)
+- only `PENDING` standard bookings move; `CONFIRMED` returns `requiresOperations`
+- a materialized custom CareRequest job returns `requiresOperations` — never a silent move
+- `IN_PROGRESS` / `COMPLETED` / `CANCELLED` refused
+- new time must clear `MIN_RESCHEDULE_LEAD_MS`
+- the **same Booking row** is updated; no replacement booking is ever created
+- a provider assigned for the old time is released and notified
+- previous and new times are written to `AuditLog`
+- compare-and-set over status + scheduledAt + providerId, so a concurrent confirmation or
+  assignment wins instead of being overwritten by a stale phone screen
+- a repeat request for the time already stored returns `unchanged: true`, not a false conflict
 
 ## Feature Matrix
 
-✅ source implementation; 🟡 partial; 🔴 missing; ⚫ legacy/dead. E2E is unverified unless explicitly stated. Web column covers the isolated integration branch, with main differences noted. These are capability groups, not a fabricated percentage.
+E2E is unverified unless the row says otherwise.
 
-| Domain        | Capability                          | Web | Mobile | Backend | DB  | Working E2E? | Gap                                        | Priority | Action                             |
-| ------------- | ----------------------------------- | --- | ------ | ------- | --- | ------------ | ------------------------------------------ | -------- | ---------------------------------- |
-| Identity      | signup/login/logout/refresh         | ✅  | ✅     | ✅      | ✅  | unverified   | cookie/JWT revocation parity               | P0       | test both transports               |
-| Identity      | reset/verification/profile editing  | ✅  | ✅     | ✅      | ✅  | unverified   | preserve local fixes                       | P2       | regression tests                   |
-| Identity      | roles/provider/admin                | ✅  | 🟡     | ✅      | ✅  | unverified   | mobile role surfaces limited               | P2       | audit authorization                |
-| Family        | dependent CRUD/sharing              | ✅  | ✅     | ✅      | ✅  | unverified   | local self/account bridge                  | P1       | preserve and verify                |
-| Family        | emergency/medical context           | ✅  | 🟡     | ✅      | ✅  | unverified   | all profile fields not sent                | P1       | inspect write contracts            |
-| Services      | canonical discovery                 | ✅  | 🟡     | ✅      | ✅  | unverified   | mobile hides non-rich rows                 | P1       | render all published rows          |
-| Services      | offline catalog identity            | ✅  | 🟡     | ✅      | ✅  | unverified   | local fallback advertises unknown IDs      | P1       | fail closed on unavailable catalog |
-| Ask           | server conversation turns           | ✅  | 🟡     | ✅      | ✅  | unverified   | only symptom intent reaches orchestrator   | P1       | send non-emergency intents too     |
-| Ask           | cross-device conversation history   | ✅  | 🟡     | ✅      | ✅  | unverified   | mobile keeps local sessions                | P1       | expose server sessions             |
-| Ask           | voice                               | 🟡  | ✅     | ✅      | 🟡  | unverified   | platform input differences                 | P2       | intentional native capability      |
-| Ask           | unlisted request/ops handoff        | ✅  | 🔴     | ✅      | ✅  | unverified   | CareRequest missing on main and mobile     | P1       | use existing branch domain         |
-| Booking       | create/list/detail/clinical outcome | ✅  | ✅     | ✅      | ✅  | unverified   | refresh on return                          | P1       | shared lifecycle tests             |
-| Booking       | cancel/refund                       | ✅  | ✅     | ✅      | ✅  | unverified   | cross-platform proof absent                | P1       | integration test                   |
-| Booking       | reschedule                          | ✅  | 🔴     | ✅      | ✅  | unverified   | mobile action missing                      | P1       | use canonical operation            |
-| Care requests | status/history                      | ✅  | 🔴     | ✅      | ✅  | unverified   | no mobile list                             | P1       | shared customer endpoint           |
-| Care requests | quote approval/cancel               | ✅  | 🔴     | ✅      | ✅  | unverified   | no mobile controls                         | P1       | shared PATCH endpoint              |
-| Payments      | booking/plan hosted checkout        | ✅  | ✅     | ✅      | ✅  | unverified   | webhook requires deployed credentials      | P1       | preserve server verification       |
-| Payments      | custom quote checkout               | ✅  | 🔴     | 🟡      | ✅  | unverified   | cookie-only order; no hosted request       | P1       | shared auth and hosted transport   |
-| Payments      | retry/refund/idempotency            | ✅  | 🟡     | ✅      | ✅  | unverified   | concurrent client actions                  | P0       | server claims remain canonical     |
-| Provider      | onboarding/documents/verification   | ✅  | 🟡     | ✅      | ✅  | unverified   | mobile category coverage                   | P2       | retain web operations              |
-| Provider      | assignment/fulfillment              | ✅  | 🟡     | ✅      | ✅  | unverified   | link serialization differs                 | P1       | shared booking IDs                 |
-| Admin         | sourcing/quote/escalation/timeline  | ✅  | ⚫     | ✅      | ✅  | unverified   | web role-specific UI intentional           | P2       | mobile requests reach same queue   |
-| Clinical      | patient/session handoff             | ✅  | 🟡     | ✅      | ✅  | unverified   | local conversation engine duplicates rules | P1       | backend orchestration first        |
-| Notifications | email/SMS/WhatsApp                  | ✅  | 🟡     | ✅      | ✅  | unverified   | provider delivery unverified               | P2       | inspect adapters/outbox            |
-| Notifications | native push/inbox                   | 🟡  | ✅     | 🟡      | ✅  | unverified   | live device delivery unverified            | P2       | verify credentials/device          |
-| History       | bookings/payments                   | ✅  | ✅     | ✅      | ✅  | unverified   | custom requests omitted                    | P1       | show request history               |
-| AI            | RAG/safety/streaming                | ✅  | 🟡     | ✅      | ✅  | unverified   | mobile fallback medical logic              | P1       | avoid expanding duplication        |
-| Location      | saved address/GPS/service area      | 🟡  | 🟡     | 🟡      | 🟡  | unverified   | native address cache vs booking text       | P2       | map address persistence            |
-| Safety        | SOS/check-ins/contacts              | ✅  | ✅     | ✅      | ✅  | unverified   | dispatch delivery not proven               | P2       | verify without sending alerts      |
-| Records       | vitals/documents/medications        | ✅  | 🟡     | ✅      | ✅  | unverified   | device-local episode memory                | P2       | canonical record access            |
+| Domain        | Capability                           | Web | Mobile | Backend | DB  | E2E | Notes                                                  |
+| ------------- | ------------------------------------ | --- | ------ | ------- | --- | --- | ------------------------------------------------------ |
+| Identity      | signup/login/logout/refresh          | ✅  | ✅     | ✅      | ✅  | ⚠️  | no test credentials in this environment                |
+| Family        | dependent CRUD/sharing               | ✅  | ✅     | ✅      | ✅  | ⚠️  |                                                        |
+| Services      | canonical discovery                  | ✅  | ✅     | ✅      | ✅  | 🟡  | mobile renders legacy rows without rich `details`      |
+| Ask           | server conversation turns            | ✅  | 🟡     | ✅      | ✅  | ⚠️  |                                                        |
+| Ask           | unlisted request → ops handoff       | ✅  | ✅     | ✅      | ✅  | ⚠️  | CareRequest lifecycle present on the parity branch     |
+| Booking       | create/list/detail                   | ✅  | ✅     | ✅      | ✅  | ⚠️  |                                                        |
+| Booking       | cancel/refund                        | ✅  | ✅     | ✅      | ✅  | ⚠️  |                                                        |
+| Booking       | **reschedule**                       | ✅  | ✅     | ✅      | ✅  | 🟡  | one shared lifecycle; 17 unit tests, no device run     |
+| Care requests | status/history                       | ✅  | ✅     | ✅      | ✅  | ⚠️  | `RequestsScreen` / `RequestDetailsScreen`              |
+| Care requests | quote approval/cancel                | ✅  | ✅     | ✅      | ✅  | ⚠️  | `approveQuote()` / `cancel()`                          |
+| Payments      | booking/plan hosted checkout         | ✅  | ✅     | ✅      | ✅  | ⚠️  | needs Razorpay test mode + account                     |
+| Payments      | custom quote checkout                | ✅  | ✅     | ✅      | ✅  | ⚠️  | `paymentsApi.createCareRequestOrder` + hosted checkout |
+| Payments      | retry/refund/idempotency             | ✅  | ✅     | ✅      | ✅  | ⚠️  | failure matrix not executed                            |
+| Provider      | assignment/fulfillment               | ✅  | 🟡     | ✅      | ✅  | ⚠️  | continuity not proven                                  |
+| Clinical      | escalation convergence               | ✅  | n/a    | ✅      | ✅  | ✅  | triggers exercised on real Postgres (see below)        |
+| Notifications | in-app inbox                         | ✅  | ✅     | ✅      | ✅  | 🟡  |                                                        |
+| Notifications | **remote push (server→device)**      | 🔴  | 🔴     | 🔴      | ✅  | 🔴  | see Notifications below                                |
+| Ask           | fake local `order_*`/`request_*` IDs | ⚫  | ⚫     | n/a     | n/a | n/a | `actionIntegration.ts` removed; must stay removed      |
 
-## Mobile-only Features
+## Verification Performed (2026-09-06)
 
-Native voice, push/device token integration, GPS, offline episode memory and local safety fallback. Presentation differences are intentional; persisted care state must remain shared. Static catalog entries are inventoried in companion source file.
+Run on a disposable PostgreSQL 16 + pgvector instance built for this audit.
 
-## Web-only Features
+| Check                                             | Result                                                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Backend typecheck (`tsc --noEmit`)                | ✅ 0 errors                                                                                               |
+| Backend tests (`npm test`)                        | ✅ 495 / 495 passing                                                                                      |
+| Backend production build                          | ⚠️ blocked — sandbox cannot fetch Google Fonts for `next/font`                                            |
+| Migrations from scratch (27 migrations, in order) | ✅ all applied to an empty database                                                                       |
+| Schema ↔ migrations drift                         | ✅ 62 models / 62 tables, 0 table and 0 column differences                                                |
+| `prisma migrate deploy` + `migrate diff`          | ⚠️ blocked — `binaries.prisma.sh` unreachable (403/000); replayed the SQL directly instead                |
+| Clinical escalation triggers                      | ✅ OPEN→ASSIGNED→ACCEPTED, provider swap resets acceptance, cancel resolves, CHECK rejects invalid status |
+| Reschedule vs clinical escalation                 | ✅ a reschedule-shaped write fabricates no clinical progress (escalation returns to OPEN, unresolved)     |
+| Catalog seed (`prisma/seed-catalog.ts`)           | ✅ 27 created, then 0 created / 27 updated on re-run — idempotent, non-destructive                        |
+| Mobile typecheck                                  | ✅ 0 errors                                                                                               |
+| Mobile lint                                       | ✅ 0 errors (201 pre-existing console/`any` warnings)                                                     |
+| Mobile tests                                      | ✅ 568 / 568 passing, 39 suites                                                                           |
+| **GitHub CI**                                     | ⚠️ **blocked by environment authentication** — see below                                                  |
 
-Durable custom requests, quoting, operations sourcing, provider credential management, clinical escalation monitoring and server conversation history. Some exist only on the unmerged integration base, not main.
+### ⚠️ CI verification blocked by environment authentication
 
-## Backend Gaps
+Neither repository is attached to this session: the GitHub API answers
+"sessions are bound to their configured repositories", the tool that would attach them is not
+available here, and `carebow-main` rejects git credentials entirely (private repo).
+Therefore: workflow runs, commit checks and PR #136 status **have not been read**, and branches
+**have not been pushed**. Every result above is a local replay of what the workflows define
+(`.github/workflows/ci.yml` in both repos), not a green CI run. Do not report CI as green.
 
-New CareRequest workflow not integrated into main. Hosted custom-payment transport missing. Customer request list capped at 20 and does not recheck profile access for each row. Mobile payment status treats all non-booking payments as plans.
+## Production Service Catalog
 
-## Database Gaps
+Read live from `GET https://www.carebow.com/api/public/services` (unauthenticated, read-only).
+`GET /api/ready` → `{"ready":true}`.
 
-CareRequest status uses String rather than DB enum; transitions must stay server-owned. Scalar user/profile/session/payment/link IDs lack several FK constraints. No live orphan scan or schema drift proof yet. No destructive changes justified.
+- **All 27 canonical services are present in production**, with pricing model and category
+  matching `prisma/mobile-catalog.json` exactly (fixed / packages / hourly / daily / quote).
+- **11 extra legacy rows are also published** — all quote-only, all with `cmoptp…` ids from an
+  earlier generation, several semantically duplicating a canonical service:
 
-## API Gaps
+| Legacy row                 | Category         | Duplicates                                    |
+| -------------------------- | ---------------- | --------------------------------------------- |
+| Doctor Home Visit          | DOCTOR_VISIT     | Doctor Visit (fixed $50)                      |
+| Home Nursing Care          | NURSE_CARE       | Expert Home Stay Nurse (packages)             |
+| Physiotherapy Session      | PHYSIOTHERAPY    | Physiotherapy (packages)                      |
+| Home Blood Test            | LAB_TEST         | Lab Testing (packages)                        |
+| Medicine Home Delivery     | PHARMACY         | Medicine Delivery (fixed $5)                  |
+| Companion Care             | COMPANION        | Companionship (packages)                      |
+| Medical Equipment Rental   | EQUIPMENT_RENTAL | the 9 specific equipment rows                 |
+| Yoga for Seniors           | YOGA             | Yoga and Meditation (packages)                |
+| Elder Caregiver (Full Day) | CAREGIVER        | Elder care overlaps daily_care rows           |
+| Emergency Ambulance        | AMBULANCE        | no canonical equivalent                       |
+| Diet Consultation          | MEDITATION       | no canonical equivalent; category looks wrong |
 
-See route/caller inventory. Shared chat uses dual auth, request payment currently cookie-only. V1 catalog exposes raw rich JSON while public catalog strips marketing fields. Mobile and web errors have different envelopes; preserve explicit failure handling.
+A customer browsing production today sees both a priced canonical service and a quote-only
+near-duplicate for the same care. **P1, requires a human decision — no rows were changed.**
+The safe remedy is to set `isAvailable = false` on the reviewed duplicates (never delete: they
+may be referenced by historical bookings). `prisma/seed-catalog.ts` will not do this; it only
+upserts the canonical 27 by slug and contains no delete.
 
-## Security Findings
+Not verifiable through the public endpoint: `slug` values, rows with `isAvailable = false`, and
+rows whose pricing is malformed (all three are filtered out server-side before the response).
+Those need a database session.
 
-No new client secrets. Payment amount/currency and access checks stay server-owned. Revoked shared-profile access must also apply to request list/history. Existing copied web edits are separately preserved and are not counted as new work.
+## Notifications
+
+| Piece                                             | State                                                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Local / scheduled notifications (Notifee)         | ✅ real                                                                                                                      |
+| In-app notification inbox (`Notification` table)  | ✅ real                                                                                                                      |
+| `POST/DELETE /v1/auth/device-token` backend route | ✅ exists, upserts and deletes `DeviceToken`                                                                                 |
+| `deviceTokenApi` client in mobile                 | 🔴 exists but has **zero call sites**                                                                                        |
+| APNs / FCM SDK in mobile                          | 🔴 absent — only `@notifee/react-native`; no `getToken`, `getAPNSToken`, `registerDeviceForRemoteMessages`, `onTokenRefresh` |
+| Backend sender to APNs / FCM                      | 🔴 absent — the only match for `fcm`/`apns`/`firebase-admin` in `src/` is a comment                                          |
+
+**`DeviceToken` is a write-only sink: nothing writes to it from the app and nothing reads it to
+send.** Local notifications firing on a phone is not remote push. Completing this means adding a
+messaging SDK, APNs certificates/entitlements, an FCM project, and a backend sender with
+credentials — a standalone integration, not a finishing touch.
+
+→ **P2 / launch-decision required.** Do not mark push complete.
+
+## Cross-Platform E2E Matrix
+
+⚠️ **Not executed.** Requires a real test customer account, a test patient profile, operations/
+admin access and Razorpay test-mode keys — none of which exist in this environment. Scenarios A–I
+(mobile↔web booking parity, Ask CareBow custom request, quote→payment→webhook, materialization,
+cancel, reschedule, profile sync, access revocation) remain **pending**, as does the payment
+failure matrix (14 cases) and provider/operations continuity. No E2E result is claimed.
 
 ## P0
 
-Verify patient-access boundaries for CareRequest reads and actions. Avoid unsafe local service remapping. Do not claim payment success based on a browser return.
+None open from this pass.
 
 ## P1
 
-Connect mobile orchestration and durable request list/actions/payments; expose full catalog; refresh bookings across navigation; prove shared patient and payment identity.
+- Production catalog carries 11 legacy quote-only duplicates alongside the canonical 27 (above).
+- Cross-platform E2E matrix unexecuted — the definition of done cannot be met without it.
+- Payment failure matrix unexecuted; no proof against double-charge or false `CONFIRMED`.
+- Provider/operations continuity unproven end to end.
 
 ## P2
 
-Complete server conversation history, notification transport evidence, location/records and provider parity after core integration.
+- Remote push notifications: launch decision required (above).
+- Server conversation history, location/records parity, notification transport evidence.
 
 ## P3
 
-Presentation polish deferred.
-
-## Completed During This Work
-
-Repository inspection/fetch; safe isolated integration checkout; preservation of existing changes; architecture and source inventories.
-
-## Remaining Work
-
-Implementation and tests in progress. Main integration, migration deployment, live database comparisons, and all eight device/web E2E journeys are not yet verified.
-
-## E2E Verification
-
-Scenarios 1–8: pending. Compilation and mocked tests will be reported separately from PostgreSQL/API/device proof.
-
-## Recommended Architecture Decisions
-
-Use carebow-main PostgreSQL + shared domain functions as source of truth. Extend the existing CareRequest branch rather than introducing a second request model. Mobile remains a transport/UI client. Main rollout must include that branch's migrations and reviewed existing fixes. Keep integration isolated until tested; no push or production deployment authorized.
+- 201 pre-existing mobile lint warnings (console statements, `any`). Not this project's scope.
