@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -12,17 +12,40 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import type { AppNavigationProp } from '@/navigation/types';
-import { memberApi, type V1Booking } from '@/services/api/endpoints/member';
+import {
+  memberApi,
+  type ProviderBookingTransition,
+  type V1Booking,
+} from '@/services/api/endpoints/member';
+import { isProviderUserType, useAuthStore } from '@/store/useAuthStore';
 import { colors, radius, spacing, typography, shadows } from '@/theme';
+
+const providerActionForStatus = (
+  status: V1Booking['status']
+): { status: ProviderBookingTransition; label: string; icon: string } | null => {
+  if (status === 'PENDING') {
+    return { status: 'CONFIRMED', label: 'Accept assignment', icon: 'checkmark-circle-outline' };
+  }
+  if (status === 'CONFIRMED') {
+    return { status: 'IN_PROGRESS', label: 'Start care', icon: 'play-circle-outline' };
+  }
+  if (status === 'IN_PROGRESS') {
+    return { status: 'COMPLETED', label: 'Complete care', icon: 'checkmark-done-circle-outline' };
+  }
+  return null;
+};
 
 export default function MemberBookingDetailsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute();
   const id = (route.params as { id?: string } | undefined)?.id;
+  const userType = useAuthStore((state) => state.userType);
   const [booking, setBooking] = useState<V1Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -52,6 +75,32 @@ export default function MemberBookingDetailsScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const providerAction = useMemo(
+    () => (booking && isProviderUserType(userType) ? providerActionForStatus(booking.status) : null),
+    [booking, userType]
+  );
+
+  const runProviderAction = async () => {
+    if (!booking || !providerAction || transitioning) return;
+
+    setTransitioning(true);
+    setActionError(null);
+    try {
+      const response = await memberApi.updateProviderBookingStatus(booking.id, providerAction.status);
+      if (!response.success) {
+        setActionError(response.error || 'CareBow could not update this assignment.');
+        return;
+      }
+      // The transition response is intentionally minimal. Reload the canonical
+      // Booking so the screen never keeps a locally-mutated status or stale handoff.
+      await load();
+    } catch {
+      setActionError('Cannot reach CareBow servers. The assignment was not changed locally.');
+    } finally {
+      setTransitioning(false);
+    }
+  };
 
   const openContact = (value: string, kind: 'phone' | 'email') => {
     const href = kind === 'phone' ? `tel:${value}` : `mailto:${value}`;
@@ -119,6 +168,36 @@ export default function MemberBookingDetailsScreen() {
             </Text>
           </View>
         </View>
+
+        {providerAction ? (
+          <View style={styles.actionCard}>
+            <Text style={styles.sectionTitle}>Assignment</Text>
+            <Text style={styles.sectionHint}>
+              This updates the same CareBow Booking. The server verifies that this assignment belongs to you before changing its status.
+            </Text>
+            {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
+            <TouchableOpacity
+              style={[styles.primaryButton, transitioning && styles.buttonDisabled]}
+              disabled={transitioning}
+              onPress={() => void runProviderAction()}
+              accessibilityRole="button"
+              accessibilityLabel={providerAction.label}
+            >
+              {transitioning ? (
+                <ActivityIndicator size="small" color={colors.textInverse} />
+              ) : (
+                <Icon name={providerAction.icon} size={19} color={colors.textInverse} />
+              )}
+              <Text style={styles.primaryButtonText}>
+                {transitioning ? 'Updating…' : providerAction.label}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : actionError ? (
+          <View style={styles.actionCard}>
+            <Text style={styles.actionError}>{actionError}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Appointment</Text>
@@ -267,6 +346,15 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     ...shadows.card,
   },
+  actionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
   handoffCard: { borderWidth: 1, borderColor: colors.border },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   handoffIcon: {
@@ -280,6 +368,7 @@ const styles = StyleSheet.create({
   sectionHeaderCopy: { flex: 1 },
   sectionTitle: { ...typography.h4, color: colors.textPrimary },
   sectionHint: { ...typography.caption, color: colors.textTertiary, marginTop: 2 },
+  actionError: { ...typography.bodySmall, color: colors.error },
   notes: { ...typography.body, color: colors.textPrimary, lineHeight: 22 },
   emptyText: { ...typography.body, color: colors.textSecondary },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
@@ -306,11 +395,17 @@ const styles = StyleSheet.create({
   },
   stateText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   primaryButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
   },
+  buttonDisabled: { opacity: 0.65 },
   primaryButtonText: { ...typography.label, color: colors.textInverse },
   linkButton: { padding: spacing.sm },
   linkText: { ...typography.label, color: colors.accent },
