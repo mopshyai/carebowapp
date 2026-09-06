@@ -63,17 +63,26 @@ export const toBookingService = (source: V1Service): Service => {
   };
 };
 
+/**
+ * Adapt every available backend service into the mobile catalog.
+ *
+ * Older backend rows may not yet have the richer mobile `details` payload, but
+ * they are still canonical CareBow services and must not disappear from mobile.
+ * Rich rows retain their authored presentation data; legacy rows use the safe
+ * adapter above until their metadata is backfilled server-side.
+ */
 export const groupLiveServices = (services: V1Service[]): ServiceCategory[] => {
-  const rich = services.filter(hasDetails);
-
   const groups = new Map<string, Service[]>();
-  rich.forEach((source) => {
-    const bookingService = toBookingService(source);
-    const categoryId = bookingService.categoryId;
-    const items = groups.get(categoryId) ?? [];
-    items.push(bookingService);
-    groups.set(categoryId, items);
-  });
+
+  services
+    .filter((source) => source.isAvailable)
+    .forEach((source) => {
+      const bookingService = toBookingService(source);
+      const categoryId = bookingService.categoryId;
+      const items = groups.get(categoryId) ?? [];
+      items.push(bookingService);
+      groups.set(categoryId, items);
+    });
 
   const orderedIds = [
     ...serviceCategories.map((category) => category.id),
