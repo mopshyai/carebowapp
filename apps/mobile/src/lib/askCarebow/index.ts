@@ -3,17 +3,29 @@
  * Export all modules for the AI Health Assistant
  */
 
-// The legacy engine remains available to focused regression tests, but the app
-// entry point uses the conservative clinical fallback gate so a shadowed or
-// unavailable server orchestrator cannot skip required intake fields.
+// The local engine remains the conservative deterministic fallback. The app
+// entry adapter below marks every non-emergency turn for the shared server
+// orchestrator so service/care requests cannot bypass canonical Booking and
+// CareRequest tools simply because the local classifier called them
+// `want_doctor`, `want_test`, or `talk` rather than `symptom_help`.
 export type { ConversationResponse } from './conversationEngine';
-export { processSafeFallbackUserInput as processUserInput } from './safeFallbackEngine';
+import { processSafeFallbackUserInput } from './safeFallbackEngine';
+import { normalizeIntentForAppRouting } from './orchestratorRouting';
+
+export async function processUserInput(
+  ...args: Parameters<typeof processSafeFallbackUserInput>
+): Promise<Awaited<ReturnType<typeof processSafeFallbackUserInput>>> {
+  const response = await processSafeFallbackUserInput(...args);
+  return normalizeIntentForAppRouting(response);
+}
+
 export * from './followUpQuestions';
 export * from './safetyClassifier';
 export * from './serviceRouter';
 export * from './guidanceBuilder';
 export * from './contextLoader';
 export * from './actionIntegration';
+export * from './orchestratorRouting';
 
 // Export triage level mapping utilities (P0-2 fix)
 export {
