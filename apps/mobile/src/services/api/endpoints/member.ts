@@ -138,6 +138,14 @@ export const memberApi = {
     return response.data;
   },
 
+  /** Assigned work only. Keeps a provider's own customer bookings out of their work queue. */
+  getProviderBookings: async (status?: BookingStatus): Promise<V1BookingsResponse> => {
+    const response = await ApiClient.get<V1BookingsResponse>('/v1/provider/bookings', {
+      params: status ? { status } : undefined,
+    });
+    return response.data;
+  },
+
   /** Submit a real pending booking for a service that is free to request now. */
   createBooking: async (data: {
     serviceId: string;
