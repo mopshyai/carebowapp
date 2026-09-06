@@ -8,6 +8,16 @@ import { ApiError } from '../types';
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type ProviderBookingTransition = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type ProviderFulfillmentKind = 'standard' | 'lab' | 'pharmacy' | 'equipment' | 'ambulance';
+
+export interface V1ProviderFulfillment {
+  kind: ProviderFulfillmentKind;
+  targetType: 'LabResult' | 'MedicineOrder' | 'RentalOrder' | 'AmbulanceTrip' | null;
+  targetId: string | null;
+  status: string | null;
+  genericLifecycleAllowed: boolean;
+  workflowRequired: boolean;
+}
 
 export interface V1ConsultationNote {
   id: string;
@@ -79,6 +89,8 @@ export interface V1Booking {
   familyNotes?: string | null;
   careHandoff?: V1ProviderCareHandoff | null;
   documentationCapabilities?: V1ProviderDocumentationCapabilities;
+  /** Server-owned workflow descriptor. Specialized jobs never use generic lifecycle buttons. */
+  fulfillment?: V1ProviderFulfillment;
   address?: string | null;
   service?: { name: string; category: string } | null;
   profile?: V1ProviderPatientProfile | null;
@@ -113,8 +125,10 @@ export interface V1BookingsResponse {
 
 export interface V1ProviderTransitionResponse {
   success: boolean;
+  code?: string;
   error?: string;
   booking?: V1Booking;
+  fulfillment?: V1ProviderFulfillment;
   unchanged?: boolean;
   refund?: { status: 'ISSUED' | 'NONE' | 'PENDING'; amount?: number };
 }
@@ -274,8 +288,9 @@ export const memberApi = {
   },
 
   /**
-   * Advance an assigned provider Booking through the canonical server lifecycle.
-   * The JWT route performs provider authorization and owns every status write.
+   * Advance a standard assigned provider Booking through the canonical server lifecycle.
+   * Specialized lab/pharmacy/equipment/ambulance jobs are rejected by the server and
+   * must use their native fulfillment workflow.
    */
   updateProviderBookingStatus: async (
     bookingId: string,
@@ -290,7 +305,12 @@ export const memberApi = {
     } catch (error) {
       if (error instanceof ApiError && error.status && error.status < 500) {
         const body = (error.body ?? {}) as Partial<V1ProviderTransitionResponse>;
-        return { success: false, error: body.error ?? error.message };
+        return {
+          success: false,
+          code: body.code,
+          error: body.error ?? error.message,
+          fulfillment: body.fulfillment,
+        };
       }
       throw error;
     }
