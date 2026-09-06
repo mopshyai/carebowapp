@@ -2,8 +2,8 @@
  * MemberListScreen — generic list surface for a member's secondary tabs.
  *
  * Variant-driven so one screen serves patients / assignments / tests /
- * inventory. Each variant calls its real endpoint and renders an honest
- * empty state (some backend endpoints are still stubs returning []).
+ * inventory. Each provider work variant is assignment-scoped; a provider's
+ * personal customer bookings must never appear in their work queue.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -41,9 +41,6 @@ const whenLabel = (iso: string) =>
     minute: '2-digit',
   });
 
-// Patient/assignment/test variants derive from the JWT-accessible /v1/bookings
-// surface (member/* endpoints are web-session only). Inventory has its own
-// service-partner /v1/inventory endpoint.
 const VARIANT: Record<
   MemberListVariant,
   { title: string; icon: string; empty: string; load: () => Promise<Row[]>; stub?: boolean }
@@ -53,7 +50,7 @@ const VARIANT: Record<
     icon: 'people-outline',
     empty: 'No patients yet — they appear here once you have bookings.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       const seen = new Map<string, Row>();
       for (const b of res.bookings ?? []) {
         const name = clientName(b);
@@ -68,7 +65,7 @@ const VARIANT: Record<
     icon: 'briefcase-outline',
     empty: 'No assignments yet.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       return (res.bookings ?? []).map((b) => ({
         id: b.id,
         title: `${clientName(b)} · ${b.service?.name ?? 'Service'}`,
@@ -81,7 +78,7 @@ const VARIANT: Record<
     icon: 'flask-outline',
     empty: 'No orders yet.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       return (res.bookings ?? []).map((b) => ({
         id: b.id,
         title: b.service?.name ?? 'Order',
@@ -119,7 +116,7 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
     try {
       setError(null);
       setRows(await cfg.load());
-    } catch (e) {
+    } catch {
       setError('Cannot reach CareBow servers. Pull to retry.');
     } finally {
       setLoading(false);
@@ -152,7 +149,7 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load();
               }}
               tintColor={colors.accent}
             />
