@@ -24,7 +24,6 @@ export * from './safetyClassifier';
 export * from './serviceRouter';
 export * from './guidanceBuilder';
 export * from './contextLoader';
-export * from './actionIntegration';
 export * from './orchestratorRouting';
 
 // Export triage level mapping utilities (P0-2 fix)
