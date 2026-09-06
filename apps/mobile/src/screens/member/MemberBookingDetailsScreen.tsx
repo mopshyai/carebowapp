@@ -35,6 +35,21 @@ const providerActionForStatus = (
   return null;
 };
 
+const ageFromDateOfBirth = (value?: string | null) => {
+  if (!value) return null;
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 && age <= 130 ? age : null;
+};
+
+const nonEmpty = (value?: string | null) => value?.trim() || null;
+
 export default function MemberBookingDetailsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation() as AppNavigationProp;
@@ -57,7 +72,10 @@ export default function MemberBookingDetailsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const response = await memberApi.getBooking(id);
+      // This screen belongs to the provider/member navigator. Use the bounded
+      // provider projection instead of the generic Booking detail route so raw
+      // referral delimiters and broad Profile data never become UI dependencies.
+      const response = await memberApi.getProviderBooking(id);
       if (!response.success || !response.booking) {
         setBooking(null);
         setError(response.error || 'Booking not found.');
@@ -92,8 +110,6 @@ export default function MemberBookingDetailsScreen() {
         setActionError(response.error || 'CareBow could not update this assignment.');
         return;
       }
-      // The transition response is intentionally minimal. Reload the canonical
-      // Booking so the screen never keeps a locally-mutated status or stale handoff.
       await load();
     } catch {
       setActionError('Cannot reach CareBow servers. The assignment was not changed locally.');
@@ -135,6 +151,10 @@ export default function MemberBookingDetailsScreen() {
   const when = new Date(booking.scheduledAt);
   const phone = booking.user?.phoneNumber?.trim();
   const email = booking.user?.email?.trim();
+  const profile = booking.profile;
+  const age = ageFromDateOfBirth(profile?.dateOfBirth);
+  const familyNotes = nonEmpty(booking.familyNotes);
+  const handoff = booking.careHandoff;
 
   return (
     <View style={styles.container}>
@@ -159,7 +179,7 @@ export default function MemberBookingDetailsScreen() {
             <Icon name="medkit-outline" size={24} color={colors.accent} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={styles.title}>{booking.profile?.name || 'Care recipient'}</Text>
+            <Text style={styles.title}>{profile?.name || 'Care recipient'}</Text>
             <Text style={styles.subtitle}>{booking.service?.name || 'Care service'}</Text>
           </View>
           <View style={styles.statusBadge}>
@@ -221,27 +241,134 @@ export default function MemberBookingDetailsScreen() {
           ) : null}
         </View>
 
-        {booking.notes?.trim() ? (
-          <View style={[styles.card, styles.handoffCard]}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.handoffIcon}>
-                <Icon name="clipboard-outline" size={18} color={colors.accent} />
-              </View>
-              <View style={styles.sectionHeaderCopy}>
-                <Text style={styles.sectionTitle}>Care handoff</Text>
-                <Text style={styles.sectionHint}>
-                  Booking notes and Ask CareBow assessment context, when available
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.notes}>{booking.notes.trim()}</Text>
-          </View>
-        ) : (
+        {profile ? (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Care handoff</Text>
-            <Text style={styles.emptyText}>No additional booking notes were provided.</Text>
+            <Text style={styles.sectionTitle}>Patient context</Text>
+            {age != null || profile.gender ? (
+              <DetailRow
+                icon="person-outline"
+                label="Age / gender"
+                value={[
+                  age != null ? `${age} years` : null,
+                  nonEmpty(profile.gender)?.toLowerCase().replace(/_/g, ' '),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              />
+            ) : null}
+            {profile.bloodGroup ? (
+              <DetailRow icon="water-outline" label="Blood group" value={profile.bloodGroup} />
+            ) : null}
+            {nonEmpty(profile.conditions) ? (
+              <DetailRow icon="medical-outline" label="Conditions" value={profile.conditions!.trim()} />
+            ) : null}
+            {nonEmpty(profile.allergies) ? (
+              <DetailRow icon="alert-circle-outline" label="Allergies" value={profile.allergies!.trim()} />
+            ) : null}
+            {nonEmpty(profile.medications) ? (
+              <DetailRow icon="bandage-outline" label="Medications" value={profile.medications!.trim()} />
+            ) : null}
           </View>
-        )}
+        ) : null}
+
+        <View style={[styles.card, styles.handoffCard]}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.handoffIcon}>
+              <Icon name="clipboard-outline" size={18} color={colors.accent} />
+            </View>
+            <View style={styles.sectionHeaderCopy}>
+              <Text style={styles.sectionTitle}>Care handoff</Text>
+              <Text style={styles.sectionHint}>
+                Family notes and bounded Ask CareBow referral context are kept separate.
+              </Text>
+            </View>
+          </View>
+
+          {familyNotes ? (
+            <View style={styles.handoffSection}>
+              <Text style={styles.detailLabel}>Family notes</Text>
+              <Text style={styles.notes}>{familyNotes}</Text>
+            </View>
+          ) : null}
+
+          {handoff ? (
+            <View style={styles.handoffSection}>
+              <View style={styles.referralBadge}>
+                <Icon name="sparkles-outline" size={15} color={colors.accent} />
+                <Text style={styles.referralBadgeText}>Ask CareBow referral</Text>
+              </View>
+              {handoff.triageLevel ? (
+                <DetailRow icon="pulse-outline" label="Triage" value={handoff.triageLevel} />
+              ) : null}
+              {handoff.requestedCare ? (
+                <DetailRow icon="heart-outline" label="Requested care" value={handoff.requestedCare} />
+              ) : null}
+              {handoff.symptoms.length > 0 ? (
+                <DetailRow icon="list-outline" label="Symptoms" value={handoff.symptoms.join(', ')} />
+              ) : null}
+              <Text style={styles.disclaimer}>{handoff.disclaimer}</Text>
+            </View>
+          ) : null}
+
+          {!familyNotes && !handoff ? (
+            <Text style={styles.emptyText}>No additional handoff context was provided.</Text>
+          ) : null}
+        </View>
+
+        {booking.consultationNote ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Consultation note</Text>
+            <DetailRow
+              icon="chatbox-ellipses-outline"
+              label="Chief complaint"
+              value={booking.consultationNote.chiefComplaint}
+            />
+            <DetailRow
+              icon="document-text-outline"
+              label="Diagnosis"
+              value={booking.consultationNote.diagnosis}
+            />
+            {booking.consultationNote.findings ? (
+              <DetailRow icon="search-outline" label="Findings" value={booking.consultationNote.findings} />
+            ) : null}
+            {booking.consultationNote.treatmentPlan ? (
+              <DetailRow
+                icon="checkmark-done-outline"
+                label="Treatment plan"
+                value={booking.consultationNote.treatmentPlan}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
+        {booking.prescription ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Prescription / plan</Text>
+            {booking.prescription.medicines?.length ? (
+              <DetailRow
+                icon="medkit-outline"
+                label="Medicines"
+                value={booking.prescription.medicines
+                  .map((medicine) =>
+                    [medicine.name, medicine.dose, medicine.frequency, medicine.duration]
+                      .filter(Boolean)
+                      .join(' · ')
+                  )
+                  .join('\n')}
+              />
+            ) : null}
+            {booking.prescription.labTests?.length ? (
+              <DetailRow
+                icon="flask-outline"
+                label="Lab tests"
+                value={booking.prescription.labTests.join(', ')}
+              />
+            ) : null}
+            {booking.prescription.advice ? (
+              <DetailRow icon="information-circle-outline" label="Advice" value={booking.prescription.advice} />
+            ) : null}
+          </View>
+        ) : null}
 
         {(phone || email) && (
           <View style={styles.card}>
@@ -369,6 +496,19 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.h4, color: colors.textPrimary },
   sectionHint: { ...typography.caption, color: colors.textTertiary, marginTop: 2 },
   actionError: { ...typography.bodySmall, color: colors.error },
+  handoffSection: { gap: spacing.sm },
+  referralBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentMuted,
+  },
+  referralBadgeText: { ...typography.caption, color: colors.accent, fontWeight: '600' },
+  disclaimer: { ...typography.caption, color: colors.textTertiary, fontStyle: 'italic' },
   notes: { ...typography.body, color: colors.textPrimary, lineHeight: 22 },
   emptyText: { ...typography.body, color: colors.textSecondary },
   detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
