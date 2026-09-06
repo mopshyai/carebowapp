@@ -37,6 +37,12 @@ const richService = {
   },
 };
 
+const unavailableService = {
+  ...liveService,
+  id: 'svc-hidden',
+  isAvailable: false,
+};
+
 describe('live service catalog adapter', () => {
   it('preserves production identity and pricing without inventing ratings or benefits (legacy rows)', () => {
     const service = toBookingService(liveService);
@@ -58,13 +64,19 @@ describe('live service catalog adapter', () => {
     expect(service.pricing).toEqual({ type: 'fixed', price: 450 });
   });
 
-  it('filters out legacy rows without `details` and groups by details.categoryId', () => {
-    expect(groupLiveServices([liveService, richService])).toEqual([
-      expect.objectContaining({
-        id: 'health_care',
-        title: 'Health Care',
-        items: [expect.objectContaining({ id: 'svc-real-2' })],
-      }),
-    ]);
+  it('groups both legacy and rich backend services while excluding unavailable rows', () => {
+    expect(groupLiveServices([liveService, richService, unavailableService])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'HOME_CARE',
+          items: [expect.objectContaining({ id: 'svc-real-1' })],
+        }),
+        expect.objectContaining({
+          id: 'health_care',
+          title: 'Health Care',
+          items: [expect.objectContaining({ id: 'svc-real-2' })],
+        }),
+      ])
+    );
   });
 });
