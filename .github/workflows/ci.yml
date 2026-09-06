@@ -110,7 +110,14 @@ jobs:
     name: Build iOS
     runs-on: macos-latest
     needs: [lint, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Previously gated to pushes on main, which meant no release build was ever
+    # validated before merge: a PR could be green on lint+tests and still break
+    # `assembleRelease` or `xcodebuild -configuration Release`, and the failure
+    # only surfaced after landing. Release builds break on things debug builds
+    # never touch — signing config, Hermes, CocoaPods, dead-code stripping.
+    # The workflow's own `on:` already limits this to main/develop, and
+    # `needs: [lint, test]` still short-circuits the expensive runners when the
+    # cheap checks fail.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -153,7 +160,14 @@ jobs:
     name: Build Android
     runs-on: ubuntu-latest
     needs: [lint, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Previously gated to pushes on main, which meant no release build was ever
+    # validated before merge: a PR could be green on lint+tests and still break
+    # `assembleRelease` or `xcodebuild -configuration Release`, and the failure
+    # only surfaced after landing. Release builds break on things debug builds
+    # never touch — signing config, Hermes, CocoaPods, dead-code stripping.
+    # The workflow's own `on:` already limits this to main/develop, and
+    # `needs: [lint, test]` still short-circuits the expensive runners when the
+    # cheap checks fail.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
