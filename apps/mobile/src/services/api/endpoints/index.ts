@@ -5,6 +5,7 @@
 export { authApi } from './auth';
 export { servicesApi } from './services';
 export { askCareBowApi } from './askCareBow';
+export { careRequestsApi } from './careRequests';
 export { memberApi } from './member';
 export { profilesApi } from './profiles';
 export { safetyApi } from './safety';
@@ -45,6 +46,12 @@ export type {
   CreateBookingOrderResponse,
   PaymentStatusResponse,
 } from './payments';
+export type {
+  CareRequest,
+  CareRequestAction,
+  CareRequestProfile,
+  CareRequestLinkedBooking,
+} from './careRequests';
 export type { AppPreferences, PreferencesResponse } from './preferences';
 export type { DeviceTokenResponse } from './deviceToken';
 export type { Remedy, RemediesResponse } from './remedies';
