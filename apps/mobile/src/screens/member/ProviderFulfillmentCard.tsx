@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import {
   providerFulfillmentApi,
+  type AssignedAmbulanceTrip,
   type AssignedLabTest,
+  type AssignedMedicineOrder,
+  type AssignedRentalOrder,
   type FulfillmentStatus,
   type LabResultStatus,
   type LabTestValue,
@@ -51,6 +54,29 @@ const toEditableTests = (test: AssignedLabTest | null): EditableLabValue[] =>
     flag: row.flag || '',
   }));
 
+const dateLabel = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+function ContextRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <View style={styles.contextRow}>
+      <Text style={styles.contextLabel}>{label}</Text>
+      <Text style={styles.contextValue}>{value}</Text>
+    </View>
+  );
+}
+
 export default function ProviderFulfillmentCard({
   booking,
   onUpdated,
@@ -61,9 +87,12 @@ export default function ProviderFulfillmentCard({
   const fulfillment = booking.fulfillment;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [labLoading, setLabLoading] = useState(false);
+  const [nativeLoading, setNativeLoading] = useState(false);
   const [labTest, setLabTest] = useState<AssignedLabTest | null>(null);
   const [labValues, setLabValues] = useState<EditableLabValue[]>([]);
+  const [medicineOrder, setMedicineOrder] = useState<AssignedMedicineOrder | null>(null);
+  const [rentalOrder, setRentalOrder] = useState<AssignedRentalOrder | null>(null);
+  const [ambulanceTrip, setAmbulanceTrip] = useState<AssignedAmbulanceTrip | null>(null);
 
   const kind = fulfillment?.kind;
   const status = fulfillment?.status;
@@ -71,43 +100,87 @@ export default function ProviderFulfillmentCard({
     () => (kind ? primaryProviderFulfillmentAction(kind, status) : null),
     [kind, status]
   );
-  const cancellable = Boolean(kind && canCancelProviderFulfillment(kind, status));
 
   useEffect(() => {
     let active = true;
-    if (kind !== 'lab') {
-      setLabTest(null);
-      setLabValues([]);
+    setLabTest(null);
+    setLabValues([]);
+    setMedicineOrder(null);
+    setRentalOrder(null);
+    setAmbulanceTrip(null);
+
+    if (!fulfillment?.workflowRequired || kind === 'standard' || kind === 'unknown') {
+      setNativeLoading(false);
       return () => {
         active = false;
       };
     }
 
-    setLabLoading(true);
-    void providerFulfillmentApi
-      .getLabTests()
-      .then(({ tests }) => {
-        if (!active) return;
+    setNativeLoading(true);
+    setError(null);
+
+    const loadNative = async () => {
+      if (kind === 'lab') {
+        const { tests } = await providerFulfillmentApi.getLabTests();
         const match = tests.find((row) => row.bookingId === booking.id) ?? null;
+        if (!active) return;
         setLabTest(match);
         setLabValues(toEditableTests(match));
-      })
+        return;
+      }
+
+      if (!fulfillment.targetId) return;
+
+      if (kind === 'pharmacy') {
+        const { orders } = await providerFulfillmentApi.getMedicineOrders();
+        if (active) {
+          setMedicineOrder(orders.find((row) => row.id === fulfillment.targetId) ?? null);
+        }
+      } else if (kind === 'equipment') {
+        const { orders } = await providerFulfillmentApi.getRentalOrders();
+        if (active) {
+          setRentalOrder(orders.find((row) => row.id === fulfillment.targetId) ?? null);
+        }
+      } else if (kind === 'ambulance') {
+        const { trips } = await providerFulfillmentApi.getActiveTrips();
+        if (active) {
+          setAmbulanceTrip(trips.find((row) => row.id === fulfillment.targetId) ?? null);
+        }
+      }
+    };
+
+    void loadNative()
       .catch(() => {
-        if (active) setError('Could not load the lab result fields.');
+        if (active) setError('Could not load the native fulfillment details. Refresh before acting.');
       })
       .finally(() => {
-        if (active) setLabLoading(false);
+        if (active) setNativeLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [booking.id, kind, status]);
+  }, [booking.id, fulfillment?.targetId, fulfillment?.workflowRequired, kind, status]);
 
   if (!fulfillment?.workflowRequired || kind === 'standard') return null;
 
+  const contextReady =
+    kind === 'lab'
+      ? Boolean(labTest)
+      : kind === 'pharmacy'
+        ? Boolean(medicineOrder)
+        : kind === 'equipment'
+          ? Boolean(rentalOrder)
+          : kind === 'ambulance'
+            ? Boolean(ambulanceTrip)
+            : false;
+  const actionable = contextReady && !nativeLoading;
+  const cancellable = Boolean(
+    actionable && kind && canCancelProviderFulfillment(kind, status)
+  );
+
   const runNativeStatus = async (nextStatus: string) => {
-    if (busy) return;
+    if (busy || !actionable) return;
     setBusy(true);
     setError(null);
     try {
@@ -179,7 +252,7 @@ export default function ProviderFulfillmentCard({
   };
 
   const reportLabResults = async () => {
-    if (busy || kind !== 'lab') return;
+    if (busy || kind !== 'lab' || !actionable) return;
     const hasValue = labValues.some((row) => row.value.trim().length > 0);
     if (!hasValue) {
       setError('Enter at least one result value before marking this lab test reported.');
@@ -224,6 +297,13 @@ export default function ProviderFulfillmentCard({
         </View>
       </View>
 
+      {nativeLoading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={styles.hint}>Loading fulfillment details…</Text>
+        </View>
+      ) : null}
+
       {kind === 'unknown' ? (
         <View style={styles.warningBox}>
           <Text style={styles.warningText}>
@@ -232,16 +312,85 @@ export default function ProviderFulfillmentCard({
         </View>
       ) : null}
 
-      {kind === 'lab' && status === 'PROCESSING' ? (
+      {!nativeLoading && kind !== 'unknown' && !contextReady ? (
+        <View style={styles.warningBox}>
+          <Text style={styles.warningText}>
+            The specialized fulfillment record is missing or is no longer assigned to this account. Actions are locked until operations repairs the link.
+          </Text>
+        </View>
+      ) : null}
+
+      {labTest ? (
+        <View style={styles.contextBlock}>
+          <Text style={styles.subTitle}>Ordered tests</Text>
+          {labTest.tests.map((test, index) => (
+            <Text key={`${test.name}-${index}`} style={styles.contextValue}>
+              • {test.name}
+              {test.value == null || String(test.value).trim() === ''
+                ? ''
+                : ` — ${String(test.value)}${test.unit ? ` ${test.unit}` : ''}`}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {medicineOrder ? (
+        <View style={styles.contextBlock}>
+          <Text style={styles.subTitle}>Medication order</Text>
+          <ContextRow label="Patient" value={medicineOrder.patientName} />
+          <ContextRow label="Delivery" value={medicineOrder.deliveryAddress} />
+          {medicineOrder.items.map((item) => (
+            <View key={item.id} style={styles.itemRow}>
+              <Text style={styles.itemName}>{item.name}</Text>
+              <Text style={styles.itemMeta}>
+                {[
+                  item.dosage || null,
+                  `Qty ${item.quantity}`,
+                ].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {rentalOrder ? (
+        <View style={styles.contextBlock}>
+          <Text style={styles.subTitle}>Equipment order</Text>
+          <ContextRow label="Equipment" value={rentalOrder.equipmentName} />
+          <ContextRow label="Customer" value={rentalOrder.customer} />
+          <ContextRow label="Delivery" value={rentalOrder.deliveryAddress} />
+          <ContextRow label="Start" value={dateLabel(rentalOrder.startDate)} />
+          <ContextRow label="Return due" value={dateLabel(rentalOrder.endDate)} />
+          <ContextRow
+            label="Available units"
+            value={rentalOrder.availableUnits == null ? null : String(rentalOrder.availableUnits)}
+          />
+        </View>
+      ) : null}
+
+      {ambulanceTrip ? (
+        <View style={styles.contextBlock}>
+          <View style={styles.tripHeader}>
+            <Text style={styles.subTitle}>Trip details</Text>
+            {ambulanceTrip.isEmergency ? (
+              <View style={styles.emergencyBadge}>
+                <Text style={styles.emergencyBadgeText}>Emergency</Text>
+              </View>
+            ) : null}
+          </View>
+          <ContextRow label="Patient" value={ambulanceTrip.patient} />
+          <ContextRow label="Pickup" value={ambulanceTrip.pickupAddress} />
+          <ContextRow label="Destination" value={ambulanceTrip.destination} />
+          <ContextRow label="Requested" value={dateLabel(ambulanceTrip.requestedAt)} />
+        </View>
+      ) : null}
+
+      {kind === 'lab' && status === 'PROCESSING' && labTest ? (
         <View style={styles.labSection}>
           <Text style={styles.subTitle}>Report results</Text>
           <Text style={styles.hint}>
             Lab completion requires a report file or structured result values. This form records structured values; it never marks a test reported with an empty result.
           </Text>
-          {labLoading ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-          {!labLoading && labValues.length === 0 ? (
-            <Text style={styles.hint}>No lab test fields are available yet. Refresh or contact operations.</Text>
-          ) : null}
           {labValues.map((row, index) => (
             <View key={`${row.name}-${index}`} style={styles.resultBlock}>
               <Text style={styles.resultName}>{row.name}</Text>
@@ -285,7 +434,7 @@ export default function ProviderFulfillmentCard({
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {primaryAction ? (
+      {primaryAction && actionable ? (
         <TouchableOpacity
           style={[styles.primaryButton, busy && styles.disabled]}
           disabled={busy}
@@ -323,6 +472,7 @@ const styles = StyleSheet.create({
   title: { ...typography.h4, color: colors.textPrimary },
   subTitle: { ...typography.body, color: colors.textPrimary, fontWeight: '600' },
   hint: { ...typography.bodySmall, color: colors.textSecondary },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   badge: {
     borderRadius: radius.full,
     backgroundColor: colors.accentMuted,
@@ -336,6 +486,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warningSoft,
   },
   warningText: { ...typography.bodySmall, color: colors.warning },
+  contextBlock: {
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  contextRow: { gap: 2 },
+  contextLabel: { ...typography.caption, color: colors.textTertiary },
+  contextValue: { ...typography.bodySmall, color: colors.textPrimary },
+  itemRow: {
+    borderRadius: radius.md,
+    backgroundColor: colors.surface2,
+    padding: spacing.sm,
+    gap: 2,
+  },
+  itemName: { ...typography.bodySmall, color: colors.textPrimary, fontWeight: '600' },
+  itemMeta: { ...typography.caption, color: colors.textSecondary },
+  tripHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  emergencyBadge: {
+    borderRadius: radius.full,
+    backgroundColor: colors.errorSoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  emergencyBadgeText: { ...typography.caption, color: colors.error, fontWeight: '700' },
   labSection: { gap: spacing.sm },
   resultBlock: { gap: spacing.xs },
   resultName: { ...typography.bodySmall, color: colors.textPrimary, fontWeight: '600' },
