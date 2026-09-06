@@ -4,6 +4,7 @@
 
 import type { CareReferralContext } from '@/data/types';
 import { ApiClient } from '../ApiClient';
+import { ApiError } from '../types';
 
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
@@ -169,11 +170,32 @@ export const memberApi = {
     bookingId: string,
     scheduledAt: string
   ): Promise<V1RescheduleResponse> => {
-    const response = await ApiClient.post<V1RescheduleResponse>(
-      `/v1/bookings/${bookingId}/reschedule`,
-      { scheduledAt }
-    );
-    return response.data;
+    try {
+      const response = await ApiClient.post<V1RescheduleResponse>(
+        `/v1/bookings/${bookingId}/reschedule`,
+        { scheduledAt }
+      );
+      return response.data;
+    } catch (error) {
+      // The server refuses a reschedule with a real HTTP status: 409 for a
+      // confirmed booking or a materialized custom job, 404 for someone else's
+      // booking or revoked patient access, 400 for an impossible time. Those
+      // are answers, not transport failures, and the body carries the reason
+      // and whether operations has to confirm the new time -- so surface them
+      // instead of collapsing them into "something went wrong".
+      if (error instanceof ApiError && error.status && error.status < 500) {
+        const body = (error.body ?? {}) as Partial<V1RescheduleResponse>;
+        return {
+          success: false,
+          error: body.error ?? error.message,
+          requiresOperations: body.requiresOperations,
+          currentStatus: body.currentStatus,
+        };
+      }
+      // A genuine network/server failure is not a booking fact. Let it throw so
+      // the caller reloads from the server rather than reporting a state.
+      throw error;
+    }
   },
 
   getProviderProfile: async (): Promise<V1ProviderProfileResponse> => {
