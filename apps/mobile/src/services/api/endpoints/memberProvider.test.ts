@@ -9,6 +9,7 @@ import { ApiError } from '../types';
 import { memberApi } from './member';
 
 const patch = ApiClient.patch as jest.Mock;
+const post = ApiClient.post as jest.Mock;
 const get = ApiClient.get as jest.Mock;
 
 describe('mobile provider booking API', () => {
@@ -32,6 +33,7 @@ describe('mobile provider booking API', () => {
           id: 'booking_1',
           familyNotes: 'Please call on arrival',
           careHandoff: { source: 'ask_carebow', symptoms: ['fever'], lines: [] },
+          documentationCapabilities: { consultationNote: true, prescription: false },
         },
       },
     });
@@ -41,6 +43,8 @@ describe('mobile provider booking API', () => {
     expect(get).toHaveBeenCalledWith('/v1/provider/bookings/booking_1');
     expect(result.booking?.familyNotes).toBe('Please call on arrival');
     expect(result.booking?.careHandoff?.symptoms).toEqual(['fever']);
+    expect(result.booking?.documentationCapabilities?.consultationNote).toBe(true);
+    expect(result.booking?.documentationCapabilities?.prescription).toBe(false);
   });
 
   it('sends only the canonical booking id and requested provider transition', async () => {
@@ -92,5 +96,75 @@ describe('mobile provider booking API', () => {
     await expect(
       memberApi.updateProviderBookingStatus('booking_1', 'COMPLETED')
     ).rejects.toThrow();
+  });
+
+  it('writes a consultation note through the provider JWT route and binds the booking id itself', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        note: {
+          id: 'note_1',
+          bookingId: 'booking_1',
+          chiefComplaint: 'Persistent fatigue',
+          diagnosis: 'Viral syndrome',
+        },
+      },
+    });
+
+    const result = await memberApi.saveProviderConsultationNote('booking_1', {
+      chiefComplaint: 'Persistent fatigue',
+      diagnosis: 'Viral syndrome',
+      findings: 'Stable findings',
+      treatmentPlan: 'Hydration and monitoring',
+    });
+
+    expect(post).toHaveBeenCalledWith('/v1/provider/consultation-notes', {
+      bookingId: 'booking_1',
+      chiefComplaint: 'Persistent fatigue',
+      diagnosis: 'Viral syndrome',
+      findings: 'Stable findings',
+      treatmentPlan: 'Hydration and monitoring',
+    });
+    expect(result.note?.bookingId).toBe('booking_1');
+  });
+
+  it('surfaces server scope refusals for clinical documentation', async () => {
+    post.mockRejectedValueOnce(
+      ApiError.fromResponse(403, {
+        success: false,
+        error: 'This provider role cannot author clinical consultation notes',
+      })
+    );
+
+    const result = await memberApi.saveProviderConsultationNote('booking_1', {
+      chiefComplaint: 'x',
+      diagnosis: 'y',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('This provider role cannot author clinical consultation notes');
+  });
+
+  it('writes a prescription only through the server-owned provider route', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        prescription: { id: 'rx_1', bookingId: 'booking_1', medicines: [] },
+      },
+    });
+
+    const result = await memberApi.saveProviderPrescription('booking_1', {
+      medicines: [{ name: 'Example item', dose: '1 unit' }],
+      labTests: ['Follow-up test'],
+      advice: 'Follow up as directed',
+    });
+
+    expect(post).toHaveBeenCalledWith('/v1/provider/prescriptions', {
+      bookingId: 'booking_1',
+      medicines: [{ name: 'Example item', dose: '1 unit' }],
+      labTests: ['Follow-up test'],
+      advice: 'Follow up as directed',
+    });
+    expect(result.prescription?.bookingId).toBe('booking_1');
   });
 });
