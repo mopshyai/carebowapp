@@ -48,7 +48,7 @@ describe('live service catalog adapter', () => {
     const service = toBookingService(liveService);
     expect(service.id).toBe('svc-real-1');
     expect(service.title).toBe('Home Nursing Visit');
-    expect(service.pricing).toEqual({ type: 'fixed', price: 125 });
+    expect(service.pricing).toEqual({ type: 'quote' });
     expect(service.rating).toBe(0);
     expect(service.reviewCount).toBe(0);
     expect(service.benefits).toEqual([]);
@@ -65,18 +65,22 @@ describe('live service catalog adapter', () => {
   });
 
   it('groups both legacy and rich backend services while excluding unavailable rows', () => {
-    expect(groupLiveServices([liveService, richService, unavailableService])).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'HOME_CARE',
-          items: [expect.objectContaining({ id: 'svc-real-1' })],
-        }),
-        expect.objectContaining({
-          id: 'health_care',
-          title: 'Health Care',
-          items: [expect.objectContaining({ id: 'svc-real-2' })],
-        }),
-      ])
-    );
+    expect(groupLiveServices([liveService, richService, unavailableService])).toEqual([
+      expect.objectContaining({
+        id: 'health_care',
+        title: 'Health Care',
+        items: [expect.objectContaining({ id: 'svc-real-2' })],
+      }),
+      expect.objectContaining({
+        id: 'HOME_CARE',
+        items: [expect.objectContaining({ id: 'svc-real-1', pricing: { type: 'quote' } })],
+      }),
+    ]);
   });
+});
+
+it('does not expose unavailable services or trust incomplete display metadata', () => {
+  expect(groupLiveServices([{ ...liveService, isAvailable: false }])).toEqual([]);
+  expect(toBookingService({ ...liveService, details: {} }).id).toBe(liveService.id);
+  expect(toBookingService({ ...liveService, details: [] }).pricing.type).toBe('quote');
 });

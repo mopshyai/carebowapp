@@ -35,6 +35,7 @@ import type { AppNavigationProp } from '../../navigation/types';
 import { useAskCarebowStore } from '../../store/askCarebowStore';
 import { useMemoryCount } from '../../store/healthMemoryStore';
 import { useProfileStore } from '../../store/useProfileStore';
+import { ensureLocalSelfPatientProfileFromUser } from '../../lib/profileRepository';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
 
 const relationships = [
@@ -74,6 +75,7 @@ export default function AskCareBowScreen() {
   const inputModeRef = useRef(inputMode);
 
   const members = useProfileStore((state) => state.members);
+  const profileUser = useProfileStore((state) => state.user);
   const savedFamilyMembers = useMemo(() => getSavedFamilyMembers(members), [members]);
   const selectedFamilyMember = useMemo(
     () => savedFamilyMembers.find((member) => member.id === selectedFamilyMemberId),
@@ -259,7 +261,33 @@ export default function AskCareBowScreen() {
     let relation = familyRelation;
     let age = familyAge;
 
-    if (contextType === 'family' && selectedFamilyMemberId) {
+    if (contextType === 'me') {
+      const savedSelfMember = members.find((member) => member.relationship === 'self');
+
+      try {
+        // Bridge users who saved Personal Information in an older build before
+        // that screen also created the clinical `self` patient profile. This is
+        // deliberately local so emergency guidance is not network-gated.
+        const selfMember = profileUser
+          ? ensureLocalSelfPatientProfileFromUser(profileUser)
+          : savedSelfMember;
+
+        if (!selfMember?.dateOfBirth || !selfMember.gender) {
+          throw new Error('Please add your date of birth and gender in Personal Information.');
+        }
+
+        memberId = selfMember.id;
+        memberName = [selfMember.firstName, selfMember.lastName].filter(Boolean).join(' ') || 'Me';
+      } catch (error) {
+        Alert.alert(
+          'Complete your patient profile',
+          error instanceof Error
+            ? error.message
+            : 'CareBow could not load your saved patient details. Please try again.'
+        );
+        return;
+      }
+    } else if (contextType === 'family' && selectedFamilyMemberId) {
       if (!selectedFamilySelection) {
         Alert.alert(
           'Complete this family profile',
@@ -296,7 +324,9 @@ export default function AskCareBowScreen() {
   const canStart =
     effectiveSymptom.length > 0 &&
     (contextType === 'me' ||
-      (selectedFamilyMemberId ? Boolean(selectedFamilySelection) : Boolean(familyRelation && familyAge)));
+      (selectedFamilyMemberId
+        ? Boolean(selectedFamilySelection)
+        : Boolean(familyRelation && familyAge)));
 
   return (
     <View style={styles.container}>
@@ -392,7 +422,8 @@ export default function AskCareBowScreen() {
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>Use a saved family profile</Text>
                 <Text style={styles.fieldHint}>
-                  Choose the exact person so CareBow can use only that patient's saved health context.
+                  Choose the exact person so CareBow can use only that patient's saved health
+                  context.
                 </Text>
                 <View style={styles.savedProfilesList}>
                   {savedFamilyMembers.map((member) => {
@@ -403,7 +434,10 @@ export default function AskCareBowScreen() {
                     return (
                       <TouchableOpacity
                         key={member.id}
-                        style={[styles.savedProfileButton, selected && styles.savedProfileButtonActive]}
+                        style={[
+                          styles.savedProfileButton,
+                          selected && styles.savedProfileButtonActive,
+                        ]}
                         onPress={() => {
                           setSelectedFamilyMemberId(member.id);
                           setShowRelationshipPicker(false);

@@ -23,6 +23,7 @@ import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authApi } from '../../services/api/endpoints/auth';
 import { Gender, generateId } from '../../types/profile';
+import { syncSelfPatientProfileFromUser } from '../../lib/profileRepository';
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'male', label: 'Male' },
@@ -87,6 +88,17 @@ export default function PersonalInfoScreen() {
     try {
       const now = new Date().toISOString();
       const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const nextUser = {
+        id: user?.id || authUser?.id || generateId(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        dateOfBirth,
+        gender,
+        createdAt: user?.createdAt || now,
+        updatedAt: now,
+      };
 
       // Persist name/phone to the backend (v1, JWT). Email is the account
       // identity set at signup and is not editable here.
@@ -99,6 +111,10 @@ export default function PersonalInfoScreen() {
         });
       }
 
+      // DOB/gender are clinical identity fields, so they must also be saved to
+      // the server-backed `self` patient profile consumed by Ask CareBow.
+      await syncSelfPatientProfileFromUser(nextUser);
+
       // Mirror into the profile store (local profile-specific fields too).
       if (user) {
         updateUser({
@@ -110,17 +126,7 @@ export default function PersonalInfoScreen() {
           gender,
         });
       } else {
-        setUser({
-          id: authUser?.id || generateId(),
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          dateOfBirth,
-          gender,
-          createdAt: now,
-          updatedAt: now,
-        });
+        setUser(nextUser);
       }
 
       Alert.alert('Success', 'Your information has been saved.', [
@@ -129,7 +135,9 @@ export default function PersonalInfoScreen() {
     } catch (error) {
       Alert.alert(
         'Error',
-        'Could not save to the server. Please check your connection and try again.'
+        error instanceof Error
+          ? error.message
+          : 'Could not save to the server. Please check your connection and try again.'
       );
     } finally {
       setIsSaving(false);

@@ -215,14 +215,16 @@ export default function CheckoutScreen() {
         notes: noteParts.join(' · ') || undefined,
         selection,
         hosted: true,
-        callbackUrl: 'carebow://checkout/return',
       });
 
       if (!order.success || !order.paymentUrl || !order.orderId) {
         throw new Error(order.error || 'Could not start payment');
       }
 
-      const outcome = await checkout.start({ orderId: order.orderId, paymentUrl: order.paymentUrl });
+      const outcome = await checkout.start({
+        orderId: order.orderId,
+        paymentUrl: order.paymentUrl,
+      });
 
       if (outcome.status === 'paid') {
         showPaidConfirmation();
@@ -379,7 +381,9 @@ export default function CheckoutScreen() {
           <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>{bookingDraft.pricingLabel}</Text>
             <Text style={styles.pricingValue}>
-              {isQuoteOnlyRequest ? 'No payment today' : formatMoney(bookingDraft.subtotal, country)}
+              {isQuoteOnlyRequest
+                ? 'No payment today'
+                : formatMoney(bookingDraft.subtotal, country)}
             </Text>
           </View>
 
@@ -477,13 +481,7 @@ export default function CheckoutScreen() {
           disabled={isSubmitting || checkout.busy}
         >
           <Icon
-            name={
-              unconfirmedOrderId
-                ? 'refresh'
-                : isQuoteOnlyRequest
-                  ? 'send-outline'
-                  : 'calendar'
-            }
+            name={unconfirmedOrderId ? 'refresh' : isQuoteOnlyRequest ? 'send-outline' : 'calendar'}
             size={18}
             color={colors.white}
           />

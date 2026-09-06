@@ -28,7 +28,13 @@ const CATEGORY_TITLES: Record<string, string> = Object.fromEntries(
 );
 
 const hasDetails = (source: V1Service): boolean =>
-  source.details !== null && source.details !== undefined && typeof source.details === 'object';
+  source.details !== null &&
+  typeof source.details === 'object' &&
+  !Array.isArray(source.details) &&
+  typeof (source.details as Service).categoryId === 'string' &&
+  !!(source.details as Service).booking &&
+  !!(source.details as Service).pricing &&
+  !!(source.details as Service).fulfillment;
 
 export const toBookingService = (source: V1Service): Service => {
   if (hasDetails(source)) {
@@ -45,8 +51,8 @@ export const toBookingService = (source: V1Service): Service => {
     shortTagline: source.description,
     description: source.description,
     benefits: [],
-    fulfillment: { mode: 'checkout', requiresPayment: false },
-    pricing: { type: 'fixed', price: source.basePrice / 100 },
+    fulfillment: { mode: 'on_request', requiresPayment: false },
+    pricing: { type: 'quote' },
     booking: {
       requiresMember: true,
       requiresDate: true,

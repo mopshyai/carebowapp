@@ -107,7 +107,9 @@ export default function OrderDetailsScreen() {
       if (!result.success) {
         await fetchOne(id);
         Alert.alert(
-          result.requiresOperations ? 'CareBow needs to confirm the new time' : 'Could not reschedule',
+          result.requiresOperations
+            ? 'CareBow needs to confirm the new time'
+            : 'Could not reschedule',
           result.error || 'Refresh the booking and try again.'
         );
         return;
@@ -187,7 +189,6 @@ export default function OrderDetailsScreen() {
       const order = await paymentsApi.createSettleOrder({
         bookingId: id,
         hosted: true,
-        callbackUrl: 'carebow://checkout/return',
       });
 
       if (!order.success || !order.paymentUrl || !order.orderId) {

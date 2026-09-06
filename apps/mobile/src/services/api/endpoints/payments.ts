@@ -55,7 +55,8 @@ export type PaymentStatusResponse = {
   success: boolean;
   error?: string;
   status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
-  kind?: 'booking' | 'care_request' | 'plan';
+  kind?: 'booking' | 'plan' | 'care_request';
+  careRequestId?: string | null;
   planSlug?: string | null;
   amount?: number;
   currency?: string;
