@@ -60,6 +60,16 @@ export interface V1CancelResponse {
   refund?: { status: 'ISSUED' | 'NONE' | 'PENDING'; amount?: number };
 }
 
+export interface V1RescheduleResponse {
+  success: boolean;
+  error?: string;
+  booking?: V1Booking;
+  unchanged?: boolean;
+  providerReleased?: boolean;
+  requiresOperations?: boolean;
+  currentStatus?: BookingStatus;
+}
+
 export interface V1BookingsResponse {
   success: boolean;
   error?: string;
@@ -147,6 +157,22 @@ export const memberApi = {
 
   cancelBooking: async (bookingId: string): Promise<V1CancelResponse> => {
     const response = await ApiClient.post<V1CancelResponse>(`/v1/bookings/${bookingId}/cancel`, {});
+    return response.data;
+  },
+
+  /**
+   * Move the requested time on the same canonical Booking. The server may reject
+   * this when the booking is confirmed, custom-care-backed, no longer PENDING,
+   * or the user's patient access changed while this screen was open.
+   */
+  rescheduleBooking: async (
+    bookingId: string,
+    scheduledAt: string
+  ): Promise<V1RescheduleResponse> => {
+    const response = await ApiClient.post<V1RescheduleResponse>(
+      `/v1/bookings/${bookingId}/reschedule`,
+      { scheduledAt }
+    );
     return response.data;
   },
 
