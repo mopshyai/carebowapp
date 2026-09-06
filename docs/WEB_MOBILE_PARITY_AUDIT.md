@@ -200,10 +200,12 @@ None open from this pass.
 
 ## P1
 
-- Production catalog: 7 duplicate rows still published; remedy scripted and tested, **awaiting production DB execution**.
-- E2E scenarios D, E, F unexecuted — payment, materialization and refund parity remain unproven.
-- Payment chaos matrix unexecuted; no proof against double-charge or false `CONFIRMED`.
-- Provider/operations continuity unproven end to end.
+- **Provider fulfilment is web-only.** No `/api/v1/*` route constructs a provider actor, so
+  a provider using the mobile app cannot accept, start or complete a job. The lifecycle
+  itself is proven over the web transport.
+- Production catalog: 7 duplicate rows still published; remedy scripted and tested against a
+  reproduction of production, **awaiting production DB execution**.
+- Razorpay-API half of the payment matrix unexecuted (order/link creation, outbound refunds).
 - GitHub CI still unread and branches unpushed (environment authentication).
 
 ## P2
