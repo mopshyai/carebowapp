@@ -11,6 +11,7 @@ export type ProviderBookingTransition = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED
 
 export interface V1ConsultationNote {
   id: string;
+  bookingId?: string;
   chiefComplaint: string;
   findings?: string | null;
   diagnosis: string;
@@ -21,6 +22,7 @@ export interface V1ConsultationNote {
 
 export interface V1Prescription {
   id: string;
+  bookingId?: string;
   medicines?: Array<{
     name?: string;
     dose?: string;
@@ -58,6 +60,11 @@ export interface V1ProviderPatientProfile {
   medications?: string | null;
 }
 
+export interface V1ProviderDocumentationCapabilities {
+  consultationNote: boolean;
+  prescription: boolean;
+}
+
 export interface V1Booking {
   id: string;
   scheduledAt: string;
@@ -71,6 +78,7 @@ export interface V1Booking {
   /** Provider routes split the family note from the bounded Ask CareBow handoff. */
   familyNotes?: string | null;
   careHandoff?: V1ProviderCareHandoff | null;
+  documentationCapabilities?: V1ProviderDocumentationCapabilities;
   address?: string | null;
   service?: { name: string; category: string } | null;
   profile?: V1ProviderPatientProfile | null;
@@ -153,6 +161,25 @@ export interface MemberOverviewResponse {
   error?: string;
   overview?: MemberOverview;
 }
+
+export type ProviderConsultationNoteInput = {
+  chiefComplaint: string;
+  diagnosis: string;
+  findings?: string;
+  treatmentPlan?: string;
+};
+
+export type ProviderPrescriptionInput = {
+  medicines?: Array<{
+    name: string;
+    dose?: string;
+    frequency?: string;
+    duration?: string;
+  }>;
+  labTests?: string[];
+  advice?: string;
+  nextReview?: string;
+};
 
 export const memberApi = {
   /** All bookings involving me (as provider or user). JWT-accessible. */
@@ -263,6 +290,46 @@ export const memberApi = {
     } catch (error) {
       if (error instanceof ApiError && error.status && error.status < 500) {
         const body = (error.body ?? {}) as Partial<V1ProviderTransitionResponse>;
+        return { success: false, error: body.error ?? error.message };
+      }
+      throw error;
+    }
+  },
+
+  saveProviderConsultationNote: async (
+    bookingId: string,
+    input: ProviderConsultationNoteInput
+  ): Promise<{ success: boolean; error?: string; note?: V1ConsultationNote }> => {
+    try {
+      const response = await ApiClient.post<{
+        success: boolean;
+        error?: string;
+        note?: V1ConsultationNote;
+      }>('/v1/provider/consultation-notes', { bookingId, ...input });
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiError && error.status && error.status < 500) {
+        const body = (error.body ?? {}) as { error?: string };
+        return { success: false, error: body.error ?? error.message };
+      }
+      throw error;
+    }
+  },
+
+  saveProviderPrescription: async (
+    bookingId: string,
+    input: ProviderPrescriptionInput
+  ): Promise<{ success: boolean; error?: string; prescription?: V1Prescription }> => {
+    try {
+      const response = await ApiClient.post<{
+        success: boolean;
+        error?: string;
+        prescription?: V1Prescription;
+      }>('/v1/provider/prescriptions', { bookingId, ...input });
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiError && error.status && error.status < 500) {
+        const body = (error.body ?? {}) as { error?: string };
         return { success: false, error: body.error ?? error.message };
       }
       throw error;
