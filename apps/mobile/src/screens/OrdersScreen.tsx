@@ -74,7 +74,10 @@ export default function OrdersScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xl }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
-        <CareRequestList onBooking={(id) => navigation.navigate('OrderDetails', { id })} />
+        <CareRequestList
+          onBooking={(id) => navigation.navigate('OrderDetails', { id })}
+          onOpenRequest={(id) => navigation.navigate('RequestDetails', { id })}
+        />
         {loading ? (
           <View style={styles.state}>
             <ActivityIndicator size="large" color={colors.primary.default} />
