@@ -36,6 +36,28 @@ export interface V1Prescription {
   [key: string]: unknown;
 }
 
+export interface V1ProviderCareHandoff {
+  source: 'ask_carebow';
+  disclaimer: string;
+  triageLevel?: string | null;
+  requestedCare?: string | null;
+  symptoms: string[];
+  episodeId?: string | null;
+  chatSessionId?: string | null;
+  lines: string[];
+}
+
+export interface V1ProviderPatientProfile {
+  id?: string;
+  name: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodGroup?: string | null;
+  conditions?: string | null;
+  allergies?: string | null;
+  medications?: string | null;
+}
+
 export interface V1Booking {
   id: string;
   scheduledAt: string;
@@ -44,11 +66,14 @@ export interface V1Booking {
   amount: number;
   currency?: 'INR' | 'USD';
   paymentStatus?: string;
-  /** Provider/customer booking handoff. Includes sanitized Ask CareBow referral when present. */
+  /** Generic customer-facing routes may still return immutable raw Booking notes. */
   notes?: string | null;
+  /** Provider routes split the family note from the bounded Ask CareBow handoff. */
+  familyNotes?: string | null;
+  careHandoff?: V1ProviderCareHandoff | null;
   address?: string | null;
   service?: { name: string; category: string } | null;
-  profile?: { name: string } | null;
+  profile?: V1ProviderPatientProfile | null;
   provider?: { name: string; image?: string | null } | null;
   user?: { name?: string; email?: string; phoneNumber?: string | null } | null;
   consultationNote?: V1ConsultationNote | null;
@@ -146,6 +171,20 @@ export const memberApi = {
     return response.data;
   },
 
+  /**
+   * Provider-only detail projection. Returns bounded patient context and splits
+   * family notes from Ask CareBow referral metadata instead of exposing the raw
+   * Booking.notes delimiter block.
+   */
+  getProviderBooking: async (
+    bookingId: string
+  ): Promise<{ success: boolean; error?: string; booking?: V1Booking }> => {
+    const response = await ApiClient.get<{ success: boolean; error?: string; booking?: V1Booking }>(
+      `/v1/provider/bookings/${bookingId}`
+    );
+    return response.data;
+  },
+
   /** Submit a real pending booking for a service that is free to request now. */
   createBooking: async (data: {
     serviceId: string;
@@ -163,7 +202,7 @@ export const memberApi = {
     return response.data;
   },
 
-  /** Fetch one booking plus any provider-authored consultation/prescription outcome. */
+  /** Fetch one customer/provider-visible booking plus durable provider outcome. */
   getBooking: async (
     bookingId: string
   ): Promise<{ success: boolean; error?: string; booking?: V1Booking }> => {
@@ -194,12 +233,6 @@ export const memberApi = {
       );
       return response.data;
     } catch (error) {
-      // The server refuses a reschedule with a real HTTP status: 409 for a
-      // confirmed booking or a materialized custom job, 404 for someone else's
-      // booking or revoked patient access, 400 for an impossible time. Those
-      // are answers, not transport failures, and the body carries the reason
-      // and whether operations has to confirm the new time -- so surface them
-      // instead of collapsing them into "something went wrong".
       if (error instanceof ApiError && error.status && error.status < 500) {
         const body = (error.body ?? {}) as Partial<V1RescheduleResponse>;
         return {
@@ -209,8 +242,6 @@ export const memberApi = {
           currentStatus: body.currentStatus,
         };
       }
-      // A genuine network/server failure is not a booking fact. Let it throw so
-      // the caller reloads from the server rather than reporting a state.
       throw error;
     }
   },
