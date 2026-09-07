@@ -11,6 +11,10 @@ on:
     # reactivating a public-repo schedule that GitHub disabled for inactivity.
     - cron: '17 6 * * 1'
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze
