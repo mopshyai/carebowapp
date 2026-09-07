@@ -7,8 +7,8 @@
  * a response as it arrives in React Native. This is otherwise a plain SSE
  * client (frames separated by a blank line, each carrying one `data: ` line
  * of JSON) — there is no reconnection, retry, or `event:`/`id:` field
- * support because the one server this talks to (carebow-main's
- * /api/chat/sessions/:id/messages) doesn't use them.
+ * support because the one server this talks to (carebow-main's canonical
+ * /api/v1/chat/sessions/:id/messages adapter) doesn't use them.
  */
 
 /**
@@ -59,9 +59,6 @@ export function postSSE(
 
     xhr.onprogress = () => flush(xhr.responseText);
     xhr.onload = () => {
-      // Every frame this server sends ends with its own blank-line
-      // terminator, so the response is already complete here — this just
-      // guards against a dropped final onprogress tick.
       flush(xhr.responseText.endsWith('\n\n') ? xhr.responseText : `${xhr.responseText}\n\n`);
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
