@@ -72,16 +72,26 @@ jobs:
     steps:
       - name: Check required iOS release configuration
         shell: bash
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_B64: ${{ secrets.APP_STORE_CONNECT_KEY_B64 }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          MOBILE_DOTENV: ${{ secrets.MOBILE_DOTENV }}
         run: |
+          set -euo pipefail
           missing=()
-          [ -n "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" ] || missing+=(APP_STORE_CONNECT_KEY_ID)
-          [ -n "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" ] || missing+=(APP_STORE_CONNECT_ISSUER_ID)
-          [ -n "${{ secrets.APP_STORE_CONNECT_KEY_B64 }}" ] || missing+=(APP_STORE_CONNECT_KEY_B64)
-          [ -n "${{ secrets.MATCH_GIT_URL }}" ] || missing+=(MATCH_GIT_URL)
-          [ -n "${{ secrets.MATCH_PASSWORD }}" ] || missing+=(MATCH_PASSWORD)
-          [ -n "${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}" ] || missing+=(MATCH_GIT_BASIC_AUTHORIZATION)
-          [ -n "${{ secrets.KEYCHAIN_PASSWORD }}" ] || missing+=(KEYCHAIN_PASSWORD)
-          [ -n "${{ secrets.MOBILE_DOTENV }}" ] || missing+=(MOBILE_DOTENV)
+          [ -n "$APP_STORE_CONNECT_KEY_ID" ] || missing+=(APP_STORE_CONNECT_KEY_ID)
+          [ -n "$APP_STORE_CONNECT_ISSUER_ID" ] || missing+=(APP_STORE_CONNECT_ISSUER_ID)
+          [ -n "$APP_STORE_CONNECT_KEY_B64" ] || missing+=(APP_STORE_CONNECT_KEY_B64)
+          [ -n "$MATCH_GIT_URL" ] || missing+=(MATCH_GIT_URL)
+          [ -n "$MATCH_PASSWORD" ] || missing+=(MATCH_PASSWORD)
+          [ -n "$MATCH_GIT_BASIC_AUTHORIZATION" ] || missing+=(MATCH_GIT_BASIC_AUTHORIZATION)
+          [ -n "$KEYCHAIN_PASSWORD" ] || missing+=(KEYCHAIN_PASSWORD)
+          [ -n "$MOBILE_DOTENV" ] || missing+=(MOBILE_DOTENV)
           if [ ${#missing[@]} -ne 0 ]; then
             printf '::error::Missing required iOS release configuration: %s\n' "${missing[*]}"
             exit 1
@@ -116,9 +126,12 @@ jobs:
       - name: Materialise production mobile config
         working-directory: apps/mobile
         shell: bash
+        env:
+          MOBILE_DOTENV: ${{ secrets.MOBILE_DOTENV }}
         run: |
+          set -euo pipefail
           umask 077
-          printf '%s' "${{ secrets.MOBILE_DOTENV }}" > .env
+          printf '%s' "$MOBILE_DOTENV" > .env
 
       - name: Build and upload to TestFlight
         working-directory: apps/mobile
@@ -149,14 +162,22 @@ jobs:
     steps:
       - name: Check required Android release configuration
         shell: bash
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          MOBILE_DOTENV: ${{ secrets.MOBILE_DOTENV }}
         run: |
+          set -euo pipefail
           missing=()
-          [ -n "${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}" ] || missing+=(PLAY_SERVICE_ACCOUNT_JSON)
-          [ -n "${{ secrets.ANDROID_KEYSTORE_B64 }}" ] || missing+=(ANDROID_KEYSTORE_B64)
-          [ -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] || missing+=(ANDROID_KEYSTORE_PASSWORD)
-          [ -n "${{ secrets.ANDROID_KEY_ALIAS }}" ] || missing+=(ANDROID_KEY_ALIAS)
-          [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ] || missing+=(ANDROID_KEY_PASSWORD)
-          [ -n "${{ secrets.MOBILE_DOTENV }}" ] || missing+=(MOBILE_DOTENV)
+          [ -n "$PLAY_SERVICE_ACCOUNT_JSON" ] || missing+=(PLAY_SERVICE_ACCOUNT_JSON)
+          [ -n "$ANDROID_KEYSTORE_B64" ] || missing+=(ANDROID_KEYSTORE_B64)
+          [ -n "$ANDROID_KEYSTORE_PASSWORD" ] || missing+=(ANDROID_KEYSTORE_PASSWORD)
+          [ -n "$ANDROID_KEY_ALIAS" ] || missing+=(ANDROID_KEY_ALIAS)
+          [ -n "$ANDROID_KEY_PASSWORD" ] || missing+=(ANDROID_KEY_PASSWORD)
+          [ -n "$MOBILE_DOTENV" ] || missing+=(MOBILE_DOTENV)
           if [ ${#missing[@]} -ne 0 ]; then
             printf '::error::Missing required Android release configuration: %s\n' "${missing[*]}"
             exit 1
@@ -197,15 +218,21 @@ jobs:
       - name: Materialise production mobile config
         working-directory: apps/mobile
         shell: bash
+        env:
+          MOBILE_DOTENV: ${{ secrets.MOBILE_DOTENV }}
         run: |
+          set -euo pipefail
           umask 077
-          printf '%s' "${{ secrets.MOBILE_DOTENV }}" > .env
+          printf '%s' "$MOBILE_DOTENV" > .env
 
       - name: Decode upload keystore
         shell: bash
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
+          set -euo pipefail
           umask 077
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.keystore"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.keystore" >> "$GITHUB_ENV"
 
       - name: Build and upload to Play internal
