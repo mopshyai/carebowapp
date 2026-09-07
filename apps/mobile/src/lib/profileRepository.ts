@@ -6,6 +6,7 @@ import {
   type FamilyMember,
   type Gender,
   type Relationship,
+  type UserProfile,
 } from '../types/profile';
 import { useProfileStore } from '../store/useProfileStore';
 import { profilesApi, type V1Profile } from '../services/api/endpoints/profiles';
@@ -96,10 +97,7 @@ function parseMedications(value?: string | null) {
  * preferences) are preserved only on an existing device and are never presented
  * as cloud-synced data.
  */
-export function memberInputFromBackend(
-  profile: V1Profile,
-  existing?: FamilyMember
-): MemberInput {
+export function memberInputFromBackend(profile: V1Profile, existing?: FamilyMember): MemberInput {
   const { firstName, lastName } = splitName(profile.name);
   const emptyHealth = createEmptyMemberHealthInfo();
 
@@ -132,6 +130,111 @@ export function memberInputFromBackend(
     },
     carePreferences: existing?.carePreferences ?? createEmptyCarePreferences(),
   };
+}
+
+/**
+ * Keep the account-level Personal Information screen and the clinical `self`
+ * patient profile on the same identity. Older app versions stored DOB/gender
+ * only on `UserProfile`, which made Ask CareBow believe the saved user had no
+ * patient details.
+ */
+export function selfMemberSnapshotFromUser(
+  user: UserProfile,
+  existing?: FamilyMember
+): FamilyMember {
+  const now = new Date().toISOString();
+
+  return {
+    id: existing?.id ?? generateId(),
+    backendId: existing?.backendId,
+    firstName: user.firstName.trim() || existing?.firstName || '',
+    lastName: user.lastName.trim() || existing?.lastName || '',
+    relationship: 'self',
+    dateOfBirth: user.dateOfBirth || existing?.dateOfBirth,
+    gender: user.gender || existing?.gender,
+    isDefault: existing?.isDefault ?? true,
+    healthInfo: existing?.healthInfo ?? createEmptyMemberHealthInfo(),
+    carePreferences: existing?.carePreferences ?? createEmptyCarePreferences(),
+    profileCompleteness: existing?.profileCompleteness ?? 0,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Migrate account-level demographics into the local `self` patient cache
+ * without a network dependency. Ask CareBow's deterministic safety path must
+ * remain reachable when the server is unavailable; server-backed orchestration
+ * still calls ensureBackendProfile before using the profile remotely.
+ */
+export function ensureLocalSelfPatientProfileFromUser(user: UserProfile): FamilyMember {
+  const state = useProfileStore.getState();
+  const existing = state.members.find((member) => member.relationship === 'self');
+  const snapshot = selfMemberSnapshotFromUser(user, existing);
+
+  if (existing) {
+    state.updateMember(existing.id, {
+      firstName: snapshot.firstName,
+      lastName: snapshot.lastName,
+      relationship: 'self',
+      dateOfBirth: snapshot.dateOfBirth,
+      gender: snapshot.gender,
+    });
+    return useProfileStore.getState().getMemberById(existing.id) ?? snapshot;
+  }
+
+  return state.addMember({
+    backendId: snapshot.backendId,
+    firstName: snapshot.firstName,
+    lastName: snapshot.lastName,
+    relationship: 'self',
+    dateOfBirth: snapshot.dateOfBirth,
+    gender: snapshot.gender,
+    isDefault: snapshot.isDefault,
+    healthInfo: snapshot.healthInfo,
+    carePreferences: snapshot.carePreferences,
+  });
+}
+
+/**
+ * Persist the signed-in person's Personal Information as the server-backed
+ * patient profile used by Ask CareBow, then update the local member cache only
+ * after the server confirms the save.
+ */
+export async function syncSelfPatientProfileFromUser(user: UserProfile): Promise<FamilyMember> {
+  const state = useProfileStore.getState();
+  const existing = state.members.find((member) => member.relationship === 'self');
+  const snapshot = selfMemberSnapshotFromUser(user, existing);
+  const backendId = await persistMemberSnapshot(snapshot);
+
+  if (existing) {
+    state.updateMember(existing.id, {
+      backendId,
+      firstName: snapshot.firstName,
+      lastName: snapshot.lastName,
+      relationship: 'self',
+      dateOfBirth: snapshot.dateOfBirth,
+      gender: snapshot.gender,
+    });
+    return (
+      useProfileStore.getState().getMemberById(existing.id) ?? {
+        ...snapshot,
+        backendId,
+      }
+    );
+  }
+
+  return state.addMember({
+    backendId,
+    firstName: snapshot.firstName,
+    lastName: snapshot.lastName,
+    relationship: 'self',
+    dateOfBirth: snapshot.dateOfBirth,
+    gender: snapshot.gender,
+    isDefault: snapshot.isDefault,
+    healthInfo: snapshot.healthInfo,
+    carePreferences: snapshot.carePreferences,
+  });
 }
 
 /**

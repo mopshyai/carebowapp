@@ -1,5 +1,5 @@
 /**
- * Paid bookings and plans.
+ * Paid bookings, custom-care requests and plans.
  *
  * The server owns pricing and payment truth. Mobile opens Razorpay hosted
  * checkout and later asks the server whether the webhook confirmed payment.
@@ -40,15 +40,28 @@ export type CreateBookingOrderResponse = {
   paymentUrl?: string;
 };
 
+export type CreateCareRequestOrderResponse = {
+  success: boolean;
+  error?: string;
+  orderId?: string;
+  paymentUrl?: string;
+  amount?: number;
+  currency?: string;
+  requestText?: string;
+  reused?: boolean;
+};
+
 export type PaymentStatusResponse = {
   success: boolean;
   error?: string;
   status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
-  kind?: 'booking' | 'plan';
+  kind?: 'booking' | 'plan' | 'care_request';
+  careRequestId?: string | null;
   planSlug?: string | null;
   amount?: number;
   currency?: string;
   booking?: { id: string; status: string; scheduledAt: string } | null;
+  careRequest?: { id: string; status: string; updatedAt?: string } | null;
 };
 
 export type SettleBookingRequest = {
@@ -94,7 +107,7 @@ export type PlansResponse = {
 
 export type PaymentRecord = {
   id: string;
-  kind: 'booking' | 'plan';
+  kind: 'booking' | 'care_request' | 'plan';
   amount: number;
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
@@ -102,6 +115,7 @@ export type PaymentRecord = {
   reference?: string | null;
   createdAt: string;
   booking?: { id: string; status: string; scheduledAt: string } | null;
+  careRequest?: { id: string; status: string } | null;
 };
 
 export type PaymentsListResponse = {
@@ -117,7 +131,7 @@ export type PaymentsListResponse = {
  *
  * This dedupes only requests that are concurrently in flight. Once the first
  * call settles the key is removed, so an intentional later retry still creates
- * a fresh order.
+ * a fresh order unless the server returns/reuses the existing payment intent.
  */
 const inFlightOrderRequests = new Map<string, Promise<unknown>>();
 
@@ -175,6 +189,15 @@ export const paymentsApi = {
       const response = await ApiClient.post<CreateBookingOrderResponse>(
         '/v1/payments/booking-order',
         body
+      );
+      return response.data;
+    }),
+
+  createCareRequestOrder: (careRequestId: string): Promise<CreateCareRequestOrderResponse> =>
+    singleFlight(`care-request:${careRequestId}`, async () => {
+      const response = await ApiClient.post<CreateCareRequestOrderResponse>(
+        '/v1/payments/care-request-order',
+        { careRequestId }
       );
       return response.data;
     }),

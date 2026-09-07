@@ -28,7 +28,7 @@ import { RequestTextArea } from '../components/ui/RequestTextArea';
 import { StickyCheckoutBar } from '../components/ui/StickyCheckoutBar';
 import { TimePicker } from '../components/ui/TimePicker';
 import { QuantityStepper } from '../components/ui/QuantityStepper';
-import { calculatePrice, getServiceById } from '../data/services';
+import { calculatePrice } from '../data/services';
 import { Member, PackageOption } from '../data/types';
 import { useCartStore } from '../store/useCartStore';
 import { useProfileStore } from '../store/useProfileStore';
@@ -98,12 +98,10 @@ export default function ServiceDetailsScreen() {
       })
       .catch(() => {
         if (!active) return;
-        const localService = getServiceById(id || '');
-        if (!localService) {
-          setLoadError('This service is no longer available.');
-          return;
-        }
-        setService(localService);
+        setService(null);
+        setLoadError(
+          'This service could not be verified. Please reconnect and choose it from Services.'
+        );
       });
 
     // Members (for booking) come from the backend profiles. If the backend

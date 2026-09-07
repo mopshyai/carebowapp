@@ -52,9 +52,7 @@ export default function CarePlansScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
-  const [unconfirmedPayment, setUnconfirmedPayment] = useState<UnconfirmedPlanPayment | null>(
-    null
-  );
+  const [unconfirmedPayment, setUnconfirmedPayment] = useState<UnconfirmedPlanPayment | null>(null);
 
   const checkout = useHostedCheckout();
 
@@ -96,7 +94,10 @@ export default function CarePlansScreen() {
       if (status.status === 'SUCCESS') {
         setUnconfirmedPayment(null);
         await refreshPlanTruth();
-        Alert.alert('You are on the new plan', `${pending.planTitle} is now active on your account.`);
+        Alert.alert(
+          'You are on the new plan',
+          `${pending.planTitle} is now active on your account.`
+        );
         return;
       }
 
@@ -136,7 +137,6 @@ export default function CarePlansScreen() {
       const order = await paymentsApi.createPlanOrder({
         planSlug: plan.id,
         hosted: true,
-        callbackUrl: 'carebow://checkout/return',
       });
 
       if (!order.success || !order.paymentUrl || !order.orderId) {
@@ -173,7 +173,9 @@ export default function CarePlansScreen() {
   };
 
   const busy = (planId: string) =>
-    buyingId === planId || checkout.busy || (!!unconfirmedPayment && unconfirmedPayment.planId !== planId);
+    buyingId === planId ||
+    checkout.busy ||
+    (!!unconfirmedPayment && unconfirmedPayment.planId !== planId);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>

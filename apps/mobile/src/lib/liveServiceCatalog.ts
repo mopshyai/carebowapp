@@ -28,7 +28,13 @@ const CATEGORY_TITLES: Record<string, string> = Object.fromEntries(
 );
 
 const hasDetails = (source: V1Service): boolean =>
-  source.details !== null && source.details !== undefined && typeof source.details === 'object';
+  source.details !== null &&
+  typeof source.details === 'object' &&
+  !Array.isArray(source.details) &&
+  typeof (source.details as Service).categoryId === 'string' &&
+  !!(source.details as Service).booking &&
+  !!(source.details as Service).pricing &&
+  !!(source.details as Service).fulfillment;
 
 export const toBookingService = (source: V1Service): Service => {
   if (hasDetails(source)) {
@@ -45,8 +51,8 @@ export const toBookingService = (source: V1Service): Service => {
     shortTagline: source.description,
     description: source.description,
     benefits: [],
-    fulfillment: { mode: 'checkout', requiresPayment: false },
-    pricing: { type: 'fixed', price: source.basePrice / 100 },
+    fulfillment: { mode: 'on_request', requiresPayment: false },
+    pricing: { type: 'quote' },
     booking: {
       requiresMember: true,
       requiresDate: true,
@@ -63,17 +69,26 @@ export const toBookingService = (source: V1Service): Service => {
   };
 };
 
+/**
+ * Adapt every available backend service into the mobile catalog.
+ *
+ * Older backend rows may not yet have the richer mobile `details` payload, but
+ * they are still canonical CareBow services and must not disappear from mobile.
+ * Rich rows retain their authored presentation data; legacy rows use the safe
+ * adapter above until their metadata is backfilled server-side.
+ */
 export const groupLiveServices = (services: V1Service[]): ServiceCategory[] => {
-  const rich = services.filter(hasDetails);
-
   const groups = new Map<string, Service[]>();
-  rich.forEach((source) => {
-    const bookingService = toBookingService(source);
-    const categoryId = bookingService.categoryId;
-    const items = groups.get(categoryId) ?? [];
-    items.push(bookingService);
-    groups.set(categoryId, items);
-  });
+
+  services
+    .filter((source) => source.isAvailable)
+    .forEach((source) => {
+      const bookingService = toBookingService(source);
+      const categoryId = bookingService.categoryId;
+      const items = groups.get(categoryId) ?? [];
+      items.push(bookingService);
+      groups.set(categoryId, items);
+    });
 
   const orderedIds = [
     ...serviceCategories.map((category) => category.id),

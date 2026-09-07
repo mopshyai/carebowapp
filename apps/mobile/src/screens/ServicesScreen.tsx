@@ -4,13 +4,20 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { AppNavigationProp } from '../navigation/types';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { CategorySection } from '../components/ui/CategorySection';
-import { serviceCategories } from '../data/services';
 import type { Service, ServiceCategory } from '../data/types';
 import { servicesApi } from '../services/api/endpoints/services';
 import { groupLiveServices } from '../lib/liveServiceCatalog';
@@ -49,7 +56,11 @@ function filterForCareIntent(
       return /video|teleconsult|telemedicine|virtual|online consult/.test(text);
     });
     if (liveConsults.length > 0) {
-      return asRecommendationGroup('carebow_video_consult', 'Live doctor consultations', liveConsults);
+      return asRecommendationGroup(
+        'carebow_video_consult',
+        'Live doctor consultations',
+        liveConsults
+      );
     }
 
     // If no dedicated virtual service exists yet, show actual doctor services
@@ -67,11 +78,7 @@ function filterForCareIntent(
     }
   }
 
-  if (
-    requested === 'doctor-visit' ||
-    requested === 'home-care' ||
-    requested === 'home-visit'
-  ) {
+  if (requested === 'doctor-visit' || requested === 'home-care' || requested === 'home-visit') {
     const homeDoctorServices = allServices.filter((service) => {
       const text = serviceSearchText(service);
       return /doctor|physician|home visit|medical visit/.test(text);
@@ -113,8 +120,8 @@ export default function ServicesScreen() {
   const route = useRoute();
   const requestedCategory = (route.params as { category?: string } | undefined)?.category;
   const referralContext = useCartStore((state) => state.pendingReferralContext);
-  const [categories, setCategories] = useState<ServiceCategory[]>(serviceCategories);
-  const [, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -125,13 +132,11 @@ export default function ServicesScreen() {
       .then((services) => {
         if (!active) return;
         const live = groupLiveServices(services);
-        // Fall back to the local catalog if the backend has no rich services yet,
-        // so the user never sees an empty screen.
-        setCategories(live.length > 0 ? live : serviceCategories);
+        setCategories(live);
       })
       .catch(() => {
         if (!active) return;
-        setCategories(serviceCategories);
+        setCategories([]);
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -196,6 +201,13 @@ export default function ServicesScreen() {
           </View>
         )}
 
+        {isLoading && <ActivityIndicator accessibilityLabel="Loading services" />}
+        {!isLoading && categories.length === 0 && (
+          <Text style={styles.referralText}>
+            Services could not be loaded. Reopen this page when connected, or ask CareBow to help
+            find a service.
+          </Text>
+        )}
         {visibleCategories.map((category) => (
           <CategorySection
             key={category.id}

@@ -2,6 +2,7 @@ import {
   localGenderFromBackend,
   localRelationshipFromBackend,
   memberInputFromBackend,
+  selfMemberSnapshotFromUser,
 } from './profileRepository';
 import {
   createEmptyCarePreferences,
@@ -97,5 +98,52 @@ describe('profileRepository backend mapping', () => {
     const input = memberInputFromBackend(serverProfile({ name: '   ' }));
     expect(input.firstName).toBe('');
     expect(input.lastName).toBe('');
+  });
+
+  it('bridges saved Personal Information into a self patient profile', () => {
+    const snapshot = selfMemberSnapshotFromUser({
+      id: 'user-1',
+      firstName: 'Asha',
+      lastName: 'Patel',
+      email: 'asha@example.com',
+      phone: '+1 555 0100',
+      dateOfBirth: '1984-06-15',
+      gender: 'female',
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-21T00:00:00.000Z',
+    });
+
+    expect(snapshot).toEqual(
+      expect.objectContaining({
+        firstName: 'Asha',
+        lastName: 'Patel',
+        relationship: 'self',
+        dateOfBirth: '1984-06-15',
+        gender: 'female',
+      })
+    );
+  });
+
+  it('preserves self health context while refreshing personal demographics', () => {
+    const existing = { ...existingMember(), relationship: 'self' as const };
+    const snapshot = selfMemberSnapshotFromUser(
+      {
+        id: 'user-1',
+        firstName: 'Maya',
+        lastName: 'Kumar',
+        email: 'maya@example.com',
+        phone: '',
+        dateOfBirth: '1960-01-02',
+        gender: 'female',
+        createdAt: '2026-08-20T00:00:00.000Z',
+        updatedAt: '2026-08-21T00:00:00.000Z',
+      },
+      existing
+    );
+
+    expect(snapshot.id).toBe(existing.id);
+    expect(snapshot.backendId).toBe(existing.backendId);
+    expect(snapshot.healthInfo.height).toBe(160);
+    expect(snapshot.dateOfBirth).toBe('1960-01-02');
   });
 });

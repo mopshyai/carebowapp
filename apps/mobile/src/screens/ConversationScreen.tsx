@@ -259,7 +259,7 @@ export default function ConversationScreen() {
 
         if (
           ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
-          response.intent === 'symptom_help' &&
+          !safetyBypass &&
           draftResponse &&
           currentSession.memberId
         ) {
@@ -318,7 +318,10 @@ export default function ConversationScreen() {
               displayMessages = [];
               void refreshEntitlement().catch(() => {});
             } else {
-              logger.warn('Ask CareBow rewrite unavailable; using deterministic response', apiError);
+              logger.warn(
+                'Ask CareBow rewrite unavailable; using deterministic response',
+                apiError
+              );
             }
           }
         }
@@ -470,8 +473,13 @@ export default function ConversationScreen() {
             <Text style={styles.headerSubtitle}>AI Health Assistant</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.menuButton}>
-          <Icon name="ellipsis-vertical" size={20} color={colors.textSecondary} />
+        <TouchableOpacity
+          style={styles.menuButton}
+          accessibilityRole="button"
+          accessibilityLabel="View care requests and bookings"
+          onPress={() => navigation.navigate('Orders')}
+        >
+          <Icon name="receipt-outline" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 

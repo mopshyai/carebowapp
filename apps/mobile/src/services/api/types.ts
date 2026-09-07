@@ -50,6 +50,15 @@ export interface ApiErrorDetails {
   status?: number;
   field?: string;
   details?: Record<string, unknown>;
+  /**
+   * The parsed error response body, verbatim.
+   *
+   * Some endpoints answer a refusal with structured server truth beyond a
+   * message -- whether operations must confirm the change, what status the
+   * record is actually in now. Flattening that to `message` throws away the
+   * part the UI needs to tell the user what really happened.
+   */
+  body?: unknown;
 }
 
 export class ApiError extends Error {
@@ -57,6 +66,7 @@ export class ApiError extends Error {
   status?: number;
   field?: string;
   details?: Record<string, unknown>;
+  body?: unknown;
 
   constructor(error: ApiErrorDetails) {
     super(error.message);
@@ -65,6 +75,7 @@ export class ApiError extends Error {
     this.status = error.status;
     this.field = error.field;
     this.details = error.details;
+    this.body = error.body;
   }
 
   static fromResponse(status: number, data?: unknown): ApiError {
@@ -99,7 +110,7 @@ export class ApiError extends Error {
         code = status >= 500 ? 'SERVER_ERROR' : 'UNKNOWN';
     }
 
-    return new ApiError({ code, message, status, field, details });
+    return new ApiError({ code, message, status, field, details, body: data });
   }
 
   static networkError(message = 'Network error'): ApiError {

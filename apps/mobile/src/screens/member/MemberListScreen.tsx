@@ -2,15 +2,25 @@
  * MemberListScreen — generic list surface for a member's secondary tabs.
  *
  * Variant-driven so one screen serves patients / assignments / tests /
- * inventory. Each variant calls its real endpoint and renders an honest
- * empty state (some backend endpoints are still stubs returning []).
+ * inventory. Each provider work variant is assignment-scoped; a provider's
+ * personal customer bookings must never appear in their work queue.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
+import type { AppNavigationProp } from '@/navigation/types';
 import { memberApi, V1Booking } from '@/services/api/endpoints/member';
 import { inventoryApi } from '@/services/api/endpoints/inventory';
 
@@ -31,9 +41,6 @@ const whenLabel = (iso: string) =>
     minute: '2-digit',
   });
 
-// Patient/assignment/test variants derive from the JWT-accessible /v1/bookings
-// surface (member/* endpoints are web-session only). Inventory has its own
-// service-partner /v1/inventory endpoint.
 const VARIANT: Record<
   MemberListVariant,
   { title: string; icon: string; empty: string; load: () => Promise<Row[]>; stub?: boolean }
@@ -43,7 +50,7 @@ const VARIANT: Record<
     icon: 'people-outline',
     empty: 'No patients yet — they appear here once you have bookings.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       const seen = new Map<string, Row>();
       for (const b of res.bookings ?? []) {
         const name = clientName(b);
@@ -58,7 +65,7 @@ const VARIANT: Record<
     icon: 'briefcase-outline',
     empty: 'No assignments yet.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       return (res.bookings ?? []).map((b) => ({
         id: b.id,
         title: `${clientName(b)} · ${b.service?.name ?? 'Service'}`,
@@ -71,7 +78,7 @@ const VARIANT: Record<
     icon: 'flask-outline',
     empty: 'No orders yet.',
     load: async () => {
-      const res = await memberApi.getBookings();
+      const res = await memberApi.getProviderBookings();
       return (res.bookings ?? []).map((b) => ({
         id: b.id,
         title: b.service?.name ?? 'Order',
@@ -97,6 +104,7 @@ const VARIANT: Record<
 
 export default function MemberListScreen({ variant }: { variant: MemberListVariant }) {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation() as AppNavigationProp;
   const cfg = VARIANT[variant];
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -108,7 +116,7 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
     try {
       setError(null);
       setRows(await cfg.load());
-    } catch (e) {
+    } catch {
       setError('Cannot reach CareBow servers. Pull to retry.');
     } finally {
       setLoading(false);
@@ -117,8 +125,10 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
   }, [cfg]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
+
+  const canOpenBooking = variant !== 'inventory';
 
   return (
     <View style={styles.container}>
@@ -139,13 +149,22 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load();
               }}
               tintColor={colors.accent}
             />
           }
           renderItem={({ item }) => (
-            <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.row}
+              disabled={!canOpenBooking}
+              activeOpacity={canOpenBooking ? 0.75 : 1}
+              onPress={() => {
+                if (canOpenBooking) navigation.navigate('MemberBookingDetails', { id: item.id });
+              }}
+              accessibilityRole={canOpenBooking ? 'button' : undefined}
+              accessibilityLabel={canOpenBooking ? `Open ${item.title}` : undefined}
+            >
               <View style={styles.rowIcon}>
                 <Icon name={cfg.icon} size={18} color={colors.accent} />
               </View>
@@ -153,7 +172,10 @@ export default function MemberListScreen({ variant }: { variant: MemberListVaria
                 <Text style={styles.rowTitle}>{item.title}</Text>
                 {item.subtitle ? <Text style={styles.rowSubtitle}>{item.subtitle}</Text> : null}
               </View>
-            </View>
+              {canOpenBooking ? (
+                <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+              ) : null}
+            </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>

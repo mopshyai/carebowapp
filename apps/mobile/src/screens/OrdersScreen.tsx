@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -10,12 +10,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useBookingsStore } from '../store';
 import type { AppNavigationProp } from '../navigation/types';
 import { colors, layout, radius, shadows, space, typography } from '../theme/tokens';
 
+import CareRequestList from '../components/care/CareRequestList';
 import { formatMinor } from '../data/countries';
 
 // Formats what the server charged, in the currency it charged. Hardcoding INR
@@ -52,11 +53,11 @@ export default function OrdersScreen() {
     [fetchBookings]
   );
 
-  useEffect(() => {
-    // Not forced: returning to this screen within the freshness window reuses
-    // the cache instead of refetching on every mount.
-    fetchBookings();
-  }, [fetchBookings]);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchBookings({ force: true });
+    }, [fetchBookings])
+  );
 
   return (
     <View style={styles.container}>
@@ -73,6 +74,10 @@ export default function OrdersScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xl }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
       >
+        <CareRequestList
+          onBooking={(id) => navigation.navigate('OrderDetails', { id })}
+          onOpenRequest={(id) => navigation.navigate('RequestDetails', { id })}
+        />
         {loading ? (
           <View style={styles.state}>
             <ActivityIndicator size="large" color={colors.primary.default} />

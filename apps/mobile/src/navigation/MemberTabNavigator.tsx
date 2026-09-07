@@ -17,9 +17,11 @@ import ProfileStackNavigator from './ProfileStackNavigator';
 
 const Tab = createBottomTabNavigator();
 
-// Which work-tab variant + label/icon each member type gets.
+// Which work-tab variant + label/icon each member type gets. Clinicians must see
+// every assigned Booking, not a patient-deduplicated list, or a second visit for
+// the same patient can disappear from their actionable work queue.
 const WORK_TAB: Record<string, { variant: MemberListVariant; label: string; icon: string }> = {
-  healthcare_provider: { variant: 'patients', label: 'Patients', icon: 'people-outline' },
+  healthcare_provider: { variant: 'assignments', label: 'Appointments', icon: 'calendar-outline' },
   service_provider: { variant: 'assignments', label: 'Work', icon: 'briefcase-outline' },
   service_partner: { variant: 'tests', label: 'Orders', icon: 'flask-outline' },
 };
