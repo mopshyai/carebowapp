@@ -58,18 +58,15 @@ interface CareRequestMutationResponse {
 }
 
 /**
- * Customer-facing custom/unlisted care requests.
- *
- * This intentionally targets the same `/chat/care-requests` contract used by
- * the web Ask CareBow experience. Mobile must not create a second request
- * lifecycle or translate these records into a client-only request store.
+ * Customer-facing custom/unlisted care requests. Mobile uses the v1 adapter;
+ * the backend adapter reuses the same canonical CareRequest lifecycle as web.
  */
 export const careRequestsApi = {
   list: async (params?: {
     includeCompleted?: boolean;
     sessionId?: string;
   }): Promise<CareRequest[]> => {
-    const response = await ApiClient.get<CareRequestsResponse>('/chat/care-requests', {
+    const response = await ApiClient.get<CareRequestsResponse>('/v1/chat/care-requests', {
       params: {
         ...(params?.includeCompleted ? { includeCompleted: 'true' } : {}),
         ...(params?.sessionId ? { sessionId: params.sessionId } : {}),
@@ -79,14 +76,14 @@ export const careRequestsApi = {
   },
 
   get: async (id: string): Promise<CareRequest | null> => {
-    const response = await ApiClient.get<CareRequestsResponse>('/chat/care-requests', {
+    const response = await ApiClient.get<CareRequestsResponse>('/v1/chat/care-requests', {
       params: { id },
     });
     return response.data.careRequests?.[0] ?? null;
   },
 
   approveQuote: async (id: string): Promise<CareRequestMutationResponse> => {
-    const response = await ApiClient.patch<CareRequestMutationResponse>('/chat/care-requests', {
+    const response = await ApiClient.patch<CareRequestMutationResponse>('/v1/chat/care-requests', {
       id,
       action: 'APPROVE_QUOTE',
     });
@@ -94,7 +91,7 @@ export const careRequestsApi = {
   },
 
   cancel: async (id: string): Promise<CareRequestMutationResponse> => {
-    const response = await ApiClient.patch<CareRequestMutationResponse>('/chat/care-requests', {
+    const response = await ApiClient.patch<CareRequestMutationResponse>('/v1/chat/care-requests', {
       id,
       action: 'CANCEL',
     });

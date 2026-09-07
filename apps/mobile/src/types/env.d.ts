@@ -8,13 +8,9 @@ declare module '@env' {
   export const APP_ENV: string;
   export const APP_NAME: string;
 
-  // API Configuration
+  // Canonical CareBow API base. Endpoint modules append /v1/...
   export const API_BASE_URL: string;
   export const API_TIMEOUT: string;
-
-  // Ask CareBow AI Configuration
-  export const ASK_CAREBOW_API_URL: string;
-  export const ASK_CAREBOW_API_KEY: string;
 
   // Analytics (optional)
   export const ANALYTICS_KEY: string | undefined;

@@ -1,6 +1,7 @@
 /**
- * Chat-session orchestrator API (v1-auth'd via bearer JWT).
- * This is the RAG-backed medical reasoning path; askCareBow.ts is rewrite-only.
+ * Chat-session orchestrator API. Mobile reaches the canonical CareBow backend
+ * only through `/api/v1`; the backend adapter reuses the same chat domain
+ * services as web rather than duplicating orchestration or persistence here.
  */
 
 import { ApiClient } from '../ApiClient';
@@ -20,7 +21,7 @@ export type ServerFollowUpOutcome = 'better' | 'same' | 'worse';
 
 export const askCarebowOrchestratorApi = {
   createSession: async (profileId: string): Promise<ChatSession> => {
-    const response = await ApiClient.post<{ session: ChatSession }>('/chat/sessions', {
+    const response = await ApiClient.post<{ session: ChatSession }>('/v1/chat/sessions', {
       profileId,
     });
     return response.data.session;
@@ -32,7 +33,7 @@ export const askCarebowOrchestratorApi = {
     requestId: string
   ): Promise<ChatOrchestratorMessageResponse> => {
     const response = await ApiClient.post<ChatOrchestratorMessageResponse>(
-      `/chat/sessions/${sessionId}/messages`,
+      `/v1/chat/sessions/${sessionId}/messages`,
       { content, requestId }
     );
     return response.data;
@@ -43,7 +44,7 @@ export const askCarebowOrchestratorApi = {
     outcome: ServerFollowUpOutcome
   ): Promise<{ success: boolean; careStatus?: string }> => {
     const response = await ApiClient.post<{ success: boolean; careStatus?: string }>(
-      `/chat/sessions/${sessionId}/follow-up-outcome`,
+      `/v1/chat/sessions/${sessionId}/follow-up-outcome`,
       { outcome }
     );
     return response.data;

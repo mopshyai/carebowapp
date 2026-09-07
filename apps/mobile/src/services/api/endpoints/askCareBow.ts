@@ -17,7 +17,10 @@ export const askCareBowApi = {
     forWhom: 'me' | 'family';
     requestId: string;
   }): Promise<AskCareBowRewriteResponse> => {
-    const response = await ApiClient.post<AskCareBowRewriteResponse>('/ask-carebow/message', data);
+    const response = await ApiClient.post<AskCareBowRewriteResponse>(
+      '/v1/ask-carebow/message',
+      data
+    );
     return response.data;
   },
 };
