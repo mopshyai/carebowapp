@@ -1,6 +1,3 @@
-// API
-export { api } from './api/client';
-
 // Stores
 export { useCurrencyStore, createCurrencyStore } from './store/useCurrencyStore';
 export type { CurrencyCode } from './store/useCurrencyStore';
