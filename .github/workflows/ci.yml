@@ -12,7 +12,6 @@ concurrency:
 
 env:
   NODE_VERSION: "20"
-  PNPM_VERSION: "10"
 
 jobs:
   lint:
@@ -20,15 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
@@ -48,15 +45,13 @@ jobs:
     needs: lint
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
@@ -68,31 +63,23 @@ jobs:
         run: pnpm test -- --passWithNoTests --ci
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
-
-  # NOTE: there is no generic `build` job. `pnpm build` executed zero tasks —
-  # no remaining workspace defines a build script, and the job carried
-  # DATABASE_URL / AUTH_SECRET left over from the deleted apps/api. A green
-  # check for running nothing is worse than no check. The real builds are
-  # build-ios and build-android below.
 
   security:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
@@ -101,34 +88,23 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Security audit
-        # Advisory only: a transitive CVE with no available fix should surface,
-        # not block every merge. Review the output, do not ignore it.
+        # High/critical dependency vulnerabilities are release blockers.
+        # Do not mask this failure with continue-on-error.
         run: pnpm audit --audit-level=high
-        continue-on-error: true
 
   build-ios:
     name: Build iOS
     runs-on: macos-latest
     needs: [lint, test]
-    # Previously gated to pushes on main, which meant no release build was ever
-    # validated before merge: a PR could be green on lint+tests and still break
-    # `assembleRelease` or `xcodebuild -configuration Release`, and the failure
-    # only surfaced after landing. Release builds break on things debug builds
-    # never touch — signing config, Hermes, CocoaPods, dead-code stripping.
-    # The workflow's own `on:` already limits this to main/develop, and
-    # `needs: [lint, test]` still short-circuits the expensive runners when the
-    # cheap checks fail.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
@@ -142,11 +118,6 @@ jobs:
           pod install
 
       - name: Build iOS
-        # generic/platform, not a named device. Pinning "iPhone 16" ties the
-        # build to whatever simulators a given runner image happens to ship
-        # with, and fails with "Unable to find a device matching the provided
-        # destination specifier" the moment that changes. We are compiling, not
-        # running, so no concrete device is needed.
         run: |
           cd apps/mobile
           xcodebuild -workspace ios/CareBow.xcworkspace \
@@ -160,25 +131,15 @@ jobs:
     name: Build Android
     runs-on: ubuntu-latest
     needs: [lint, test]
-    # Previously gated to pushes on main, which meant no release build was ever
-    # validated before merge: a PR could be green on lint+tests and still break
-    # `assembleRelease` or `xcodebuild -configuration Release`, and the failure
-    # only surfaced after landing. Release builds break on things debug builds
-    # never touch — signing config, Hermes, CocoaPods, dead-code stripping.
-    # The workflow's own `on:` already limits this to main/develop, and
-    # `needs: [lint, test]` still short-circuits the expensive runners when the
-    # cheap checks fail.
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
@@ -192,12 +153,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # signingConfigs.release (apps/mobile/android/app/build.gradle) needs a
-      # keystore or it fails packaging with "SigningConfig is missing required
-      # property storeFile" — this job only verifies the release variant still
-      # compiles and packages, so a disposable key is enough. It is never the
-      # real upload key: that lives in the ANDROID_KEYSTORE_B64 secret used by
-      # deploy.yml's publish job, gitignored locally, and untouched here.
       - name: Generate ephemeral release-signing keystore
         run: |
           keytool -genkeypair -v \
