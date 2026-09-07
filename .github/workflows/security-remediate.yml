@@ -1,0 +1,51 @@
+name: Security Remediation
+
+on:
+  push:
+    branches: [audit/web-mobile-parity]
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v5
+        with:
+          ref: audit/web-mobile-parity
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply pnpm audit fixes
+        run: pnpm audit --fix || true
+
+      - name: Normalize lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+
+      - name: Commit remediation
+        run: |
+          if git diff --quiet -- package.json pnpm-lock.yaml apps/mobile/package.json packages/shared/package.json; then
+            echo "No dependency remediation changes generated."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json pnpm-lock.yaml apps/mobile/package.json packages/shared/package.json
+          git commit -m "fix(security): apply pnpm audit dependency remediation"
+          git push origin HEAD:audit/web-mobile-parity
