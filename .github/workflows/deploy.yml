@@ -50,12 +50,13 @@ jobs:
             exit 0
           fi
 
+          # Workflow/governance-only changes must not silently publish a new app.
+          # Release pipeline changes are exercised via workflow_dispatch.
           if git diff --quiet HEAD^ HEAD -- \
             apps/mobile \
             packages \
             package.json \
-            pnpm-lock.yaml \
-            .github/workflows/deploy.yml; then
+            pnpm-lock.yaml; then
             echo "release=false" >> "$GITHUB_OUTPUT"
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
