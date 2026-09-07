@@ -27,9 +27,10 @@ jobs:
   ios-native:
     name: CodeQL iOS (C/C++/Swift)
     runs-on: macos-14
-    # Native extraction has to compile CocoaPods plus the app. Keep a hard cap,
-    # but allow enough headroom for cold GitHub-hosted macOS runners.
-    timeout-minutes: 90
+    # Instrumented Release compilation was still progressing when run 34162940046
+    # hit the 90-minute limit. Allow cold CocoaPods extraction plus analysis to
+    # finish without changing the proven CI build command or scan coverage.
+    timeout-minutes: 180
     permissions:
       actions: read
       contents: read
