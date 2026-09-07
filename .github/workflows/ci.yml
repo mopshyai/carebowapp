@@ -88,12 +88,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Security audit
-        # High/critical dependency vulnerabilities are release blockers.
+        # Moderate/high/critical dependency vulnerabilities are release blockers.
         # The two explicit image-size exceptions are Metro build-tool advisories
         # with no published patched upstream release as of 2026-09-07.
         # They are tracked in issue #131 and must be removed when upstream fixes land.
         run: >-
-          pnpm audit --audit-level=high
+          pnpm audit --audit-level=moderate
           --ignore=GHSA-w3rx-r6r6-pgpr
           --ignore=GHSA-5p2g-fcmc-qvqq
 
