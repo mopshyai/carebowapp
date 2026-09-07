@@ -81,6 +81,7 @@ class AnalyticsServiceImpl {
   private userProperties: UserProperties = {};
   private flushTimer: NodeJS.Timeout | null = null;
   private initialized: boolean = false;
+  private sessionSequence: number = 0;
 
   /**
    * Initialize analytics service
@@ -340,10 +341,12 @@ class AnalyticsServiceImpl {
   }
 
   private async createNewSession(): Promise<string> {
-    const sessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
+    this.sessionSequence += 1;
+    const sessionId = `session_${now.toString(36)}_${this.sessionSequence.toString(36)}`;
     await AsyncStorage.setItem(
       ANALYTICS_SESSION_KEY,
-      JSON.stringify({ id: sessionId, lastActive: Date.now() })
+      JSON.stringify({ id: sessionId, lastActive: now })
     );
     return sessionId;
   }
