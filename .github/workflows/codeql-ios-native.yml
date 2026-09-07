@@ -63,22 +63,17 @@ jobs:
 
       - name: Build iOS native code
         working-directory: apps/mobile
-        # CodeQL needs a real compiler invocation, not a distributable archive.
-        # Build one simulator architecture in Debug so React Native does not
-        # spend this security job bundling production JS or compiling duplicate
-        # simulator architectures. Swift/Obj-C/C/C++ sources are still compiled
-        # and extracted by CodeQL.
+        # Keep this build command aligned with the CI iOS build. CodeQL wraps the
+        # compiler invocation, so a known-green simulator build is safer than
+        # forcing custom architecture/signing flags that can break CocoaPods or
+        # React Native native targets on GitHub-hosted macOS runners.
         run: >-
           xcodebuild
           -workspace ios/CareBow.xcworkspace
           -scheme CareBow
-          -configuration Debug
+          -configuration Release
           -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
-          ARCHS="$(uname -m)"
-          ONLY_ACTIVE_ARCH=YES
-          CODE_SIGNING_ALLOWED=NO
-          COMPILER_INDEX_STORE_ENABLE=NO
           build
 
       - name: Perform CodeQL Analysis
