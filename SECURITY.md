@@ -36,7 +36,7 @@ Changes to this repository are expected to pass the following automated gates be
 - Android release build;
 - iOS release build.
 
-Secret scanning, Dependabot alerts, private vulnerability reporting, and GitHub security advisories are enabled for the repository.
+Repository operators should keep secret scanning, Dependabot alerts/security updates, private vulnerability reporting, and GitHub security advisories enabled where available. Availability and enablement must be verified in GitHub settings rather than inferred from this policy document.
 
 GitHub Actions are pinned to immutable commit SHAs. Release jobs use GitHub secrets and isolated runner temporary storage for signing material. Production mobile configuration must fail closed when required release configuration is absent.
 
