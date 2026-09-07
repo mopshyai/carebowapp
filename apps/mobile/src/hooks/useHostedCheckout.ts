@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking } from 'react-native';
+import { classifyHostedCheckoutStatus } from '../lib/payments/hostedCheckoutStatus';
 import { paymentsApi, type PaymentStatusResponse } from '../services/api/endpoints/payments';
 
 const POLL_ATTEMPTS = 6;
@@ -56,11 +57,12 @@ export function useHostedCheckout(): UseHostedCheckout {
 
       try {
         const response = await paymentsApi.getPaymentStatus(orderId);
-        if (response.status === 'SUCCESS') {
+        const decision = classifyHostedCheckoutStatus(response);
+        if (decision === 'paid') {
           finish({ status: 'paid', payment: response });
           return;
         }
-        if (response.status === 'FAILED') {
+        if (decision === 'failed') {
           finish({ status: 'failed' });
           return;
         }
@@ -71,8 +73,9 @@ export function useHostedCheckout(): UseHostedCheckout {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    // Never call a slow webhook a failed payment. The customer must be told to
-    // check the schedule/receipt before trying to pay again.
+    // Never call a slow webhook or unresolved captured custom-care payment a
+    // failed payment. The customer must be told to check status before trying
+    // to pay again; another attempt could otherwise create a duplicate charge.
     if (pending.current?.orderId === orderId) {
       finish({ status: 'unconfirmed' });
     }

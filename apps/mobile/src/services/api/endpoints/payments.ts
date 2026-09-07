@@ -51,10 +51,17 @@ export type CreateCareRequestOrderResponse = {
   reused?: boolean;
 };
 
+export type PaymentStatusValue = 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+
 export type PaymentStatusResponse = {
   success: boolean;
   error?: string;
-  status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+  /** Client-safe status. For custom care this stays PENDING until the CareRequest is confirmed. */
+  status?: PaymentStatusValue;
+  /** Raw processor/payment-row state for diagnostics; it is not permission to declare care confirmed. */
+  processorStatus?: PaymentStatusValue;
+  /** True when money was captured but the CareRequest still needs server-side resolution/refund. */
+  resolutionRequired?: boolean;
   kind?: 'booking' | 'plan' | 'care_request';
   careRequestId?: string | null;
   planSlug?: string | null;
@@ -110,7 +117,7 @@ export type PaymentRecord = {
   kind: 'booking' | 'care_request' | 'plan';
   amount: number;
   currency: string;
-  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+  status: PaymentStatusValue;
   description: string;
   reference?: string | null;
   createdAt: string;
