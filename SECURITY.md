@@ -10,7 +10,7 @@ We support the current production mobile release and the current `main` branch. 
 
 **Do not open a public issue for a suspected security vulnerability.**
 
-Use GitHub Private Vulnerability Reporting from this repository's **Security** tab whenever possible. If that channel is unavailable, email `security@carebow.com`.
+If GitHub shows a private **Report a vulnerability** option for this repository, use it. Otherwise email the published CareBow contact address, `info@carebow.com`, with a subject such as `Security vulnerability report` so the report can be routed privately.
 
 Please include only the information needed to reproduce and assess the issue:
 
