@@ -153,7 +153,7 @@ describe('streamOrchestratorReply', () => {
     mockedGetAccessToken.mockReset().mockReturnValue('tok_123');
   });
 
-  it('sends request id, emits deltas and resolves with the final reply', async () => {
+  it('sends request id through the canonical v1 stream, emits deltas and resolves', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
       onEvent({ type: 'delta', text: 'Sore ' });
@@ -183,7 +183,7 @@ describe('streamOrchestratorReply', () => {
       backendSessionId: 'session-1',
     });
     expect(mockedPostSSE).toHaveBeenCalledWith(
-      'https://api.example.com/chat/sessions/session-1/messages',
+      'https://api.example.com/v1/chat/sessions/session-1/messages',
       { content: 'sore throat', stream: true, requestId: REQUEST_ID },
       { 'Content-Type': 'application/json', Authorization: 'Bearer tok_123' },
       expect.any(Function)
@@ -211,7 +211,7 @@ describe('streamOrchestratorReply', () => {
     });
 
     expect(mockedPostSSE).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.stringContaining('/v1/chat/sessions/session-1/messages'),
       expect.objectContaining({ requestId: REQUEST_ID }),
       { 'Content-Type': 'application/json' },
       expect.any(Function)
