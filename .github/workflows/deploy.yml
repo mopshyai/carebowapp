@@ -1,7 +1,8 @@
 name: Release Mobile
 
 # Publish only after the CI workflow has completed successfully on main.
-# Manual workflow_dispatch remains available for an intentional re-release.
+# Manual workflow_dispatch remains available for an intentional re-release of
+# a main commit that has already passed CI.
 #
 # Release secrets may live at repository level today and should move into the
 # `testflight` / `play-internal` GitHub Environments as the team grows. Never put
@@ -15,6 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -40,6 +42,30 @@ jobs:
         with:
           ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 2
+
+      - name: Verify manual release has passed CI
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Manual mobile releases are restricted to the main branch."
+            exit 1
+          fi
+
+          successful_ci_runs="$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&event=push&per_page=100" \
+              --jq '[.workflow_runs[] | select(.name == "CI" and .head_branch == "main" and .conclusion == "success")] | length'
+          )"
+
+          if [ "$successful_ci_runs" -lt 1 ]; then
+            echo "::error::Release SHA ${RELEASE_SHA} has no successful CI push run on main."
+            exit 1
+          fi
 
       - id: changes
         name: Decide whether this commit affects a mobile release
