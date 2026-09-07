@@ -1,54 +1,69 @@
 version: 2
+
 updates:
-  # Root package.json
+  # The root pnpm lockfile owns dependency resolution for the workspace. Keep a
+  # single npm updater here to avoid duplicate root/mobile update PRs.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
     labels:
       - "dependencies"
       - "automated"
     commit-message:
       prefix: "chore(deps)"
     groups:
-      react-native:
+      react-native-safe:
         patterns:
           - "react-native*"
           - "@react-native*"
           - "@react-navigation*"
-      testing:
+        update-types:
+          - "minor"
+          - "patch"
+      testing-safe:
         patterns:
           - "jest*"
           - "@testing-library*"
           - "@types/jest"
-      linting:
+        update-types:
+          - "minor"
+          - "patch"
+      linting-safe:
         patterns:
           - "eslint*"
           - "@typescript-eslint*"
           - "prettier"
+        update-types:
+          - "minor"
+          - "patch"
+      tooling-safe:
+        patterns:
+          - "turbo"
+          - "turbo-*"
+          - "typescript"
+          - "husky"
+          - "lint-staged"
+          - "standard-version"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # Mobile app
-  - package-ecosystem: "npm"
-    directory: "/apps/mobile"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "mobile"
-      - "automated"
-    commit-message:
-      prefix: "chore(deps-mobile)"
-
-  # GitHub Actions
+  # GitHub Actions are pinned to immutable commit SHAs in workflow files.
+  # Dependabot keeps those pins current without reverting to mutable tags.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "09:30"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "ci"

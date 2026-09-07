@@ -1,11 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question
-    url: https://github.com/mopshyai/carebowapp/discussions/new?category=q-a
-    about: Ask questions and get help from the community
-  - name: Feature Discussion
-    url: https://github.com/mopshyai/carebowapp/discussions/new?category=ideas
-    about: Discuss ideas before opening a feature request
-  - name: Security Issue
+  - name: Security vulnerability
     url: https://github.com/mopshyai/carebowapp/security/policy
-    about: Report security vulnerabilities privately
+    about: Report suspected security vulnerabilities privately. Do not open a public issue.
+  - name: Backend / web repository
+    url: https://github.com/mopshyai/carebow-main/issues
+    about: Use carebow-main for backend, web-app, API, database, or server-side issues.

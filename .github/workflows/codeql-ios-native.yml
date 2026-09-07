@@ -1,0 +1,76 @@
+name: CodeQL iOS Native
+
+# iOS native scanning is path-scoped because macOS CodeQL builds are expensive.
+# A weekly scheduled run catches ecosystem/query changes even when native files
+# have not changed recently.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "apps/mobile/ios/**"
+      - ".github/workflows/codeql-ios-native.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "apps/mobile/ios/**"
+      - ".github/workflows/codeql-ios-native.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "43 6 * * 1"
+
+concurrency:
+  group: codeql-ios-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-native:
+    name: CodeQL iOS (C/C++/Swift)
+    runs-on: macos-14
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          languages: cpp,swift
+          build-mode: manual
+          queries: security-extended
+
+      - name: Build iOS native code
+        working-directory: apps/mobile
+        run: >-
+          xcodebuild
+          -workspace ios/CareBow.xcworkspace
+          -scheme CareBow
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
+        with:
+          category: "/platform:ios-native"
