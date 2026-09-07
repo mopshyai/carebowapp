@@ -70,7 +70,7 @@ This is a public repository. Never commit or paste real CareBow user/patient dat
 
 Sensitive examples include health information, symptom histories tied to a person, addresses, phone numbers, email addresses, caregiver notes, location histories, payment data, authentication tokens, private keys, and credentials.
 
-Suspected vulnerabilities must be reported through GitHub Private Vulnerability Reporting or `security@carebow.com`, not through a public issue. See [SECURITY.md](SECURITY.md).
+Suspected vulnerabilities must not be reported through a public issue. Use GitHub's private **Report a vulnerability** option when it is available for this repository; otherwise email the published CareBow contact address, `info@carebow.com`, with a security-vulnerability subject. See [SECURITY.md](SECURITY.md).
 
 ## Clinical / Safety-Sensitive Changes
 
