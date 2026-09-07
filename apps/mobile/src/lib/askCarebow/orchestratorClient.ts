@@ -20,21 +20,10 @@ function sessionCacheKey(localSessionId: string): string {
   return `${SESSION_CACHE_PREFIX}${localSessionId}`;
 }
 
-/**
- * Clears only the process-local acceleration layer. Persisted mappings remain in
- * AsyncStorage and can be rehydrated for the same signed-in account/session.
- * Call this at identity boundaries (logout/account switch) and in test setup so
- * one user's/session's exact server handoff cannot survive in process memory.
- */
 export function clearKnownBackendSessions(): void {
   inMemoryBackendSessions.clear();
 }
 
-/**
- * Synchronous lookup for the active care handoff. Every successful orchestrator
- * turn populates this map before the result is shown, so a subsequent booking CTA
- * can carry the exact server ChatSession without waiting on AsyncStorage.
- */
 export function getKnownBackendSessionId(localSessionId: string): string | null {
   return inMemoryBackendSessions.get(localSessionId) ?? null;
 }
@@ -127,8 +116,11 @@ export async function streamOrchestratorReply(params: {
     }
     let doneEvent: DoneEvent | null = null;
 
+    // SSE bypasses the JSON ApiClient transport but not the architecture
+    // boundary: it still targets the canonical CareBow /api/v1 adapter and uses
+    // the same bearer access token.
     await postSSE(
-      `${ApiClient.getBaseUrl()}/chat/sessions/${backendSessionId}/messages`,
+      `${ApiClient.getBaseUrl()}/v1/chat/sessions/${backendSessionId}/messages`,
       { content: params.text, stream: true, requestId: params.requestId },
       {
         'Content-Type': 'application/json',
