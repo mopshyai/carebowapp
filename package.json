@@ -22,6 +22,7 @@
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "check:api-boundary": "node scripts/check-mobile-api-boundary.mjs",
     "ios": "pnpm --filter @carebow/mobile ios",
     "android": "pnpm --filter @carebow/mobile android",
     "pod-install": "pnpm --filter @carebow/mobile pod-install",
