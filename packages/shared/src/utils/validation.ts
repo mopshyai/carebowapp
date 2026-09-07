@@ -1,7 +1,15 @@
 export const validators = {
   email: (email: string): boolean => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
+    const atIndex = email.indexOf('@');
+    if (atIndex <= 0 || atIndex !== email.lastIndexOf('@')) return false;
+
+    for (const character of email) {
+      if (character.trim() === '') return false;
+    }
+
+    const domain = email.slice(atIndex + 1);
+    const lastDotIndex = domain.lastIndexOf('.');
+    return lastDotIndex > 0 && lastDotIndex < domain.length - 1;
   },
 
   phone: (phone: string): boolean => {
