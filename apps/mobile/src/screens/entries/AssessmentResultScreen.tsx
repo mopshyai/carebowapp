@@ -12,6 +12,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { useSymptomEntryStore } from '@/store/symptomEntryStore';
+import type { AppNavigationProp } from '@/navigation/types';
 import {
   RISK_LEVEL_LABELS,
   RISK_LEVEL_COLORS,
@@ -44,7 +45,7 @@ const SUGGESTION_ICONS: Record<CareSuggestion, string> = {
 
 export default function AssessmentResultScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const route = useRoute<RouteProp<RouteParams, 'AssessmentResult'>>();
   const { entryId } = route.params;
 
@@ -80,12 +81,12 @@ export default function AssessmentResultScreen() {
 
   // Handle done
   const handleDone = useCallback(() => {
-    navigation.navigate('MainTabs' as never, { screen: 'Home' } as never);
+    navigation.navigate('MainTabs', { screen: 'Home' });
   }, [navigation]);
 
   // Handle view history
   const handleViewHistory = useCallback(() => {
-    navigation.navigate('MainTabs' as never, { screen: 'History' } as never);
+    navigation.navigate('Profile', { screen: 'CareHistory' });
   }, [navigation]);
 
   if (!entry) {
