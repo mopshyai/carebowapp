@@ -1,0 +1,53 @@
+name: RN 0.87 lockfile refresh
+
+on:
+  push:
+    branches: [codex/rn087-react19-migration]
+    paths:
+      - "apps/mobile/package.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rn87-lockfile-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh-lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: codex/rn087-react19-migration
+          persist-credentials: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.20.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22.22.0"
+          cache: pnpm
+
+      - name: Regenerate lockfile only
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+
+      - name: Commit refreshed lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "Lockfile already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore: refresh lockfile for RN 0.87 migration"
+          git push origin HEAD:codex/rn087-react19-migration
