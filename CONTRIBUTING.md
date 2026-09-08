@@ -1,188 +1,117 @@
-# Contributing to CareBow
+# Contributing to CareBow Mobile
 
-Thank you for your interest in contributing to CareBow! This document provides guidelines and instructions for contributing.
+This repository contains the CareBow React Native mobile application and shared mobile packages. The production backend, API, database, and web application live in the separate `carebow-main` repository.
 
-## Table of Contents
+## Prerequisites
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Pull Request Process](#pull-request-process)
-- [Coding Standards](#coding-standards)
-- [Commit Guidelines](#commit-guidelines)
+Use the toolchain declared by the repository rather than installing arbitrary newer majors:
 
-## Code of Conduct
+- Node.js 20 or newer compatible release (`package.json` currently requires `>=20`)
+- pnpm 10.20.0 via the root `packageManager` declaration
+- JDK 17 for Android builds
+- Android Studio / Android SDK for Android development
+- Xcode 15+ and CocoaPods for iOS development
 
-By participating in this project, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+Install dependencies from the repository root:
 
-## Getting Started
+```bash
+pnpm install --frozen-lockfile
+```
 
-### Prerequisites
+For local mobile configuration:
 
-- Node.js 18+
-- pnpm 8+
-- Xcode 15+ (for iOS development)
-- Android Studio (for Android development)
-- PostgreSQL 15+ (for backend)
+```bash
+cp apps/mobile/.env.example apps/mobile/.env
+```
 
-### Local Development Setup
-
-1. **Fork and clone the repository**
-
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/carebowapp.git
-   cd carebowapp
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Set up environment variables**
-
-   ```bash
-   cp apps/mobile/.env.example apps/mobile/.env
-   ```
-
-4. **Start development servers**
-   ```bash
-   pnpm dev
-   ```
+Treat every value bundled into the mobile application as publicly extractable. Never put server credentials, private API keys, database credentials, signing material, privileged service tokens, or production user data in a mobile `.env` file.
 
 ## Development Workflow
 
-### Branch Naming
+Create changes on a branch from `main`. Recommended branch prefixes:
 
-Use descriptive branch names following this pattern:
+- `feature/` — user-facing capability
+- `fix/` — bug or regression fix
+- `security/` — security remediation
+- `refactor/` — behavior-preserving refactor
+- `docs/` — documentation only
+- `chore/` — maintenance/dependencies/tooling
 
-- `feature/` - New features (e.g., `feature/add-video-call`)
-- `fix/` - Bug fixes (e.g., `fix/login-crash`)
-- `refactor/` - Code refactoring (e.g., `refactor/auth-flow`)
-- `docs/` - Documentation updates (e.g., `docs/api-endpoints`)
-- `chore/` - Maintenance tasks (e.g., `chore/update-deps`)
+Direct pushes to protected release branches are against CareBow engineering policy. Changes should land through pull requests after required checks pass.
 
-### Running Tests
+## Required Local Checks
 
-```bash
-# Run all tests
-pnpm test
-
-# Run tests with coverage
-pnpm test:coverage
-
-# Run tests in watch mode
-pnpm test:watch
-```
-
-### Linting and Formatting
+Before requesting review, run the checks relevant to your change:
 
 ```bash
-# Check linting
 pnpm lint
-
-# Fix linting issues
-pnpm lint:fix
-
-# Format code
-pnpm format
-
-# Type checking
 pnpm typecheck
+pnpm test -- --passWithNoTests --ci
 ```
 
-## Pull Request Process
+When native or release behavior changes, also run the relevant iOS/Android build and document the device/simulator path you tested.
 
-1. **Create a feature branch** from `main`
-2. **Make your changes** following our coding standards
-3. **Write or update tests** for your changes
-4. **Ensure all tests pass** locally
-5. **Update documentation** if needed
-6. **Submit a pull request** using our PR template
+## Pull Request Requirements
 
-### PR Requirements
+Every pull request should:
 
-- [ ] Tests pass (`pnpm test`)
-- [ ] Linting passes (`pnpm lint`)
-- [ ] Type checking passes (`pnpm typecheck`)
-- [ ] Documentation updated (if applicable)
-- [ ] Changelog updated (for user-facing changes)
+1. explain the user/problem impact and scope;
+2. include or update tests where practical;
+3. pass lint, type checking, tests, dependency/security review, CodeQL, and native build gates;
+4. avoid unrelated dependency or formatting churn;
+5. document rollout/rollback considerations for risky changes;
+6. complete the security/privacy and clinical-safety sections of the PR template.
+
+Do not merge a dependency major merely because Dependabot opened it. React Native, React, Metro, Babel, native tooling, testing frameworks, and release tooling can have coordinated breaking requirements. Major upgrades require a dedicated migration PR with both native builds and tests proving compatibility.
+
+## Security and Privacy Rules
+
+This is a public repository. Never commit or paste real CareBow user/patient data into source control, issues, pull requests, test fixtures, snapshots, screenshots, logs, or workflow artifacts. Use synthetic data only.
+
+Sensitive examples include health information, symptom histories tied to a person, addresses, phone numbers, email addresses, caregiver notes, location histories, payment data, authentication tokens, private keys, and credentials.
+
+Suspected vulnerabilities must not be reported through a public issue. Use GitHub's private **Report a vulnerability** option when it is available for this repository; otherwise email the published CareBow contact address, `info@carebow.com`, with a security-vulnerability subject. See [SECURITY.md](SECURITY.md).
+
+## Clinical / Safety-Sensitive Changes
+
+Engineering review alone is not enough for changes that alter symptom assessment, triage/urgency, emergency escalation, medication guidance, or other safety-sensitive health recommendations. Those changes require explicit product/clinical validation and evidence attached to the PR.
+
+## Dependency Policy
+
+Dependabot runs weekly and GitHub Actions are pinned to immutable commit SHAs. New moderate/high/critical dependency vulnerabilities block CI unless an exact, time-bounded exception is documented.
+
+Prefer upgrades that remove overrides instead of accumulating permanent transitive pins. When an override is added for security, document why it is safe and remove it once upstream dependencies adopt the patched version.
 
 ## Coding Standards
 
-### TypeScript
+### TypeScript / React Native
 
-- Use TypeScript for all new code
-- Enable strict mode
-- Avoid `any` types - use proper typing or `unknown`
-- Export types from dedicated type files
+- use TypeScript for new application logic;
+- keep types precise and avoid unnecessary `any`;
+- use functional components/hooks;
+- use the existing design-system/theme tokens;
+- keep business logic testable outside UI components;
+- use Zustand for local/global app state where already established and React Query for server state where already established.
 
-### React Native
+### Logging
 
-- Use functional components with hooks
-- Follow the existing component structure
-- Use the design system tokens from `src/theme/`
-- Keep components small and focused
+Logs must not contain access tokens, passwords, payment details, or sensitive health/account data. Debug logging involving synthetic data must be removed or appropriately gated before release.
 
-### State Management
+### Native Permissions
 
-- Use Zustand for global state
-- Keep stores focused and modular
-- Use React Query for server state
+Request only permissions that the feature actually needs. Any new Android permission, iOS entitlement, HealthKit/Health Connect capability, location mode, background mode, camera/microphone access, or notification capability must be called out explicitly in the PR.
 
-### File Organization
+## Commits
 
-```
-src/
-├── components/     # Reusable UI components
-├── screens/        # Screen components
-├── hooks/          # Custom React hooks
-├── store/          # Zustand stores
-├── services/       # API and external services
-├── lib/            # Business logic
-├── types/          # TypeScript type definitions
-├── utils/          # Utility functions
-└── theme/          # Design tokens
+Use Conventional Commit-style subjects where practical, for example:
+
+```text
+feat(booking): add reschedule confirmation
+fix(auth): prevent stale session reuse
+security(deps): patch vulnerable parser chain
+ci(release): fail closed on missing mobile config
 ```
 
-## Commit Guidelines
+## Repository Ownership
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-### Types
-
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation only
-- `style` - Code style (formatting, semicolons, etc.)
-- `refactor` - Code refactoring
-- `perf` - Performance improvement
-- `test` - Adding or updating tests
-- `chore` - Maintenance tasks
-- `ci` - CI/CD changes
-
-### Examples
-
-```
-feat(auth): add biometric login support
-fix(booking): resolve date picker timezone issue
-docs(api): update authentication endpoint docs
-refactor(store): migrate to Zustand v5
-```
-
-## Questions?
-
-Feel free to open an issue for any questions or concerns. We're here to help!
-
----
-
-Thank you for contributing to CareBow!
+Until the repository is migrated into a CareBow GitHub organization, `@mopshyai` is the valid CODEOWNER. After migration, replace personal ownership with real CareBow teams and require CODEOWNER review through the repository ruleset.

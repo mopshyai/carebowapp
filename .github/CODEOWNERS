@@ -1,19 +1,29 @@
-# Default owners for everything in the repo
-* @mopshyai/core-team
+# CareBow mobile repository ownership
+#
+# This repository currently lives under the @mopshyai user account, so GitHub
+# organization-team references such as @mopshyai/mobile-team are not valid
+# CODEOWNERS targets. Keep ownership explicit until the repository is moved to
+# a CareBow GitHub organization. After that migration, replace these entries
+# with real organization teams and require CODEOWNER review in the main ruleset.
 
-# Mobile app
-/apps/mobile/ @mopshyai/mobile-team
+# Default owner
+* @mopshyai
 
-# The backend lives in the carebow-main repository, not here.
+# Mobile app and native projects
+/apps/mobile/ @mopshyai
 
 # Shared packages
-/packages/ @mopshyai/core-team
+/packages/ @mopshyai
 
-# CI/CD and infrastructure
-/.github/ @mopshyai/devops-team
-/docker/ @mopshyai/devops-team
-Dockerfile @mopshyai/devops-team
+# CI/CD, dependency policy, and repository governance
+/.github/ @mopshyai
+/docker/ @mopshyai
+Dockerfile @mopshyai
+
+# Security and contributor policy
+/SECURITY.md @mopshyai
+/CONTRIBUTING.md @mopshyai
 
 # Documentation
-*.md @mopshyai/docs-team
-/docs/ @mopshyai/docs-team
+*.md @mopshyai
+/docs/ @mopshyai
