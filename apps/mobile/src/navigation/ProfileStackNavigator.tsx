@@ -18,7 +18,9 @@ import CareHistoryScreen from '../screens/profile/CareHistoryScreen';
 import HealthRecordsScreen from '../screens/profile/HealthRecordsScreen';
 import InsuranceScreen from '../screens/profile/InsuranceScreen';
 import NotificationsScreen from '../screens/profile/NotificationsScreen';
+import PrivacyHubScreen from '../screens/profile/PrivacyHubScreen';
 import PrivacyScreen from '../screens/profile/PrivacyScreen';
+import ProfileSharingScreen from '../screens/profile/ProfileSharingScreen';
 import HelpScreen from '../screens/profile/HelpScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import EmergencyContactsScreen from '../screens/profile/EmergencyContactsScreen';
@@ -47,7 +49,9 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} />
       <Stack.Screen name="Insurance" component={InsuranceScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="Privacy" component={PrivacyScreen} />
+      <Stack.Screen name="Privacy" component={PrivacyHubScreen} />
+      <Stack.Screen name="PrivacyPreferences" component={PrivacyScreen} />
+      <Stack.Screen name="ProfileSharing" component={ProfileSharingScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="EmergencyContacts" component={EmergencyContactsScreen} />
