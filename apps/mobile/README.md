@@ -24,30 +24,35 @@
 ## Features
 
 ### Healthcare Services
+
 - Browse and book professional caregiving services
 - Elderly care, child care, physiotherapy, and more
 - Verified service providers with ratings and reviews
 - Flexible scheduling with date and time selection
 
 ### Ask CareBow (AI Health Assistant)
+
 - Doctor-grade symptom triage and assessment
 - Personalized health guidance and recommendations
 - Voice input support for hands-free interaction
 - Smart service recommendations based on health needs
 
 ### Emergency & Safety
+
 - One-tap SOS emergency alerts
 - Scheduled check-ins with automatic notifications
 - Emergency contact management
 - Real-time location sharing during emergencies
 
 ### Family Management
+
 - Multi-member family profiles
 - Individual health records per member
 - Care history tracking
 - Insurance information management
 
 ### Orders & Requests
+
 - Service booking with package selection
 - Order tracking and history
 - Custom care request submissions
@@ -57,16 +62,16 @@
 
 ## Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| **Framework** | React Native 0.76 (New Architecture) |
-| **Language** | TypeScript 5.3 |
-| **Navigation** | React Navigation 7 |
-| **State Management** | Zustand with AsyncStorage persistence |
-| **UI Components** | Custom components with dark mode support |
-| **Icons** | React Native Vector Icons (Ionicons) |
-| **Animations** | React Native Reanimated |
-| **Gestures** | React Native Gesture Handler |
+| Category             | Technology                               |
+| -------------------- | ---------------------------------------- |
+| **Framework**        | React Native 0.76 (New Architecture)     |
+| **Language**         | TypeScript 5.3                           |
+| **Navigation**       | React Navigation 7                       |
+| **State Management** | Zustand with AsyncStorage persistence    |
+| **UI Components**    | Custom components with dark mode support |
+| **Icons**            | React Native Vector Icons (Ionicons)     |
+| **Animations**       | React Native Reanimated                  |
+| **Gestures**         | React Native Gesture Handler             |
 
 ---
 
@@ -74,7 +79,7 @@
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.22.0 (see `.nvmrc`)
 - Xcode 15+ (for iOS)
 - Android Studio (for Android)
 - CocoaPods (for iOS dependencies)
@@ -82,22 +87,26 @@
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/mopshyai/carebowapp.git
    cd carebowapp/carebow
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Install iOS pods**
+
    ```bash
    cd ios && pod install && cd ..
    ```
 
 4. **Run the app**
+
    ```bash
    # iOS
    npm run ios
@@ -141,16 +150,16 @@ carebow/
 
 ## Key Screens
 
-| Screen | Description |
-|--------|-------------|
-| **Home** | Dashboard with quick actions and service categories |
-| **Ask CareBow** | AI-powered health assistant with chat interface |
-| **Messages** | Conversation threads with care providers |
-| **Services** | Browse healthcare services catalog |
-| **Profile** | User settings and family management |
-| **Safety Hub** | Emergency SOS and check-in features |
-| **Orders** | Order history and tracking |
-| **Requests** | Custom care request management |
+| Screen          | Description                                         |
+| --------------- | --------------------------------------------------- |
+| **Home**        | Dashboard with quick actions and service categories |
+| **Ask CareBow** | AI-powered health assistant with chat interface     |
+| **Messages**    | Conversation threads with care providers            |
+| **Services**    | Browse healthcare services catalog                  |
+| **Profile**     | User settings and family management                 |
+| **Safety Hub**  | Emergency SOS and check-in features                 |
+| **Orders**      | Order history and tracking                          |
+| **Requests**    | Custom care request management                      |
 
 ---
 
