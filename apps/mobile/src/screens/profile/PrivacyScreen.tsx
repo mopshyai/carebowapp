@@ -15,6 +15,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -22,8 +23,15 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { preferencesApi } from '../../services/api/endpoints/preferences';
-import { authApi } from '../../services/api/endpoints/auth';
+import { authApi, extractUser } from '../../services/api/endpoints/auth';
 import { useAuthStore } from '../../store/useAuthStore';
+
+type DeleteMode = 'password' | 'email_code';
+
+type CurrentUserForPrivacy = {
+  email?: string | null;
+  authMethods?: Array<{ method?: string }>;
+};
 
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
@@ -34,27 +42,55 @@ export default function PrivacyScreen() {
   const logout = useAuthStore((state) => state.logout);
 
   const [deleteModalVisible, setDeleteModalVisible] = React.useState(false);
+  const [deleteMode, setDeleteMode] = React.useState<DeleteMode>('password');
   const [deletePassword, setDeletePassword] = React.useState('');
+  const [deleteCode, setDeleteCode] = React.useState('');
+  const [deleteEmail, setDeleteEmail] = React.useState('');
   const [deleting, setDeleting] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
+
+  const resetDeleteModal = () => {
+    setDeleteModalVisible(false);
+    setDeletePassword('');
+    setDeleteCode('');
+    setDeleteEmail('');
+    setDeleteMode('password');
+  };
+
+  const finishDeletedSession = async () => {
+    resetDeleteModal();
+    // The endpoint removes the account and authApi clears tokens after success.
+    // logout() still resets local Zustand state even though its network call can
+    // no longer authenticate, and it deliberately tolerates that condition.
+    await logout();
+  };
 
   const confirmDeleteAccount = async () => {
-    if (!deletePassword) {
-      return;
-    }
+    const confirmation =
+      deleteMode === 'password'
+        ? { password: deletePassword }
+        : { confirmationCode: deleteCode };
+    const hasConfirmation =
+      deleteMode === 'password' ? Boolean(deletePassword) : /^\d{6}$/.test(deleteCode);
+    if (!hasConfirmation) return;
+
     setDeleting(true);
     try {
-      await authApi.deleteAccount(deletePassword);
-      setDeleteModalVisible(false);
-      setDeletePassword('');
-      // Account is gone server-side and tokens are cleared; reset local auth
-      // state so the app returns to the sign-in flow.
-      await logout();
+      const result = await authApi.deleteAccount(confirmation);
+      if (result.success) {
+        await finishDeletedSession();
+        return;
+      }
+      Alert.alert(
+        'Could not delete account',
+        result.message || 'CareBow did not confirm account deletion. No account change was made.'
+      );
     } catch (e) {
       Alert.alert(
         'Could not delete account',
         e instanceof Error && e.message
           ? e.message
-          : 'Your password may be incorrect, or the server is unreachable. Your account was not changed.'
+          : 'The confirmation was not accepted, or the server is unreachable. Your account was not changed.'
       );
     } finally {
       setDeleting(false);
@@ -89,25 +125,84 @@ export default function PrivacyScreen() {
     }
   };
 
-  const handleDataExport = () => {
-    Alert.alert(
-      'Data export unavailable',
-      'The production data-export endpoint is not connected to this mobile build. No request was submitted.'
-    );
+  const handleDataExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await authApi.createDataExportLink();
+      if (!result.success || !result.downloadUrl) {
+        throw new Error('CareBow could not create a data export link.');
+      }
+      await Linking.openURL(result.downloadUrl);
+    } catch (e) {
+      Alert.alert(
+        'Could not export data',
+        e instanceof Error && e.message
+          ? e.message
+          : 'CareBow could not prepare your export. No data was changed.'
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const beginDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const current = await authApi.getCurrentUser();
+      const user = extractUser(current) as CurrentUserForPrivacy | null;
+      const hasPassword = Boolean(
+        user?.authMethods?.some((method) => method?.method === 'EMAIL_PASSWORD')
+      );
+
+      setDeletePassword('');
+      setDeleteCode('');
+      setDeleteEmail('');
+
+      if (hasPassword) {
+        setDeleteMode('password');
+        setDeleteModalVisible(true);
+        return;
+      }
+
+      const confirmation = await authApi.deleteAccount();
+      if (!confirmation.confirmationRequired) {
+        if (confirmation.success) {
+          await finishDeletedSession();
+          return;
+        }
+        throw new Error(
+          confirmation.message || 'CareBow could not start account-deletion confirmation.'
+        );
+      }
+
+      setDeleteMode('email_code');
+      setDeleteEmail(confirmation.email || 'your verified email');
+      setDeleteModalVisible(true);
+    } catch (e) {
+      Alert.alert(
+        'Could not start account deletion',
+        e instanceof Error && e.message
+          ? e.message
+          : 'CareBow could not verify your account-deletion method. Your account was not changed.'
+      );
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This permanently deletes your CareBow account and all associated data. This cannot be undone.',
+      'This permanently deletes your CareBow account and associated CareBow records. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
           style: 'destructive',
           onPress: () => {
-            setDeletePassword('');
-            setDeleteModalVisible(true);
+            void beginDeleteAccount();
           },
         },
       ]
@@ -147,6 +242,10 @@ export default function PrivacyScreen() {
       value: settings.allowAnalytics,
     },
   ];
+
+  const deleteInputValue = deleteMode === 'password' ? deletePassword : deleteCode;
+  const deleteInputReady =
+    deleteMode === 'password' ? Boolean(deletePassword) : /^\d{6}$/.test(deleteCode);
 
   return (
     <View style={styles.container}>
@@ -229,27 +328,41 @@ export default function PrivacyScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Data</Text>
           <View style={styles.sectionCard}>
-            <TouchableOpacity style={styles.actionItem} onPress={handleDataExport}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => void handleDataExport()}
+              disabled={exporting}
+            >
               <View style={styles.settingIcon}>
-                <Icon name="download-outline" size={20} color={colors.accent} />
+                {exporting ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Icon name="download-outline" size={20} color={colors.accent} />
+                )}
               </View>
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>Export My Data</Text>
-                <Text style={styles.settingDescription}>Download a copy of your data</Text>
+                <Text style={styles.settingDescription}>
+                  Download a JSON copy of your core CareBow account and care data
+                </Text>
               </View>
               <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
 
             <View style={styles.settingItemBorder} />
 
-            <TouchableOpacity style={styles.actionItem} onPress={handleDeleteAccount}>
+            <TouchableOpacity style={styles.actionItem} onPress={handleDeleteAccount} disabled={deleting}>
               <View style={[styles.settingIcon, { backgroundColor: colors.errorSoft }]}>
-                <Icon name="trash-outline" size={20} color={colors.error} />
+                {deleting ? (
+                  <ActivityIndicator size="small" color={colors.error} />
+                ) : (
+                  <Icon name="trash-outline" size={20} color={colors.error} />
+                )}
               </View>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: colors.error }]}>Delete Account</Text>
                 <Text style={styles.settingDescription}>
-                  Permanently delete your account and data
+                  Permanently delete your account and associated CareBow records
                 </Text>
               </View>
               <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
@@ -275,33 +388,39 @@ export default function PrivacyScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Delete-account password confirmation */}
+      {/* Delete-account confirmation */}
       <Modal
         visible={deleteModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => !deleting && setDeleteModalVisible(false)}
+        onRequestClose={() => !deleting && resetDeleteModal()}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Confirm deletion</Text>
             <Text style={styles.modalBody}>
-              Enter your password to permanently delete your account.
+              {deleteMode === 'password'
+                ? 'Enter your password to permanently delete your account.'
+                : `Enter the 6-digit deletion code sent to ${deleteEmail}.`}
             </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Password"
+              placeholder={deleteMode === 'password' ? 'Password' : '6-digit code'}
               placeholderTextColor={colors.textTertiary}
-              secureTextEntry
+              secureTextEntry={deleteMode === 'password'}
+              keyboardType={deleteMode === 'email_code' ? 'number-pad' : 'default'}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={deleteMode === 'email_code' ? 6 : undefined}
               autoFocus
-              value={deletePassword}
-              onChangeText={setDeletePassword}
+              value={deleteInputValue}
+              onChangeText={deleteMode === 'password' ? setDeletePassword : setDeleteCode}
               editable={!deleting}
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancel]}
-                onPress={() => setDeleteModalVisible(false)}
+                onPress={resetDeleteModal}
                 disabled={deleting}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
@@ -310,10 +429,10 @@ export default function PrivacyScreen() {
                 style={[
                   styles.modalButton,
                   styles.modalDelete,
-                  (!deletePassword || deleting) && styles.modalButtonDisabled,
+                  (!deleteInputReady || deleting) && styles.modalButtonDisabled,
                 ]}
-                onPress={confirmDeleteAccount}
-                disabled={!deletePassword || deleting}
+                onPress={() => void confirmDeleteAccount()}
+                disabled={!deleteInputReady || deleting}
               >
                 {deleting ? (
                   <ActivityIndicator size="small" color={colors.surface} />
