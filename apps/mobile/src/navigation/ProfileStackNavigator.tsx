@@ -19,7 +19,7 @@ import HealthRecordsScreen from '../screens/profile/HealthRecordsScreen';
 import InsuranceScreen from '../screens/profile/InsuranceScreen';
 import NotificationsScreen from '../screens/profile/NotificationsScreen';
 import PrivacyHubScreen from '../screens/profile/PrivacyHubScreen';
-import PrivacyScreen from '../screens/profile/PrivacyScreen';
+import PrivacyControlsScreen from '../screens/profile/PrivacyControlsScreen';
 import ProfileSharingScreen from '../screens/profile/ProfileSharingScreen';
 import HelpScreen from '../screens/profile/HelpScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
@@ -50,7 +50,7 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="Insurance" component={InsuranceScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Privacy" component={PrivacyHubScreen} />
-      <Stack.Screen name="PrivacyPreferences" component={PrivacyScreen} />
+      <Stack.Screen name="PrivacyPreferences" component={PrivacyControlsScreen} />
       <Stack.Screen name="ProfileSharing" component={ProfileSharingScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
