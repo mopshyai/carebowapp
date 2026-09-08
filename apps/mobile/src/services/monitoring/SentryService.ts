@@ -1,12 +1,28 @@
 /**
  * Sentry Service
  * Crash reporting and performance monitoring
+ *
+ * Setup:
+ * 1. Create a Sentry project at https://sentry.io
+ * 2. Get your DSN from Project Settings > Client Keys
+ * 3. Add to .env: SENTRY_DSN=your_dsn_here
+ *
+ * Features:
+ * - Automatic crash reporting
+ * - Performance monitoring
+ * - Pseudonymous user context tracking
+ * - Custom error logging
+ * - Breadcrumb trail
  */
 
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
 import { SENTRY_DSN as ENV_SENTRY_DSN } from '@env';
 import { redactSentryBreadcrumb, redactSentryFreeText } from './sentryPrivacy';
+
+// ============================================
+// TYPES
+// ============================================
 
 export interface UserContext {
   id: string;
@@ -22,24 +38,46 @@ export interface ErrorContext {
 
 export type SeverityLevel = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
+// ============================================
+// CONFIGURATION
+// ============================================
+
 // From '@env' (react-native-dotenv), not process.env — the latter is never
-// populated in React Native.
+// populated in React Native, so this previously resolved to '' in every build
+// and crash reporting was silently disabled.
 const SENTRY_DSN = ENV_SENTRY_DSN || '';
+
+// Enable in production whenever a DSN is actually configured. Enabling without
+// a DSN just makes Sentry.init a no-op that looks like it worked.
 const SENTRY_ENABLED = Boolean(SENTRY_DSN) && !__DEV__;
+
+// App version for release tracking
 const APP_VERSION = '1.0.0';
 const APP_BUILD = '1';
+
+// ============================================
+// SENTRY SERVICE CLASS
+// ============================================
 
 class SentryServiceClass {
   private isInitialized = false;
 
+  /**
+   * Initialize Sentry SDK
+   * Call this early in app startup (before App component)
+   */
   initialize(): void {
     if (this.isInitialized) {
-      if (__DEV__) console.log('[Sentry] Already initialized');
+      if (__DEV__) {
+        console.log('[Sentry] Already initialized');
+      }
       return;
     }
 
     if (!SENTRY_ENABLED) {
-      if (__DEV__) console.log('[Sentry] Disabled in development mode');
+      if (__DEV__) {
+        console.log('[Sentry] Disabled in development mode');
+      }
       return;
     }
 
@@ -54,16 +92,25 @@ class SentryServiceClass {
         release: `com.carebow.app@${APP_VERSION}+${APP_BUILD}`,
         dist: APP_BUILD,
         environment: __DEV__ ? 'development' : 'production',
+
+        // CareBow handles health information. Never ask the SDK to enrich
+        // events with default personally-identifying data.
         sendDefaultPii: false,
-        tracesSampleRate: __DEV__ ? 1.0 : 0.2,
-        profilesSampleRate: __DEV__ ? 1.0 : 0.1,
+
+        // Performance monitoring
+        tracesSampleRate: __DEV__ ? 1.0 : 0.2, // 20% in production
+        profilesSampleRate: __DEV__ ? 1.0 : 0.1, // 10% in production
+
+        // Enable native crash reporting
         enableNativeCrashHandling: true,
         enableAutoSessionTracking: true,
+
+        // Breadcrumb settings
         maxBreadcrumbs: 100,
 
-        // Health-app privacy boundary. Preserve stack frames, exception types,
-        // levels and operational tags, but strip identity, request payloads,
-        // arbitrary extras and arbitrary free text before export.
+        // Health-app privacy boundary. Error names/stacks and operational tags
+        // are useful; direct identity, request payloads and arbitrary extras are
+        // not worth the risk of copying PHI/PII into a monitoring vendor.
         beforeSend: (event) => {
           if (event.user) {
             event.user = event.user.id ? { id: event.user.id } : undefined;
@@ -91,36 +138,74 @@ class SentryServiceClass {
             }
           }
 
+          // captureError() accepts convenience context for local debugging, but
+          // arbitrary extras can contain symptoms, names, phone numbers, or
+          // booking notes. Do not export them from the device.
           delete event.extra;
+
+          // Automatic breadcrumbs are useful for chronology, but their data
+          // objects may include URLs, request parameters, or input values.
+          if (event.breadcrumbs) {
+            event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
+              ...breadcrumb,
+              data: undefined,
+            }));
+          }
+
+          // Message fields are also arbitrary free text. They can contain
+          // symptoms, names, addresses, or booking notes even when PII defaults
+          // and structured extras are disabled. Keep stack/type metadata while
+          // replacing free text with fixed operational placeholders.
           return redactSentryFreeText(event);
         },
 
+        // Strip breadcrumb payloads and arbitrary message text before they are
+        // attached to any event. Category/level/timestamp remain useful.
         beforeBreadcrumb: (breadcrumb) => redactSentryBreadcrumb(breadcrumb),
+
+        // Add default tags
         integrations: [Sentry.reactNativeTracingIntegration()],
       });
 
+      // Set default tags
       Sentry.setTag('platform', Platform.OS);
       Sentry.setTag('platformVersion', String(Platform.Version));
+
       this.isInitialized = true;
 
-      if (__DEV__) console.log('[Sentry] Initialized successfully');
+      if (__DEV__) {
+        console.log('[Sentry] Initialized successfully');
+      }
     } catch (error) {
       console.error('[Sentry] Initialization failed:', error);
     }
   }
 
+  /**
+   * Set pseudonymous user context for error tracking.
+   * Direct identifiers (email/username) deliberately stay on-device.
+   */
   setUser(user: UserContext | null): void {
     if (!this.isInitialized) return;
 
     if (user) {
       Sentry.setUser({ id: user.id });
-      if (__DEV__) console.log('[Sentry] User set:', user.id);
+
+      if (__DEV__) {
+        console.log('[Sentry] User set:', user.id);
+      }
     } else {
       Sentry.setUser(null);
-      if (__DEV__) console.log('[Sentry] User cleared');
+
+      if (__DEV__) {
+        console.log('[Sentry] User cleared');
+      }
     }
   }
 
+  /**
+   * Log an error to Sentry
+   */
   captureError(
     error: Error,
     context?: ErrorContext,
@@ -132,12 +217,23 @@ class SentryServiceClass {
     }
 
     return Sentry.withScope((scope) => {
+      // Set severity level
       scope.setLevel(severity);
-      if (context) scope.setExtras(context);
+
+      // Context remains useful locally/in scope, but beforeSend strips arbitrary
+      // extras before the event leaves the device.
+      if (context) {
+        scope.setExtras(context);
+      }
+
+      // Capture the error
       return Sentry.captureException(error);
     });
   }
 
+  /**
+   * Log a message to Sentry
+   */
   captureMessage(
     message: string,
     severity: SeverityLevel = 'info',
@@ -150,11 +246,19 @@ class SentryServiceClass {
 
     return Sentry.withScope((scope) => {
       scope.setLevel(severity);
-      if (context) scope.setExtras(context);
+
+      if (context) {
+        scope.setExtras(context);
+      }
+
       return Sentry.captureMessage(message);
     });
   }
 
+  /**
+   * Add a breadcrumb for debugging. Data is accepted for local call-site
+   * compatibility but removed by beforeBreadcrumb before export.
+   */
   addBreadcrumb(
     message: string,
     category: string = 'app',
@@ -172,43 +276,74 @@ class SentryServiceClass {
     });
   }
 
+  /**
+   * Start a performance transaction
+   */
   startTransaction(name: string, operation: string): Sentry.Span | undefined {
     if (!this.isInitialized) return undefined;
-    return Sentry.startInactiveSpan({ name, op: operation });
+
+    return Sentry.startInactiveSpan({
+      name,
+      op: operation,
+    });
   }
 
+  /**
+   * Set a custom tag
+   */
   setTag(key: string, value: string): void {
     if (!this.isInitialized) return;
     Sentry.setTag(key, value);
   }
 
+  /**
+   * Set custom extra data
+   */
   setExtra(key: string, value: unknown): void {
     if (!this.isInitialized) return;
     Sentry.setExtra(key, value);
   }
 
+  /**
+   * Clear all context (for logout)
+   */
   clearContext(): void {
     if (!this.isInitialized) return;
+
     Sentry.setUser(null);
     Sentry.setTags({});
-    if (__DEV__) console.log('[Sentry] Context cleared');
+
+    if (__DEV__) {
+      console.log('[Sentry] Context cleared');
+    }
   }
 
+  /**
+   * Wrap a component with Sentry error boundary
+   */
   wrap<P extends object>(
     Component: React.ComponentType<P>,
     _fallback?: React.ReactNode
   ): React.ComponentType<P> {
+    // Sentry.wrap is typed for ComponentType<Record<string, unknown>>; bridge the generic.
     return Sentry.wrap(
       Component as React.ComponentType<Record<string, unknown>>
     ) as React.ComponentType<P>;
   }
 
+  /**
+   * Create navigation integration for screen tracking
+   */
   getNavigationIntegration(): ReturnType<typeof Sentry.reactNavigationIntegration> {
     return Sentry.reactNavigationIntegration();
   }
 
+  /**
+   * Force flush pending events (useful before app close)
+   */
   async flush(timeout: number = 2000): Promise<boolean> {
     if (!this.isInitialized) return false;
+
     try {
       await (Sentry.flush as (timeout?: number) => Promise<boolean>)(timeout);
       return true;
@@ -217,17 +352,32 @@ class SentryServiceClass {
     }
   }
 
+  /**
+   * Check if Sentry is initialized
+   */
   isEnabled(): boolean {
     return this.isInitialized;
   }
 }
 
+// ============================================
+// SINGLETON EXPORT
+// ============================================
+
 export const SentryService = new SentryServiceClass();
+
+// ============================================
+// CONVENIENCE EXPORTS
+// ============================================
+
 export const initializeSentry = () => SentryService.initialize();
 export const captureError = SentryService.captureError.bind(SentryService);
 export const captureMessage = SentryService.captureMessage.bind(SentryService);
 export const addBreadcrumb = SentryService.addBreadcrumb.bind(SentryService);
 export const setSentryUser = SentryService.setUser.bind(SentryService);
 export const clearSentryContext = SentryService.clearContext.bind(SentryService);
+
+// Re-export Sentry for direct access if needed
 export { Sentry };
+
 export default SentryService;
