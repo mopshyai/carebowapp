@@ -14,8 +14,7 @@ import {
   TextInputProps,
   ViewStyle,
   AccessibilityInfo,
-  NativeSyntheticEvent,
-  TextInputFocusEventData,
+  TextInputFocusEvent,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography } from '../../theme';
@@ -58,7 +57,7 @@ export function FormInput({
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const errorAnimation = useRef(new Animated.Value(0)).current;
-  const inputRef = useRef<React.ElementRef<typeof TextInput>>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     Animated.timing(errorAnimation, {
@@ -74,12 +73,12 @@ export function FormInput({
     }
   }, [error]);
 
-  const handleFocus = (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+  const handleFocus = (event: TextInputFocusEvent) => {
     setIsFocused(true);
     onFocus?.(event);
   };
 
-  const handleBlur = (event: NativeSyntheticEvent<TextInputFocusEventData>) => {
+  const handleBlur = (event: TextInputFocusEvent) => {
     setIsFocused(false);
     onBlur?.(event);
   };
