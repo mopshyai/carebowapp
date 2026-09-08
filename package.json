@@ -26,7 +26,7 @@
     "ios": "pnpm --filter @carebow/mobile ios",
     "android": "pnpm --filter @carebow/mobile android",
     "pod-install": "pnpm --filter @carebow/mobile pod-install",
-    "prepare": "husky install",
+    "prepare": "node scripts/patch-react-native-splash-screen.mjs && husky install",
     "precommit": "lint-staged",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
