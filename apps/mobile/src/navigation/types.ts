@@ -96,6 +96,8 @@ export type ProfileStackParamList = {
   Insurance: undefined;
   Notifications: undefined;
   Privacy: undefined;
+  PrivacyPreferences: undefined;
+  ProfileSharing: undefined;
   Help: undefined;
   Settings: undefined;
   EmergencyContacts: undefined;

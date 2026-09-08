@@ -22,6 +22,21 @@ import {
   VerifyEmailResponse,
 } from '../types';
 
+type DeleteAccountResponse = {
+  success?: boolean;
+  message?: string;
+  confirmationRequired?: boolean;
+  confirmationMethod?: 'email_otp';
+  email?: string;
+  expiresAt?: string;
+};
+
+type DataExportLinkResponse = {
+  success: boolean;
+  downloadUrl: string;
+  expiresAt: string;
+};
+
 /**
  * Pull tokens out of whichever envelope field the backend used.
  * Returns null when the response carries no tokens (e.g. signup that
@@ -183,11 +198,26 @@ export const authApi = {
     }
   },
 
-  deleteAccount: async (password: string): Promise<{ message: string }> => {
-    const response = await ApiClient.post<{ message: string }>('/v1/auth/delete-account', {
-      password,
-    });
-    await ApiClient.clearTokens();
+  /**
+   * Delete an account. Password accounts submit a password. OAuth-only accounts
+   * first call with an empty payload to request an email code, then submit that
+   * code through confirmationCode.
+   */
+  deleteAccount: async (confirmation?: {
+    password?: string;
+    confirmationCode?: string;
+  }): Promise<DeleteAccountResponse> => {
+    const response = await ApiClient.post<DeleteAccountResponse>(
+      '/v1/auth/delete-account',
+      confirmation ?? {}
+    );
+    if (response.data.success) await ApiClient.clearTokens();
+    return response.data;
+  },
+
+  /** Create a five-minute browser download link for the self-service data export. */
+  createDataExportLink: async (): Promise<DataExportLinkResponse> => {
+    const response = await ApiClient.post<DataExportLinkResponse>('/v1/privacy/export-link', {});
     return response.data;
   },
 };
