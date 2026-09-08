@@ -25,11 +25,14 @@ concurrency:
 
 jobs:
   ios-native:
-    name: CodeQL iOS (C/C++/Swift)
+    name: CodeQL iOS native (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
     runs-on: macos-14
-    # Instrumented Release compilation was still progressing when run 34162940046
-    # hit the 90-minute limit. Allow cold CocoaPods extraction plus analysis to
-    # finish without changing the proven CI build command or scan coverage.
+    # Run 34178452452 exhausted 180 minutes compiling both architectures.
+    # Scan each on its own runner; retain both architectures and all targets.
     timeout-minutes: 180
     permissions:
       actions: read
@@ -64,10 +67,9 @@ jobs:
 
       - name: Build iOS native code
         working-directory: apps/mobile
-        # Keep this build command aligned with the CI iOS build. CodeQL wraps the
-        # compiler invocation, so a known-green simulator build is safer than
-        # forcing custom architecture/signing flags that can break CocoaPods or
-        # React Native native targets on GitHub-hosted macOS runners.
+        # Preserve the CI Release build, but partition architecture work across
+        # runners. React-Fabric and ReactCodegen alone spent ~47 minutes issuing
+        # compile steps for both architectures in the timed-out main run.
         run: >-
           xcodebuild
           -workspace ios/CareBow.xcworkspace
@@ -75,9 +77,24 @@ jobs:
           -configuration Release
           -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
+          ARCHS=${{ matrix.arch }}
+          -showBuildTimingSummary
           build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
-          category: "/platform:ios-native"
+          category: "/platform:ios-native/arch:${{ matrix.arch }}"
+
+  ios-native-gate:
+    name: CodeQL iOS (C/C++/Swift)
+    if: ${{ always() }}
+    needs: ios-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require both architecture analyses
+        env:
+          NATIVE_RESULT: ${{ needs.ios-native.result }}
+        run: test "$NATIVE_RESULT" = success
