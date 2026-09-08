@@ -1,6 +1,6 @@
 /**
  * Help & Support Screen
- * FAQ and contact options
+ * Evidence-bounded FAQs and support status
  */
 
 import React, { useState, useRef } from 'react';
@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Pressable,
-  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -23,67 +22,43 @@ const FAQ_ITEMS = [
     id: '1',
     question: 'How do I book a service?',
     answer:
-      'Browse our services from the Home tab, select a service, choose your preferred time and date, and complete the checkout. You can pay online or upon service delivery.',
+      'Browse services from the Home tab, select a service, choose the available date and time options, and follow the checkout flow. The checkout shows the options currently available for that order.',
   },
   {
     id: '2',
     question: 'How does Ask CareBow work?',
     answer:
-      'Ask CareBow is your AI health assistant. Describe your symptoms and it will help assess the situation and recommend appropriate care options. Note: It provides guidance only and is not a substitute for professional medical advice.',
+      'Ask CareBow provides health guidance and care-routing support from the information you share. It is not a diagnosis, a replacement for a clinician, or an emergency service.',
   },
   {
     id: '3',
     question: 'Can I cancel or reschedule a booking?',
     answer:
-      'Yes, you can cancel or reschedule from your Orders page up to 24 hours before the scheduled time for a full refund. Changes within 24 hours may be subject to a fee.',
+      'Available cancellation and rescheduling actions depend on the service and current booking status. Use Orders to see the actions CareBow currently supports. Refund eligibility is shown only when it is confirmed by the applicable booking and payment flow.',
   },
   {
     id: '4',
     question: 'How do I add family members?',
     answer:
-      'Go to Profile > Family Members and tap the + button to add a new member. You can add their health information to help us provide better care recommendations.',
+      'Go to Profile > Family Members and tap the + button to add a member. You can add health information that is relevant to managing their care.',
   },
   {
     id: '5',
-    question: 'Is my health information secure?',
+    question: 'How is my health information protected?',
     answer:
-      'Yes, we use industry-standard encryption and follow HIPAA guidelines to protect your health information. You can review our privacy practices in Profile > Privacy & Security.',
+      'CareBow uses security and privacy controls to protect account and health information. Review Profile > Privacy & Security for the controls available in this build. Regulatory or compliance claims are made only when they have been formally verified.',
   },
   {
     id: '6',
     question: 'What payment methods do you accept?',
     answer:
-      'We accept all major credit cards, debit cards, and Apple Pay. Some services also allow cash payment upon delivery.',
+      'The secure checkout shows the payment methods currently available for the order, region, and payment processor. CareBow does not promise a payment method that is not shown in checkout.',
   },
   {
     id: '7',
     question: 'How do I contact a care provider?',
     answer:
-      'Once your service is confirmed, you can message your assigned care provider through the Messages tab. Contact details are also available in your order details.',
-  },
-];
-
-const CONTACT_OPTIONS = [
-  {
-    id: 'chat',
-    icon: 'chatbubble-ellipses',
-    title: 'Live Chat',
-    subtitle: 'Chat with our support team',
-    action: 'chat',
-  },
-  {
-    id: 'email',
-    icon: 'mail',
-    title: 'Email Support',
-    subtitle: 'support@carebow.com',
-    action: 'mailto:support@carebow.com',
-  },
-  {
-    id: 'phone',
-    icon: 'call',
-    title: 'Phone Support',
-    subtitle: '1-800-CAREBOW (Available 24/7)',
-    action: 'tel:1-800-227-3269',
+      'When a provider is assigned, use the order or request details for the contact actions CareBow currently exposes. The Messages tab shows only real conversations and does not create a provider chat by itself.',
   },
 ];
 
@@ -96,14 +71,6 @@ export default function HelpScreen() {
 
   const toggleFaq = (id: string) => {
     setExpandedFaq(expandedFaq === id ? null : id);
-  };
-
-  const handleContact = async (action: string) => {
-    if (action === 'chat') {
-      // Would open chat interface
-      return;
-    }
-    await Linking.openURL(action);
   };
 
   return (
@@ -122,23 +89,21 @@ export default function HelpScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
       >
-        {/* Contact Options */}
+        {/* Support status */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Us</Text>
-          <View style={styles.contactGrid}>
-            {CONTACT_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.contactCard}
-                onPress={() => handleContact(option.action)}
-              >
-                <View style={styles.contactIcon}>
-                  <Icon name={option.icon as any} size={24} color={colors.accent} />
-                </View>
-                <Text style={styles.contactTitle}>{option.title}</Text>
-                <Text style={styles.contactSubtitle}>{option.subtitle}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionTitle}>Support</Text>
+          <View style={styles.supportCard}>
+            <View style={styles.supportIcon}>
+              <Icon name="information-circle-outline" size={24} color={colors.accent} />
+            </View>
+            <View style={styles.supportContent}>
+              <Text style={styles.supportTitle}>Verified support channels are being configured</Text>
+              <Text style={styles.supportText}>
+                This build does not claim live chat, 24/7 phone support, or a guaranteed support
+                mailbox until those channels are activated and tested. For urgent medical needs,
+                use the appropriate local emergency service.
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -184,7 +149,7 @@ export default function HelpScreen() {
               </View>
               <View style={styles.resourceInfo}>
                 <Text style={styles.resourceTitle}>User Guide</Text>
-                <Text style={styles.resourceSubtitle}>Learn how to use CareBow</Text>
+                <Text style={styles.resourceSubtitle}>Review the frequently asked questions</Text>
               </View>
               <Icon name="chevron-forward" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
@@ -242,36 +207,33 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.xxs,
   },
-  contactGrid: {
+  supportCard: {
     flexDirection: 'row',
     gap: spacing.sm,
-  },
-  contactCard: {
-    flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
-    alignItems: 'center',
     ...shadows.card,
   },
-  contactIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  supportIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.accentMuted,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    justifyContent: 'center',
   },
-  contactTitle: {
+  supportContent: {
+    flex: 1,
+  },
+  supportTitle: {
     ...typography.label,
-    textAlign: 'center',
-    marginBottom: 2,
+    color: colors.textPrimary,
+    marginBottom: spacing.xxs,
   },
-  contactSubtitle: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    textAlign: 'center',
+  supportText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   faqList: {
     backgroundColor: colors.surface,
