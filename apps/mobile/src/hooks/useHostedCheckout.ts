@@ -31,10 +31,6 @@ type PendingCheckout = {
 };
 
 export function useHostedCheckout(): UseHostedCheckout {
-  /**
-   * The pending operation lives in a ref because AppState callbacks and rapid
-   * taps must see the current value synchronously; React state rerenders later.
-   */
   const pending = useRef<PendingCheckout | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -70,12 +66,11 @@ export function useHostedCheckout(): UseHostedCheckout {
         // A network blip is not a payment outcome. Keep polling.
       }
 
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), POLL_INTERVAL_MS);
+      });
     }
 
-    // Never call a slow webhook or unresolved captured custom-care payment a
-    // failed payment. The customer must be told to check status before trying
-    // to pay again; another attempt could otherwise create a duplicate charge.
     if (pending.current?.orderId === orderId) {
       finish({ status: 'unconfirmed' });
     }
@@ -90,8 +85,6 @@ export function useHostedCheckout(): UseHostedCheckout {
 
   useEffect(
     () => () => {
-      // The old implementation nulled the resolver here, leaving start()'s
-      // promise permanently pending. Resolve conservatively instead.
       const current = pending.current;
       pending.current = null;
       current?.resolve({ status: 'unconfirmed' });
@@ -103,13 +96,7 @@ export function useHostedCheckout(): UseHostedCheckout {
     ({ orderId, paymentUrl }: { orderId: string; paymentUrl: string }): Promise<CheckoutOutcome> => {
       const current = pending.current;
       if (current) {
-        // Two rapid taps for the same server order share one browser launch and
-        // one outcome. This is synchronous; it does not wait for a rerender.
         if (current.orderId === orderId) return current.promise;
-
-        // A different checkout cannot replace one already in flight. Financially
-        // the safest answer is "unconfirmed", which tells the caller not to make
-        // another payment until the existing one is checked.
         return Promise.resolve({ status: 'unconfirmed' });
       }
 
