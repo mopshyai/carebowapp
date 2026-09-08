@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ElementRef } from 'react';
 import {
   View,
   Text,
@@ -41,7 +41,7 @@ export default function ThreadScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { id } = (route.params as { id: string }) || {};
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ElementRef<typeof ScrollView>>(null);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState(conversationsData[id || '1']?.messages || []);
 
