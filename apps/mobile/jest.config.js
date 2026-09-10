@@ -4,10 +4,10 @@
  */
 
 module.exports = {
-  preset: 'react-native',
+  preset: '@react-native/jest-preset',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|react-native-vector-icons|@react-navigation|react-native-reanimated|react-native-gesture-handler|react-native-screens|react-native-safe-area-context|react-native-image-picker|react-native-svg)/)',
+    'node_modules/(?!(react-native|@react-native|react-native-vector-icons|@react-navigation|react-native-reanimated|react-native-worklets|react-native-gesture-handler|react-native-screens|react-native-safe-area-context|react-native-image-picker|react-native-svg)/)',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],

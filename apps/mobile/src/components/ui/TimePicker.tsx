@@ -23,22 +23,23 @@ export function TimePicker({
   label,
   disabledSlots = [],
 }: TimePickerProps) {
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
-  // Scroll to selected time on mount
   useEffect(() => {
-    if (selectedTime && scrollViewRef.current) {
-      const selectedIndex = availableSlots.findIndex((t) => t === selectedTime);
-      if (selectedIndex > 0) {
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({
-            x: selectedIndex * 90,
-            animated: true,
-          });
-        }, 100);
-      }
-    }
-  }, []);
+    if (!selectedTime || !scrollViewRef.current) return;
+
+    const selectedIndex = availableSlots.findIndex((time) => time === selectedTime);
+    if (selectedIndex <= 0) return;
+
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        x: selectedIndex * 90,
+        animated: true,
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [availableSlots, selectedTime]);
 
   return (
     <View style={styles.container}>

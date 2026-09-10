@@ -30,7 +30,9 @@ jobs:
       fail-fast: false
       matrix:
         arch: [arm64, x86_64]
-    runs-on: macos-14
+    # RN 0.87 requires Xcode >=16.1. macos-14 currently defaults to Xcode 15.4,
+    # while macos-15 uses the supported Xcode 16.4 baseline.
+    runs-on: macos-15
     # Run 34178452452 exhausted 180 minutes compiling both architectures.
     # Scan each on its own runner; retain both architectures and all targets.
     timeout-minutes: 180
@@ -48,7 +50,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: "20"
+          node-version: "22.22.0"
           cache: pnpm
 
       - name: Install dependencies

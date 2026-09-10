@@ -87,7 +87,7 @@ export function BiometricLock({
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.accent} />
+      <StatusBar barStyle="light-content" />
 
       {/* Logo/Brand */}
       <View style={styles.brandSection}>

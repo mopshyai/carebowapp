@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22.22.0"
   PNPM_VERSION: "10.20.0"
   RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
@@ -92,7 +92,9 @@ jobs:
     name: TestFlight
     needs: gate
     if: needs.gate.outputs.release == 'true'
-    runs-on: macos-14
+    # RN 0.87 requires Xcode >=16.1. Pin the release lane to macOS 15's Xcode
+    # 16.4 baseline instead of the obsolete macOS 14 / Xcode 15.4 image.
+    runs-on: macos-15
     timeout-minutes: 60
     environment: testflight
     steps:

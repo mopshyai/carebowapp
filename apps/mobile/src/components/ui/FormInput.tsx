@@ -14,44 +14,25 @@ import {
   TextInputProps,
   ViewStyle,
   AccessibilityInfo,
+  TextInputFocusEvent,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography } from '../../theme';
 
-// ============================================
-// TYPES
-// ============================================
-
 export interface FormInputProps extends Omit<TextInputProps, 'style'> {
-  /** Field label */
   label?: string;
-  /** Error message */
   error?: string;
-  /** Helper text shown below input */
   helperText?: string;
-  /** Left icon name */
   leftIcon?: string;
-  /** Right icon name */
   rightIcon?: string;
-  /** Callback when right icon is pressed */
   onRightIconPress?: () => void;
-  /** Whether field is required */
   required?: boolean;
-  /** Whether field is disabled */
   disabled?: boolean;
-  /** Input container style */
   containerStyle?: ViewStyle;
-  /** Character counter (shows X/max) */
   showCharacterCount?: boolean;
-  /** Success state */
   isSuccess?: boolean;
-  /** Success message */
   successMessage?: string;
 }
-
-// ============================================
-// COMPONENT
-// ============================================
 
 export function FormInput({
   label,
@@ -76,9 +57,8 @@ export function FormInput({
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const errorAnimation = useRef(new Animated.Value(0)).current;
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
-  // Animate error appearance
   useEffect(() => {
     Animated.timing(errorAnimation, {
       toValue: error ? 1 : 0,
@@ -87,28 +67,22 @@ export function FormInput({
     }).start();
   }, [error, errorAnimation]);
 
-  // Announce errors to screen readers
   useEffect(() => {
     if (error) {
       AccessibilityInfo.announceForAccessibility(`Error: ${error}`);
     }
   }, [error]);
 
-  const handleFocus = (e: any) => {
+  const handleFocus = (event: TextInputFocusEvent) => {
     setIsFocused(true);
-    onFocus?.(e);
+    onFocus?.(event);
   };
 
-  const handleBlur = (e: any) => {
+  const handleBlur = (event: TextInputFocusEvent) => {
     setIsFocused(false);
-    onBlur?.(e);
+    onBlur?.(event);
   };
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible((prev) => !prev);
-  };
-
-  // Determine border color
   const getBorderColor = () => {
     if (error) return colors.error;
     if (isSuccess) return colors.success;
@@ -116,15 +90,12 @@ export function FormInput({
     return colors.border;
   };
 
-  // Determine if using password visibility toggle
   const showPasswordToggle = secureTextEntry && !rightIcon;
   const actualSecureTextEntry = secureTextEntry && !isPasswordVisible;
-
   const characterCount = typeof value === 'string' ? value.length : 0;
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {/* Label */}
       {label && (
         <View style={styles.labelContainer}>
           <Text style={[styles.label, error && styles.labelError]}>
@@ -134,7 +105,6 @@ export function FormInput({
         </View>
       )}
 
-      {/* Input Container */}
       <View
         style={[
           styles.inputContainer,
@@ -143,7 +113,6 @@ export function FormInput({
           disabled && styles.inputContainerDisabled,
         ]}
       >
-        {/* Left Icon */}
         {leftIcon && (
           <Icon
             name={leftIcon}
@@ -153,7 +122,6 @@ export function FormInput({
           />
         )}
 
-        {/* Text Input */}
         <TextInput
           ref={inputRef}
           style={[
@@ -172,17 +140,13 @@ export function FormInput({
           selectionColor={colors.accent}
           accessibilityLabel={label}
           accessibilityHint={helperText}
-          accessibilityState={{
-            disabled,
-            selected: isFocused,
-          }}
+          accessibilityState={{ disabled, selected: isFocused }}
           {...textInputProps}
         />
 
-        {/* Right Icon / Password Toggle */}
         {showPasswordToggle ? (
           <TouchableOpacity
-            onPress={togglePasswordVisibility}
+            onPress={() => setIsPasswordVisible((visible) => !visible)}
             style={styles.rightIconButton}
             accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
             accessibilityRole="button"
@@ -208,7 +172,6 @@ export function FormInput({
           </TouchableOpacity>
         ) : null}
 
-        {/* Success Icon */}
         {isSuccess && !error && !rightIcon && !showPasswordToggle && (
           <Icon
             name="checkmark-circle"
@@ -219,10 +182,8 @@ export function FormInput({
         )}
       </View>
 
-      {/* Error / Helper / Success Row */}
       <View style={styles.bottomRow}>
         <View style={styles.messageContainer}>
-          {/* Error Message */}
           {error && (
             <Animated.View
               style={[
@@ -247,7 +208,6 @@ export function FormInput({
             </Animated.View>
           )}
 
-          {/* Success Message */}
           {!error && isSuccess && successMessage && (
             <View style={styles.successContainer}>
               <Icon name="checkmark-circle" size={14} color={colors.success} />
@@ -255,13 +215,11 @@ export function FormInput({
             </View>
           )}
 
-          {/* Helper Text */}
           {!error && !successMessage && helperText && (
             <Text style={styles.helperText}>{helperText}</Text>
           )}
         </View>
 
-        {/* Character Count */}
         {showCharacterCount && maxLength && (
           <Text
             style={[
@@ -277,29 +235,16 @@ export function FormInput({
   );
 }
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.md,
-  },
+  container: { marginBottom: spacing.md },
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  label: {
-    ...typography.label,
-    color: colors.textPrimary,
-  },
-  labelError: {
-    color: colors.error,
-  },
-  required: {
-    color: colors.error,
-  },
+  label: { ...typography.label, color: colors.textPrimary },
+  labelError: { color: colors.error },
+  required: { color: colors.error },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,14 +254,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     minHeight: 48,
   },
-  inputContainerFocused: {
-    borderWidth: 2,
-    backgroundColor: colors.background,
-  },
-  inputContainerDisabled: {
-    backgroundColor: colors.surface2,
-    opacity: 0.6,
-  },
+  inputContainerFocused: { borderWidth: 2, backgroundColor: colors.background },
+  inputContainerDisabled: { backgroundColor: colors.surface2, opacity: 0.6 },
   input: {
     flex: 1,
     ...typography.body,
@@ -325,25 +264,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     minHeight: 48,
   },
-  inputWithLeftIcon: {
-    paddingLeft: 0,
-  },
-  inputWithRightIcon: {
-    paddingRight: 0,
-  },
-  inputDisabled: {
-    color: colors.textTertiary,
-  },
-  leftIcon: {
-    marginLeft: spacing.md,
-    marginRight: spacing.xs,
-  },
-  rightIconButton: {
-    padding: spacing.md,
-  },
-  successIcon: {
-    marginRight: spacing.md,
-  },
+  inputWithLeftIcon: { paddingLeft: 0 },
+  inputWithRightIcon: { paddingRight: 0 },
+  inputDisabled: { color: colors.textTertiary },
+  leftIcon: { marginLeft: spacing.md, marginRight: spacing.xs },
+  rightIconButton: { padding: spacing.md },
+  successIcon: { marginRight: spacing.md },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -351,40 +277,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.xxs,
     minHeight: 18,
   },
-  messageContainer: {
-    flex: 1,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  errorText: {
-    ...typography.caption,
-    color: colors.error,
-    flex: 1,
-  },
-  successContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  successText: {
-    ...typography.caption,
-    color: colors.success,
-  },
-  helperText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-  },
+  messageContainer: { flex: 1 },
+  errorContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  errorText: { ...typography.caption, color: colors.error, flex: 1 },
+  successContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xxs },
+  successText: { ...typography.caption, color: colors.success },
+  helperText: { ...typography.caption, color: colors.textTertiary },
   characterCount: {
     ...typography.caption,
     color: colors.textTertiary,
     marginLeft: spacing.sm,
   },
-  characterCountMax: {
-    color: colors.error,
-  },
+  characterCountMax: { color: colors.error },
 });
 
 export default FormInput;
