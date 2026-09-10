@@ -1829,7 +1829,7 @@ PODS:
     - React-Core
     - SDWebImage (~> 5.11.1)
     - SDWebImageWebPCoder (~> 0.8.4)
-  - RNGestureHandler (2.32.0):
+  - RNGestureHandler (3.2.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1850,6 +1850,7 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
+    - RNWorklets (>= 0.8.0)
     - Yoga
   - RNKeychain (10.0.0):
     - hermes-engine
@@ -2628,7 +2629,7 @@ SPEC CHECKSUMS:
   RNCClipboard: a4d3243922d75b241b7ab9c0f8b62995a601ff2b
   RNDateTimePicker: c3fc062fa18439d8da7b510b242534c0d334af36
   RNFastImage: 462a183c4b0b6b26fdfd639e1ed6ba37536c3b87
-  RNGestureHandler: acdcc210495ed9fba5c904e91eaf1f476139069f
+  RNGestureHandler: ec5fccd94cfa3ef0014ca794e4acd9807e497939
   RNKeychain: 551d42b0ef53426f82551a0cc961cfa10ad33afa
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
   RNReactNativeHapticFeedback: f46e6882569d5f0ee6b24f2bcb10337adecfc648

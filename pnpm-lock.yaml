@@ -136,8 +136,8 @@ importers:
         specifier: ^8.6.3
         version: 8.6.3(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))(react@19.2.3)
       react-native-gesture-handler:
-        specifier: 2.32.0
-        version: 2.32.0(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))(react@19.2.3)
+        specifier: 3.2.1
+        version: 3.2.1(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))(react@19.2.3)
       react-native-haptic-feedback:
         specifier: ^2.3.3
         version: 2.3.3(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))
@@ -1429,13 +1429,6 @@ packages:
       }
     engines: { node: ">=v18" }
 
-  "@egjs/hammerjs@2.0.17":
-    resolution:
-      {
-        integrity: sha512-XQsZgjm2EcVUiZQf11UBJQfmZeEmOW8DpI1gsFeln6w0ae0ii4dMQEQ0kjl6DspdWX1aGY1/loyXnP0JS06e/A==,
-      }
-    engines: { node: ">=0.8.0" }
-
   "@eslint-community/eslint-utils@4.9.1":
     resolution:
       {
@@ -2537,12 +2530,6 @@ packages:
     resolution:
       {
         integrity: sha512-olP3sd1qOEe5dXTSaFvQG+02VdRXcdytWLAZsAq1PecU8uqQAhkrnbli7DagjtXKW/Bl7YJbUsa8MPcuc8LHEQ==,
-      }
-
-  "@types/hammerjs@2.0.46":
-    resolution:
-      {
-        integrity: sha512-ynRvcq6wvqexJ9brDMS4BnBLzmr0e14d6ZJTEShTBWKymQiHwlAyGu0ZPEFI2Fh1U53F7tN9ufClWM5KvqkKOw==,
       }
 
   "@types/istanbul-lib-coverage@2.0.6":
@@ -5078,12 +5065,6 @@ packages:
         integrity: sha512-GApNk4zLHi2UWoWZZkx7LNCOSzLSc5lB55pZ/PhK7ycFeg7u5LcF88p/WbpIi1XUDtE0MpHE3uRR3u3KB7TjSQ==,
       }
 
-  hoist-non-react-statics@3.3.2:
-    resolution:
-      {
-        integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==,
-      }
-
   hosted-git-info@2.8.9:
     resolution:
       {
@@ -7320,10 +7301,10 @@ packages:
       react: ^17 || ^18
       react-native: ">=0.60.0"
 
-  react-native-gesture-handler@2.32.0:
+  react-native-gesture-handler@3.2.1:
     resolution:
       {
-        integrity: sha512-uYIMOKlKENORq2SABE+jIjbPU+h5I/sQKcq2v16zRq848nwEp1fWRVwML4QWqijc8UcXJC25o54S8GQd4Mf2OA==,
+        integrity: sha512-VEWscxUN29aeccbD2McF0LSXrwOhSdisaSRFiEWg0O/3WrVghNJp/tOtLrCgzb9gfcZ3xdA+K2Sp8F5G3iHx/Q==,
       }
     peerDependencies:
       react: "*"
@@ -10001,10 +9982,6 @@ snapshots:
     dependencies:
       chalk: 4.1.2
 
-  "@egjs/hammerjs@2.0.17":
-    dependencies:
-      "@types/hammerjs": 2.0.46
-
   "@eslint-community/eslint-utils@4.9.1(eslint@8.57.1)":
     dependencies:
       eslint: 8.57.1
@@ -10965,8 +10942,6 @@ snapshots:
   "@types/graceful-fs@4.1.9":
     dependencies:
       "@types/node": 22.19.7
-
-  "@types/hammerjs@2.0.46": {}
 
   "@types/istanbul-lib-coverage@2.0.6": {}
 
@@ -12725,10 +12700,6 @@ snapshots:
     dependencies:
       hermes-estree: 0.36.1
 
-  hoist-non-react-statics@3.3.2:
-    dependencies:
-      react-is: 16.13.1
-
   hosted-git-info@2.8.9: {}
 
   hosted-git-info@4.1.0:
@@ -14244,11 +14215,9 @@ snapshots:
       react: 19.2.3
       react-native: 0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3)
 
-  react-native-gesture-handler@2.32.0(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))(react@19.2.3):
+  react-native-gesture-handler@3.2.1(react-native@0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3))(react@19.2.3):
     dependencies:
-      "@egjs/hammerjs": 2.0.17
       "@types/react-test-renderer": 19.1.0
-      hoist-non-react-statics: 3.3.2
       invariant: 2.2.4
       react: 19.2.3
       react-native: 0.87.1(@babel/core@7.29.6)(@react-native-community/cli@20.2.0(typescript@6.0.3))(@react-native/metro-config@0.87.1(@babel/core@7.29.6))(@types/react@19.2.9)(react@19.2.3)
