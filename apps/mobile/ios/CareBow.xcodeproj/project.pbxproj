@@ -33,6 +33,7 @@
 		7ABEBF0D8C1FEA847C9CB9A1 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438C40D2B22F357C4EDCCDC5 /* Swift.swift */; };
 		8141B9AFD7E0DD136912B2A3 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 269B3E79F5BAC5BE1BC4B99A /* Swift.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		8E861BC8475DB765094B1BFE /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9471F811252F16D4E2E17EA5 /* Swift.swift */; };
 		91318E4EDE7A8F48A41F7ABF /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F13F479CE7B58384BB3458F /* Swift.swift */; };
 		925D5E01147E4755A4C1F88A /* FontAwesome5_Brands.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E6895175E4FD4D6FA40A85A8 /* FontAwesome5_Brands.ttf */; };
 		977C68123C5F4CB88FAB003E /* Entypo.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8F215DAD5E5147749190F98E /* Entypo.ttf */; };
@@ -58,6 +59,7 @@
 		E65DC79E046C1AB445041D20 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A3AEF9FE509404BB0CC0869 /* Swift.swift */; };
 		EC8DBC82231C90566CC622F9 /* libPods-CareBow.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 48D9700C43C3306537261940 /* libPods-CareBow.a */; };
 		F65AAE1DB8AA05A06D5F6605 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C9A63EE7BF99D0CE4E273EE /* Swift.swift */; };
+		FD3C592141922548CBCA88C6 /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF31B1C7AFF8E3AF782A0AC /* Swift.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,12 +115,14 @@
 		659A0C91290CF597F04711B9 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		6788FD3377AECAF25E300909 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		7A780396E442281BD83AE5C4 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
+		7EF31B1C7AFF8E3AF782A0AC /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = CareBow/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89856C5FE98F435EA95982FA /* Ionicons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Ionicons.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/Ionicons.ttf"; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-CareBow-CareBowTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-CareBow-CareBowTests.release.xcconfig"; path = "Target Support Files/Pods-CareBow-CareBowTests/Pods-CareBow-CareBowTests.release.xcconfig"; sourceTree = "<group>"; };
 		8A3AEF9FE509404BB0CC0869 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		8F215DAD5E5147749190F98E /* Entypo.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = Entypo.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/Entypo.ttf"; sourceTree = "<group>"; };
 		9094D2725F8049318C7A51ED /* FontAwesome6_Solid.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = FontAwesome6_Solid.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/FontAwesome6_Solid.ttf"; sourceTree = "<group>"; };
+		9471F811252F16D4E2E17EA5 /* Swift.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Swift.swift; path = CareBow/Swift.swift; sourceTree = "<group>"; };
 		B6F702B758E94EA99ADE95E5 /* FontAwesome6_Brands.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = FontAwesome6_Brands.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/FontAwesome6_Brands.ttf"; sourceTree = "<group>"; };
 		B9F32627AE364F0195D5F4DC /* SimpleLineIcons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = SimpleLineIcons.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/SimpleLineIcons.ttf"; sourceTree = "<group>"; };
 		BD9D049C692D44859067AD3A /* EvilIcons.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = EvilIcons.ttf; path = "../../../node_modules/react-native-vector-icons/Fonts/EvilIcons.ttf"; sourceTree = "<group>"; };
@@ -232,6 +236,8 @@
 				6788FD3377AECAF25E300909 /* Swift.swift */,
 				6349B98D3699D723C7FD080C /* Swift.swift */,
 				628C230BC61A9D6E97B26C0D /* Swift.swift */,
+				9471F811252F16D4E2E17EA5 /* Swift.swift */,
+				7EF31B1C7AFF8E3AF782A0AC /* Swift.swift */,
 			);
 			name = CareBow;
 			sourceTree = "<group>";
@@ -579,6 +585,8 @@
 				E283FBA6D906A281E03966EE /* Swift.swift in Sources */,
 				BB68A3102965C11810F8D5FE /* Swift.swift in Sources */,
 				5C6F55253073D233340BAF94 /* Swift.swift in Sources */,
+				8E861BC8475DB765094B1BFE /* Swift.swift in Sources */,
+				FD3C592141922548CBCA88C6 /* Swift.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -772,6 +780,10 @@
 				);
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DFOLLY_NO_CONFIG",
@@ -779,11 +791,13 @@
 					"-DFOLLY_USE_LIBCPP=1",
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					" ",
 				);
+				PODFILE_DIR = "$(SRCROOT)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -855,6 +869,10 @@
 					"\"$(inherited)\"",
 				);
 				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DFOLLY_NO_CONFIG",
@@ -862,11 +880,13 @@
 					"-DFOLLY_USE_LIBCPP=1",
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					" ",
 				);
+				PODFILE_DIR = "$(SRCROOT)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;

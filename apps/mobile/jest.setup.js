@@ -113,8 +113,8 @@ jest.mock('react-native-fast-image', () => ({
   clearDiskCache: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock react-native-document-picker
-jest.mock('react-native-document-picker', () => ({
+// Mock @react-native-documents/picker
+jest.mock('@react-native-documents/picker', () => ({
   pick: jest.fn(),
   pickDirectory: jest.fn(),
   pickMultiple: jest.fn(),
@@ -123,7 +123,10 @@ jest.mock('react-native-document-picker', () => ({
     pdf: 'com.adobe.pdf',
     allFiles: '*/*',
   },
-  isCancel: jest.fn().mockReturnValue(false),
+  isErrorWithCode: jest.fn().mockReturnValue(false),
+  errorCodes: {
+    OPERATION_CANCELED: 'OPERATION_CANCELED',
+  },
 }));
 
 // Mock @react-native-community/netinfo

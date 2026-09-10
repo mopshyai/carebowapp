@@ -18,10 +18,8 @@ react {
     codegenDir = file("../../../../node_modules/@react-native/codegen")
     cliFile = file("../../../../node_modules/react-native/cli.js")
 
-    /* Hermes Commands */
-    // Resolve Hermes from the hoisted RN package. file() makes the path absolute,
-    // avoiding dependence on the shell working directory in CI/Fastlane.
-    hermesCommand = file("../../../../node_modules/react-native/sdks/hermesc/%OS-BIN%/hermesc").absolutePath
+    // The RN 0.87 compiler is distributed by the hoisted hermes-compiler package.
+    hermesCommand = file("../../../../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc").absolutePath
 
     /* Autolinking */
     autolinkLibrariesWithApp()
