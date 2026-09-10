@@ -10,6 +10,20 @@ type MutableBreadcrumb = {
 
 type MutableExceptionValue = {
   value?: string;
+  mechanism?: {
+    data?: unknown;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+type MutableRequest = {
+  data?: unknown;
+  body?: unknown;
+  query_string?: unknown;
+  cookies?: unknown;
+  headers?: unknown;
+  url?: string;
   [key: string]: unknown;
 };
 
@@ -20,6 +34,10 @@ type MutableSentryEvent = {
     values?: MutableExceptionValue[];
     [key: string]: unknown;
   };
+  request?: MutableRequest;
+  user?: unknown;
+  extra?: unknown;
+  contexts?: unknown;
   [key: string]: unknown;
 };
 
@@ -41,8 +59,25 @@ export function redactSentryFreeText<T>(event: T): T {
   if (mutable.exception?.values) {
     for (const value of mutable.exception.values) {
       if (value.value) value.value = REDACTED_EXCEPTION_MESSAGE;
+      if (value.mechanism?.data) value.mechanism.data = undefined;
     }
   }
+
+  if (mutable.request) {
+    mutable.request.data = undefined;
+    mutable.request.body = undefined;
+    mutable.request.query_string = undefined;
+    mutable.request.cookies = undefined;
+    mutable.request.headers = undefined;
+
+    if (mutable.request.url) {
+      mutable.request.url = mutable.request.url.split('?')[0] ?? mutable.request.url;
+    }
+  }
+
+  mutable.user = undefined;
+  mutable.extra = undefined;
+  mutable.contexts = undefined;
 
   if (mutable.breadcrumbs) {
     mutable.breadcrumbs = mutable.breadcrumbs.map((breadcrumb) => ({
