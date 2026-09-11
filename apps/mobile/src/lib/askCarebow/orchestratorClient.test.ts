@@ -44,6 +44,7 @@ describe('getOrchestratorReply', () => {
   beforeEach(() => {
     mockedCreateSession.mockReset();
     mockedSendMessage.mockReset();
+    mockedGetTurn.mockReset();
   });
 
   it('creates a session, sends the message with request id, and returns the reply', async () => {
@@ -124,12 +125,19 @@ describe('getOrchestratorReply', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null when the response has no assistant content', async () => {
+  it('recovers a PENDING send from the canonical turn endpoint', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedSendMessage.mockResolvedValueOnce({
-      assistantMessage: { id: 'm1', content: '' },
+      assistantMessage: null,
       isEmergency: false,
       urgencyLevel: 'P4',
+      run: { id: 'run-1', requestId: REQUEST_ID, status: 'PENDING' },
+    });
+    mockedGetTurn.mockResolvedValueOnce({
+      assistantMessage: { id: 'a1', content: 'Recovered after pending send' },
+      isEmergency: false,
+      urgencyLevel: 'P4',
+      run: { id: 'run-1', requestId: REQUEST_ID, status: 'COMPLETED' },
     });
 
     const result = await getOrchestratorReply({
@@ -139,7 +147,8 @@ describe('getOrchestratorReply', () => {
       requestId: REQUEST_ID,
     });
 
-    expect(result).toBeNull();
+    expect(result?.text).toBe('Recovered after pending send');
+    expect(mockedGetTurn).toHaveBeenCalledWith('session-1', REQUEST_ID);
   });
 });
 

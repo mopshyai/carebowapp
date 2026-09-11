@@ -35,7 +35,7 @@ export interface ChatOrchestratorMessageResponse {
   run?: {
     id: string;
     requestId: string;
-    status: 'PENDING' | 'COMPLETED' | 'FAILED';
+    status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
     errorCode?: string | null;
   };
 }

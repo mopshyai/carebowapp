@@ -24,25 +24,25 @@ import { useAskCarebowStore } from '../store/askCarebowStore';
 import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfileStore } from '../store/useProfileStore';
-import { createMessage, Message, QuickOption } from '../types/askCarebow';
+import { createMessage, Message, QuickOption, type UrgencyLevel } from '../types/askCarebow';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
-import { processUserInput } from '../lib/askCarebow';
 import {
   detectEmergencyWithContext,
   extractPatientContext,
 } from '../lib/askCarebow/safetyClassifier';
-import { askCareBowApi } from '../services/api/endpoints/askCareBow';
 import {
   askCarebowEntitlementApi,
   type AskCarebowEntitlement,
 } from '../services/api/endpoints/askCarebowEntitlement';
 import { ApiError } from '../services/api/types';
 import {
-  bindKnownBackendSession,
+  attachCanonicalSession,
+  getCachedBackendSessionId,
+  listCanonicalSessions,
+  loadCanonicalSession,
   streamOrchestratorReply,
 } from '../lib/askCarebow/orchestratorClient';
-import { askCarebowOrchestratorApi } from '../services/api/endpoints/askCarebowOrchestrator';
 import {
   resolveConversationAgeGroup,
   resolveConversationMemberId,
@@ -74,14 +74,6 @@ import { useFollowUpStore, useHasScheduledFollowUp } from '../store/followUpStor
 import { formatFollowUpDate } from '../types/followUp';
 import { resetShownExplanations } from '../utils/questionExplanations';
 import { detectMissingInfo } from '../utils/missingInfoDetector';
-
-function isSafetyBypass(response: { isEmergency?: boolean; urgencyLevel?: string }): boolean {
-  return (
-    response.isEmergency === true ||
-    response.urgencyLevel === 'emergency' ||
-    response.urgencyLevel === 'urgent'
-  );
-}
 
 export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
@@ -130,11 +122,8 @@ export default function ConversationScreen() {
     addUserMessage,
     addAssistantMessage,
     hydrateServerMessages,
-    updateConversationPhase,
-    markQuestionAsked,
     updateHealthContext,
     setUrgencyLevel,
-    addServiceRecommendation,
     setIsTyping,
     setIsProcessing,
   } = useAskCarebowStore();
@@ -201,13 +190,20 @@ export default function ConversationScreen() {
     void (async () => {
       try {
         const backendProfileId = await ensureBackendProfile(currentSession.memberId);
-        const sessions = await askCarebowOrchestratorApi.listSessions(backendProfileId);
-        const latest = sessions.find((session) => (session._count?.messages ?? 0) > 0);
-        if (!latest || cancelled) return;
-        await bindKnownBackendSession(currentSession.id, latest.id);
-        const detail = await askCarebowOrchestratorApi.getSession(latest.id);
+        const requestedId = params.backendSessionId;
+        const cachedId = await getCachedBackendSessionId(currentSession.id);
+        const sessions = await listCanonicalSessions(backendProfileId);
+        const exactId =
+          requestedId && sessions.some((session) => session.id === requestedId)
+            ? requestedId
+            : cachedId && sessions.some((session) => session.id === cachedId)
+              ? cachedId
+              : null;
+        if (!exactId || cancelled) return;
+        await attachCanonicalSession(currentSession.id, exactId);
+        const detail = await loadCanonicalSession(exactId);
         const rows = detail.session.messages ?? [];
-        if (!rows.length || cancelled) return;
+        if (cancelled) return;
         hydrateServerMessages(
           rows.map((row) => ({
             ...createMessage(
@@ -227,7 +223,12 @@ export default function ConversationScreen() {
     return () => {
       cancelled = true;
     };
-  }, [currentSession?.id, currentSession?.memberId, hydrateServerMessages]);
+  }, [
+    currentSession?.id,
+    currentSession?.memberId,
+    hydrateServerMessages,
+    params.backendSessionId,
+  ]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -243,20 +244,11 @@ export default function ConversationScreen() {
       const requestId = createAskCarebowTurnRequestId();
 
       try {
-        // Run deterministic safety before monetization. The context-aware pass
-        // catches pediatric, pregnancy and senior-specific red flags on every
-        // turn, not just broad generic emergency phrases.
-        const response = await processUserInput(
-          text,
-          currentSession.conversationState.phase,
-          currentSession.healthContext,
-          currentSession.conversationState.questionsAsked
-        );
         const contextEmergency = detectEmergencyWithContext(
           text,
           extractPatientContext(currentSession.healthContext)
         );
-        const safetyBypass = contextEmergency.isEmergency || isSafetyBypass(response);
+        const safetyBypass = contextEmergency.isEmergency;
 
         if (!safetyBypass) {
           let currentAccess: AskCarebowEntitlement;
@@ -288,145 +280,92 @@ export default function ConversationScreen() {
 
         setIsTyping(true);
 
-        let displayMessages = response.messages;
-        const draftResponse = response.messages
-          .map((message) => message.text)
-          .filter(Boolean)
-          .join('\n\n');
-
-        let usedOrchestrator = false;
-        let serverDeniedTurn = false;
-
-        if (
-          ASK_CAREBOW_ORCHESTRATOR_ENABLED &&
-          !safetyBypass &&
-          draftResponse &&
-          currentSession.memberId
-        ) {
-          try {
-            const backendProfileId = await ensureBackendProfile(currentSession.memberId);
-
-            setStreamingText('');
-            const orchestratorReply = await streamOrchestratorReply({
-              localSessionId: currentSession.id,
-              profileId: backendProfileId,
-              text,
-              requestId,
-              onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
-            });
-            if (orchestratorReply) {
-              displayMessages = [
-                {
-                  role: 'assistant',
-                  contentType: 'text',
-                  text: orchestratorReply.text,
-                },
-              ];
-              usedOrchestrator = true;
-            }
-          } catch (profileOrOrchestratorError) {
-            logger.warn(
-              'Ask CareBow orchestrator unavailable for the resolved patient profile',
-              profileOrOrchestratorError
-            );
-          } finally {
-            setStreamingText(null);
-          }
-        }
-
-        if (!usedOrchestrator && draftResponse) {
-          try {
-            const liveResponse = await askCareBowApi.rewrite({
-              messageText: text,
-              draftResponse,
-              forWhom: conversationContext,
-              requestId,
-            });
-            if (liveResponse.entitlement) {
-              setEntitlement(liveResponse.entitlement);
-              setAccessBlocked(!liveResponse.entitlement.canAsk);
-            }
-            if (liveResponse.success && liveResponse.assistantMessage) {
-              displayMessages = response.messages.map((message, index) =>
-                index === 0 ? { ...message, text: liveResponse.assistantMessage } : message
-              );
-            }
-          } catch (apiError) {
-            if (apiError instanceof ApiError && apiError.status === 402 && !safetyBypass) {
-              serverDeniedTurn = true;
-              setAccessBlocked(true);
-              displayMessages = [];
-              void refreshEntitlement().catch(() => {});
-            } else {
-              logger.warn(
-                'Ask CareBow rewrite unavailable; using deterministic response',
-                apiError
-              );
-            }
-          }
-        }
-
-        setLastTurnUsedOrchestrator(usedOrchestrator);
-        setIsTyping(false);
-
-        if (serverDeniedTurn) {
-          addAssistantMessage({
-            role: 'assistant',
-            contentType: 'text',
-            text: 'Your Ask CareBow access limit has been reached. View Care Plans to continue. Emergency guidance remains available.',
-          });
+        if (!ASK_CAREBOW_ORCHESTRATOR_ENABLED || !currentSession.memberId) {
+          setLastTurnUsedOrchestrator(false);
+          Alert.alert(
+            'Ask CareBow is offline',
+            'Your message is saved on this device. CareBow will send it when the shared conversation service is available. I will not invent a local medical reply.'
+          );
           return;
         }
 
-        for (const msg of displayMessages) {
-          addAssistantMessage(msg);
+        const backendProfileId = await ensureBackendProfile(currentSession.memberId);
+        setStreamingText('');
+        const orchestratorReply = await streamOrchestratorReply({
+          localSessionId: currentSession.id,
+          profileId: backendProfileId,
+          text,
+          requestId,
+          onTextDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
+        });
+        setStreamingText(null);
 
-          if (currentEpisodeId && msg.text) {
-            addEpisodeMessage({
-              episodeId: currentEpisodeId,
-              role: 'assistant',
-              text: msg.text,
-            });
-          }
-
-          if (displayMessages.length > 1) {
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
+        if (!orchestratorReply) {
+          setLastTurnUsedOrchestrator(false);
+          Alert.alert(
+            'Ask CareBow is still working',
+            'Your message was sent to CareBow. I will not invent a local reply. Stay in this conversation and I will recover the saved answer if it arrives.'
+          );
+          return;
         }
 
-        if (response.urgencyLevel) {
-          const calculatedTriage = getTriageLevel({
-            urgencyLevel: response.urgencyLevel,
-            hasRedFlags: (currentSession?.healthContext.riskFactors?.length ?? 0) > 0,
-            severity: currentSession?.healthContext.severity,
+        setLastTurnUsedOrchestrator(true);
+        addAssistantMessage({
+          role: 'assistant',
+          contentType: 'text',
+          text: orchestratorReply.text,
+        });
+        if (currentEpisodeId) {
+          addEpisodeMessage({
+            episodeId: currentEpisodeId,
+            role: 'assistant',
+            text: orchestratorReply.text,
           });
-          setTriageLevel(calculatedTriage);
-          setShowActionButtons(true);
-          if (currentEpisodeId) {
-            setEpisodeTriageLevel(currentEpisodeId, calculatedTriage);
-          }
         }
 
-        if (response.phaseUpdate) updateConversationPhase(response.phaseUpdate);
-        if (response.healthContextUpdates) updateHealthContext(response.healthContextUpdates);
-        if (response.urgencyLevel) setUrgencyLevel(response.urgencyLevel);
-        if (response.questionAsked) markQuestionAsked(response.questionAsked);
-        if (response.serviceRecommendations) {
-          for (const rec of response.serviceRecommendations) addServiceRecommendation(rec);
+        const mappedUrgency: UrgencyLevel =
+          orchestratorReply.urgencyLevel === 'P1' || orchestratorReply.isEmergency
+            ? 'emergency'
+            : orchestratorReply.urgencyLevel === 'P2'
+              ? 'urgent'
+              : orchestratorReply.urgencyLevel === 'P3'
+                ? 'soon'
+                : 'self_care';
+        const calculatedTriage = getTriageLevel({
+          urgencyLevel: mappedUrgency,
+          hasRedFlags:
+            contextEmergency.isEmergency ||
+            (currentSession?.healthContext.riskFactors?.length ?? 0) > 0,
+          severity: currentSession?.healthContext.severity,
+        });
+        setTriageLevel(calculatedTriage);
+        setShowActionButtons(true);
+        if (currentEpisodeId) {
+          setEpisodeTriageLevel(currentEpisodeId, calculatedTriage);
         }
+        setUrgencyLevel(mappedUrgency);
 
         if (!safetyBypass) {
           void refreshEntitlement().catch(() => {});
         }
       } catch (error) {
         logger.error('Error processing message', error);
-        setIsTyping(false);
         setStreamingText(null);
-        addAssistantMessage({
-          role: 'assistant',
-          contentType: 'text',
-          text: "I'm having trouble processing your message. Please try again.",
-        });
+        if (error instanceof ApiError && error.status === 402) {
+          setAccessBlocked(true);
+          return;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          Alert.alert(
+            'This message could not be reused',
+            'That request was already used for a different message. Send this as a new message.'
+          );
+          return;
+        }
+        Alert.alert(
+          'Ask CareBow could not finish',
+          'Your message may already be saved on the server. Stay here instead of sending the same thing again.'
+        );
       } finally {
         setIsTyping(false);
         setIsProcessing(false);
