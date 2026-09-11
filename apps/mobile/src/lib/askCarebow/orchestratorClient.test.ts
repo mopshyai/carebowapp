@@ -9,7 +9,13 @@ import { ApiClient } from '@/services/api/ApiClient';
 import { postSSE } from '@/services/api/sseClient';
 
 jest.mock('@/services/api/endpoints/askCarebowOrchestrator', () => ({
-  askCarebowOrchestratorApi: { createSession: jest.fn(), sendMessage: jest.fn() },
+  askCarebowOrchestratorApi: {
+    createSession: jest.fn(),
+    sendMessage: jest.fn(),
+    getTurn: jest.fn(),
+    getSession: jest.fn(),
+    listSessions: jest.fn(),
+  },
 }));
 
 jest.mock('@/services/api/ApiClient', () => ({
@@ -22,6 +28,7 @@ jest.mock('@/services/api/sseClient', () => ({
 
 const mockedCreateSession = askCarebowOrchestratorApi.createSession as jest.Mock;
 const mockedSendMessage = askCarebowOrchestratorApi.sendMessage as jest.Mock;
+const mockedGetTurn = askCarebowOrchestratorApi.getTurn as jest.Mock;
 const mockedGetBaseUrl = ApiClient.getBaseUrl as jest.Mock;
 const mockedGetAccessToken = ApiClient.getAccessToken as jest.Mock;
 const mockedPostSSE = postSSE as jest.Mock;
@@ -61,11 +68,7 @@ describe('getOrchestratorReply', () => {
       backendSessionId: 'session-1',
     });
     expect(mockedCreateSession).toHaveBeenCalledWith('profile-1');
-    expect(mockedSendMessage).toHaveBeenCalledWith(
-      'session-1',
-      'I have a sore throat',
-      REQUEST_ID
-    );
+    expect(mockedSendMessage).toHaveBeenCalledWith('session-1', 'I have a sore throat', REQUEST_ID);
   });
 
   it('reuses the cached backend session for a second turn', async () => {
@@ -90,12 +93,7 @@ describe('getOrchestratorReply', () => {
     });
 
     expect(mockedCreateSession).toHaveBeenCalledTimes(1);
-    expect(mockedSendMessage).toHaveBeenNthCalledWith(
-      2,
-      'session-1',
-      'second',
-      'ask_second_123'
-    );
+    expect(mockedSendMessage).toHaveBeenNthCalledWith(2, 'session-1', 'second', 'ask_second_123');
   });
 
   it('returns null when session creation fails', async () => {
@@ -149,6 +147,7 @@ describe('streamOrchestratorReply', () => {
   beforeEach(() => {
     mockedCreateSession.mockReset();
     mockedPostSSE.mockReset();
+    mockedGetTurn.mockReset();
     mockedGetBaseUrl.mockReset().mockReturnValue('https://api.example.com');
     mockedGetAccessToken.mockReset().mockReturnValue('tok_123');
   });
@@ -218,45 +217,42 @@ describe('streamOrchestratorReply', () => {
     );
   });
 
-  it('returns null when no done event with assistant content ever arrives', async () => {
+  it('recovers a persisted assistant reply when the stream disconnects', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
       onEvent({ type: 'delta', text: 'partial' });
+    });
+    mockedGetTurn.mockResolvedValueOnce({
+      assistantMessage: {
+        id: 'a1',
+        content: 'I am sorry you are not feeling well. What is bothering you most?',
+      },
+      isEmergency: false,
+      urgencyLevel: 'P4',
+      run: { id: 'run-1', requestId: REQUEST_ID, status: 'COMPLETED' },
     });
 
     const result = await streamOrchestratorReply({
       localSessionId: 'local-3',
       profileId: 'profile-1',
-      text: 'hi',
+      text: 'I am not feeling well',
       requestId: REQUEST_ID,
       onTextDelta: () => {},
     });
 
-    expect(result).toBeNull();
+    expect(result?.text).toMatch(/not feeling well/i);
+    expect(mockedGetTurn).toHaveBeenCalledWith('session-1', REQUEST_ID);
   });
 
-  it('returns null without forwarding deltas when rollout shadows this turn', async () => {
-    mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
-    mockedPostSSE.mockImplementationOnce(async (_url, _body, _headers, onEvent) => {
-      onEvent({ type: 'done', rolledOut: false });
-    });
-
-    const deltas: string[] = [];
-    const result = await streamOrchestratorReply({
-      localSessionId: 'local-6',
-      profileId: 'profile-1',
-      text: 'sore throat',
-      requestId: REQUEST_ID,
-      onTextDelta: (d) => deltas.push(d),
-    });
-
-    expect(result).toBeNull();
-    expect(deltas).toEqual([]);
-  });
-
-  it('returns null when postSSE rejects', async () => {
+  it('recovers after a dropped SSE connection', async () => {
     mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
     mockedPostSSE.mockRejectedValueOnce(new Error('connection failed'));
+    mockedGetTurn.mockResolvedValueOnce({
+      assistantMessage: { id: 'a1', content: 'Recovered reply' },
+      isEmergency: false,
+      urgencyLevel: 'P4',
+      run: { id: 'run-1', requestId: REQUEST_ID, status: 'COMPLETED' },
+    });
 
     const result = await streamOrchestratorReply({
       localSessionId: 'local-4',
@@ -266,7 +262,12 @@ describe('streamOrchestratorReply', () => {
       onTextDelta: () => {},
     });
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      text: 'Recovered reply',
+      isEmergency: false,
+      urgencyLevel: 'P4',
+      backendSessionId: 'session-1',
+    });
   });
 
   it('returns null when session creation fails', async () => {

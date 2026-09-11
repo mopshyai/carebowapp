@@ -24,7 +24,7 @@ import { useAskCarebowStore } from '../store/askCarebowStore';
 import { useHealthMemoryStore, usePendingCandidates } from '../store/healthMemoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfileStore } from '../store/useProfileStore';
-import { Message, QuickOption } from '../types/askCarebow';
+import { createMessage, Message, QuickOption } from '../types/askCarebow';
 import type { ImageAttachment } from '../components/askCarebow/ImageUploadBottomSheet';
 
 import { processUserInput } from '../lib/askCarebow';
@@ -38,7 +38,11 @@ import {
   type AskCarebowEntitlement,
 } from '../services/api/endpoints/askCarebowEntitlement';
 import { ApiError } from '../services/api/types';
-import { streamOrchestratorReply } from '../lib/askCarebow/orchestratorClient';
+import {
+  bindKnownBackendSession,
+  streamOrchestratorReply,
+} from '../lib/askCarebow/orchestratorClient';
+import { askCarebowOrchestratorApi } from '../services/api/endpoints/askCarebowOrchestrator';
 import {
   resolveConversationAgeGroup,
   resolveConversationMemberId,
@@ -125,6 +129,7 @@ export default function ConversationScreen() {
     startNewSession,
     addUserMessage,
     addAssistantMessage,
+    hydrateServerMessages,
     updateConversationPhase,
     markQuestionAsked,
     updateHealthContext,
@@ -188,6 +193,41 @@ export default function ConversationScreen() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentSession?.memberId) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const backendProfileId = await ensureBackendProfile(currentSession.memberId);
+        const sessions = await askCarebowOrchestratorApi.listSessions(backendProfileId);
+        const latest = sessions.find((session) => (session._count?.messages ?? 0) > 0);
+        if (!latest || cancelled) return;
+        await bindKnownBackendSession(currentSession.id, latest.id);
+        const detail = await askCarebowOrchestratorApi.getSession(latest.id);
+        const rows = detail.session.messages ?? [];
+        if (!rows.length || cancelled) return;
+        hydrateServerMessages(
+          rows.map((row) => ({
+            ...createMessage(
+              String(row.role).toUpperCase() === 'ASSISTANT' ? 'assistant' : 'user',
+              row.content,
+              'text'
+            ),
+            id: row.id,
+            timestamp: row.createdAt || new Date().toISOString(),
+          }))
+        );
+      } catch (error) {
+        logger.warn('Unable to sync Ask CareBow conversation from server', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSession?.id, currentSession?.memberId, hydrateServerMessages]);
 
   useEffect(() => {
     setTimeout(() => {

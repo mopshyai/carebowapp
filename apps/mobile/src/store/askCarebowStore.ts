@@ -67,6 +67,7 @@ type AskCarebowActions = {
   // Message handling
   addUserMessage: (text: string) => void;
   addAssistantMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
+  hydrateServerMessages: (messages: Message[]) => void;
 
   // Conversation state
   updateConversationPhase: (phase: ConversationPhase) => void;
@@ -245,6 +246,21 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
             updatedAt: new Date().toISOString(),
           };
 
+          return {
+            currentSession: updatedSession,
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
+          };
+        });
+      },
+
+      hydrateServerMessages: (messages) => {
+        set((state) => {
+          if (!state.currentSession) return state;
+          const updatedSession = {
+            ...state.currentSession,
+            messages,
+            updatedAt: new Date().toISOString(),
+          };
           return {
             currentSession: updatedSession,
             sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),

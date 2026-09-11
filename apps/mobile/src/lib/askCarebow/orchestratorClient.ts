@@ -28,6 +28,14 @@ export function getKnownBackendSessionId(localSessionId: string): string | null 
   return inMemoryBackendSessions.get(localSessionId) ?? null;
 }
 
+export async function bindKnownBackendSession(
+  localSessionId: string,
+  backendSessionId: string
+): Promise<void> {
+  inMemoryBackendSessions.set(localSessionId, backendSessionId);
+  await AsyncStorage.setItem(sessionCacheKey(localSessionId), backendSessionId);
+}
+
 export async function getCachedBackendSessionId(localSessionId: string): Promise<string | null> {
   const known = getKnownBackendSessionId(localSessionId);
   if (known) return known;
@@ -137,20 +145,50 @@ export async function streamOrchestratorReply(params: {
     );
 
     const finalEvent = doneEvent as DoneEvent | null;
-    if (!finalEvent?.assistantMessage?.content) {
-      if (finalEvent?.rolledOut === false) {
-        logger.debug('Shadowed by rollout gate; using rewrite fallback for this turn');
-      }
-      return null;
+    if (finalEvent?.assistantMessage?.content) {
+      return {
+        text: finalEvent.assistantMessage.content,
+        isEmergency: finalEvent.isEmergency ?? false,
+        urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
+        backendSessionId,
+      };
     }
 
-    return {
-      text: finalEvent.assistantMessage.content,
-      isEmergency: finalEvent.isEmergency ?? false,
-      urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
-      backendSessionId,
-    };
-  } catch {
+    const recovered = await recoverTurn(backendSessionId, params.requestId);
+    if (recovered) return recovered;
+    logger.warn('Ask CareBow stream ended without a confirmed assistant reply');
     return null;
+  } catch {
+    try {
+      const backendSessionId = await getCachedBackendSessionId(params.localSessionId);
+      if (!backendSessionId) return null;
+      return await recoverTurn(backendSessionId, params.requestId);
+    } catch {
+      return null;
+    }
   }
+}
+
+async function recoverTurn(
+  backendSessionId: string,
+  requestId: string
+): Promise<OrchestratorReply | null> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const turn = await askCarebowOrchestratorApi.getTurn(backendSessionId, requestId);
+      if (turn.assistantMessage?.content) {
+        return {
+          text: turn.assistantMessage.content,
+          isEmergency: turn.isEmergency,
+          urgencyLevel: turn.urgencyLevel,
+          backendSessionId,
+        };
+      }
+      if (turn.run?.status === 'FAILED') return null;
+    } catch (error) {
+      logger.warn('Ask CareBow turn recovery failed', error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return null;
 }
