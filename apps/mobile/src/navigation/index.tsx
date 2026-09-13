@@ -11,6 +11,7 @@ import { colors } from '@/theme';
 
 import { useAuthStore, isProviderUserType } from '@/store/useAuthStore';
 import { hydrateOwnedProfilesFromServer } from '@/lib/profileRepository';
+import { useProfileStore } from '@/store/useProfileStore';
 
 import AuthNavigator from './AuthNavigator';
 import OnboardingNavigator from './OnboardingNavigator';
@@ -75,9 +76,18 @@ export default function RootNavigator() {
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !userId || isProviderUserType(userType)) return;
 
-    void hydrateOwnedProfilesFromServer(userId).catch((error) => {
-      console.warn('[RootNavigator] Patient profile hydration failed', error);
-    });
+    void hydrateOwnedProfilesFromServer(userId)
+      .then(() => {
+        const hasServerPatient = useProfileStore
+          .getState()
+          .members.some((member) => Boolean(member.backendId));
+        if (hasServerPatient && !useAuthStore.getState().hasCompletedOnboarding) {
+          useAuthStore.getState().completeOnboarding();
+        }
+      })
+      .catch((error) => {
+        console.warn('[RootNavigator] Patient profile hydration failed', error);
+      });
   }, [hasHydrated, isAuthenticated, userId, userType]);
 
   if (!hasHydrated) {
@@ -145,11 +155,7 @@ export default function RootNavigator() {
             component={ScheduleScreen}
             options={{ animation: 'default' }}
           />
-          <Stack.Screen
-            name="Thread"
-            component={ThreadScreen}
-            options={{ animation: 'default' }}
-          />
+          <Stack.Screen name="Thread" component={ThreadScreen} options={{ animation: 'default' }} />
 
           <Stack.Screen
             name="Services"
