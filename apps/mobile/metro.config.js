@@ -1,4 +1,4 @@
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const path = require('path');
 
 const projectRoot = __dirname;
@@ -13,6 +13,8 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
+const decodeUriComponentShim = path.resolve(projectRoot, 'metro-shims/decode-uri-component.cjs.js');
+
 const config = {
   projectRoot,
   watchFolders: [monorepoRoot],
@@ -21,6 +23,16 @@ const config = {
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
     ],
+    resolveRequest: (context, moduleName, platform) => {
+      if (
+        moduleName === 'decode-uri-component' &&
+        context.originModulePath &&
+        context.originModulePath.includes(`${path.sep}query-string${path.sep}`)
+      ) {
+        return { type: 'sourceFile', filePath: decodeUriComponentShim };
+      }
+      return context.resolveRequest(context, moduleName, platform);
+    },
   },
 };
 

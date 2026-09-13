@@ -273,7 +273,11 @@ export default function AskCareBowScreen() {
           : savedSelfMember;
 
         if (!selfMember?.dateOfBirth || !selfMember.gender) {
-          throw new Error('Please add your date of birth and gender in Personal Information.');
+          throw new Error(
+            savedFamilyMembers.length > 0
+              ? 'This account already has a saved family patient. Switch to For family and select that person, or add your own date of birth and gender in Personal Information.'
+              : 'Please add your date of birth and gender in Personal Information.'
+          );
         }
 
         memberId = selfMember.id;

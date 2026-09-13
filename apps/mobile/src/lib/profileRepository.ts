@@ -183,6 +183,13 @@ export function ensureLocalSelfPatientProfileFromUser(user: UserProfile): Family
     return useProfileStore.getState().getMemberById(existing.id) ?? snapshot;
   }
 
+  // Do not create a local self patient without the demographics Ask CareBow
+  // needs. That empty row later tries to POST a second server profile and
+  // traps 1-profile family accounts behind PROFILE_LIMIT_REACHED.
+  if (!snapshot.dateOfBirth || !snapshot.gender) {
+    return snapshot;
+  }
+
   return state.addMember({
     backendId: snapshot.backendId,
     firstName: snapshot.firstName,

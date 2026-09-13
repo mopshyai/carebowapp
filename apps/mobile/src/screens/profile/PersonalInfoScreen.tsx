@@ -257,7 +257,7 @@ export default function PersonalInfoScreen() {
                 style={styles.input}
                 value={dateOfBirth}
                 onChangeText={setDateOfBirth}
-                placeholder="MM/DD/YYYY"
+                placeholder="YYYY-MM-DD"
                 placeholderTextColor={colors.textTertiary}
                 keyboardType="numbers-and-punctuation"
               />
