@@ -1,9 +1,8 @@
 /**
  * Wrapper around the mobile-auth'd orchestrator for symptom-help turns.
  *
- * One requestId belongs to one user turn. ConversationScreen passes the same id
- * here and to the rewrite fallback so the backend can meter the turn exactly
- * once even when an orchestrator shadow turn falls back to rewrite.
+ * One requestId belongs to one user turn. Mobile never invents an assistant
+ * reply locally: it submits to the canonical backend and renders server state.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { askCarebowOrchestratorApi } from '../../services/api/endpoints/askCarebowOrchestrator';
@@ -26,6 +25,14 @@ export function clearKnownBackendSessions(): void {
 
 export function getKnownBackendSessionId(localSessionId: string): string | null {
   return inMemoryBackendSessions.get(localSessionId) ?? null;
+}
+
+export async function bindKnownBackendSession(
+  localSessionId: string,
+  backendSessionId: string
+): Promise<void> {
+  inMemoryBackendSessions.set(localSessionId, backendSessionId);
+  await AsyncStorage.setItem(sessionCacheKey(localSessionId), backendSessionId);
 }
 
 export async function getCachedBackendSessionId(localSessionId: string): Promise<string | null> {
@@ -80,14 +87,19 @@ export async function getOrchestratorReply(params: {
       params.text,
       params.requestId
     );
-    if (!result.assistantMessage?.content) return null;
+    if (result.assistantMessage?.content) {
+      return {
+        text: result.assistantMessage.content,
+        isEmergency: result.isEmergency,
+        urgencyLevel: result.urgencyLevel,
+        backendSessionId,
+      };
+    }
 
-    return {
-      text: result.assistantMessage.content,
-      isEmergency: result.isEmergency,
-      urgencyLevel: result.urgencyLevel,
-      backendSessionId,
-    };
+    const recovered = await recoverTurn(backendSessionId, params.requestId);
+    if (recovered) return recovered;
+    if (result.run?.status === 'FAILED') return null;
+    return null;
   } catch {
     return null;
   }
@@ -137,20 +149,62 @@ export async function streamOrchestratorReply(params: {
     );
 
     const finalEvent = doneEvent as DoneEvent | null;
-    if (!finalEvent?.assistantMessage?.content) {
-      if (finalEvent?.rolledOut === false) {
-        logger.debug('Shadowed by rollout gate; using rewrite fallback for this turn');
-      }
-      return null;
+    if (finalEvent?.assistantMessage?.content) {
+      return {
+        text: finalEvent.assistantMessage.content,
+        isEmergency: finalEvent.isEmergency ?? false,
+        urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
+        backendSessionId,
+      };
     }
 
-    return {
-      text: finalEvent.assistantMessage.content,
-      isEmergency: finalEvent.isEmergency ?? false,
-      urgencyLevel: finalEvent.urgencyLevel ?? 'P4',
-      backendSessionId,
-    };
-  } catch {
+    const recovered = await recoverTurn(backendSessionId, params.requestId);
+    if (recovered) return recovered;
+    logger.warn('Ask CareBow stream ended without a confirmed assistant reply');
     return null;
+  } catch {
+    try {
+      const backendSessionId = await getCachedBackendSessionId(params.localSessionId);
+      if (!backendSessionId) return null;
+      return await recoverTurn(backendSessionId, params.requestId);
+    } catch {
+      return null;
+    }
   }
+}
+
+export async function listCanonicalSessions(profileId?: string) {
+  return askCarebowOrchestratorApi.listSessions(profileId);
+}
+
+export async function loadCanonicalSession(backendSessionId: string) {
+  return askCarebowOrchestratorApi.getSession(backendSessionId);
+}
+
+export async function attachCanonicalSession(localSessionId: string, backendSessionId: string) {
+  await bindKnownBackendSession(localSessionId, backendSessionId);
+}
+
+async function recoverTurn(
+  backendSessionId: string,
+  requestId: string
+): Promise<OrchestratorReply | null> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      const turn = await askCarebowOrchestratorApi.getTurn(backendSessionId, requestId);
+      if (turn.assistantMessage?.content) {
+        return {
+          text: turn.assistantMessage.content,
+          isEmergency: turn.isEmergency,
+          urgencyLevel: turn.urgencyLevel,
+          backendSessionId,
+        };
+      }
+      if (turn.run?.status === 'FAILED') return null;
+    } catch (error) {
+      logger.warn('Ask CareBow turn recovery failed', error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return null;
 }
