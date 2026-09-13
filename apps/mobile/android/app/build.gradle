@@ -3,6 +3,20 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 // Vector icons configuration
+// fonts.gradle defaults to ../../node_modules/... relative to this app module,
+// which is apps/mobile/node_modules under a standalone template. CareBow hoists
+// the package to the monorepo root, so that default path is empty (Gradle
+// reports copyReactNativeVectorIconFonts NO-SOURCE) and release APKs omit the
+// icon TTFs. Point at the hoisted Fonts directory before applying the script.
+def vectorIconFontsDir = file("../../../../node_modules/react-native-vector-icons/Fonts")
+if (!vectorIconFontsDir.directory) {
+    throw new GradleException(
+        "Hoisted react-native-vector-icons Fonts missing at ${vectorIconFontsDir.absolutePath}"
+    )
+}
+project.ext.vectoricons = [
+    iconFontsDir: vectorIconFontsDir.absolutePath
+]
 apply from: file("../../../../node_modules/react-native-vector-icons/fonts.gradle")
 
 /**
@@ -117,4 +131,19 @@ tasks.matching {
     it.name.startsWith('lintVital') || it.name.contains('LintVitalReportModel')
 }.configureEach {
     dependsOn 'copyReactNativeVectorIconFonts'
+}
+
+afterEvaluate {
+    tasks.named('copyReactNativeVectorIconFonts').configure { task ->
+        task.doLast {
+            def copied = fileTree("$buildDir/intermediates/ReactNativeVectorIcons/fonts") {
+                include '*.ttf'
+            }
+            if (copied.isEmpty()) {
+                throw new GradleException(
+                    'copyReactNativeVectorIconFonts produced no .ttf files; icon fonts would be missing from the APK.'
+                )
+            }
+        }
+    }
 }
