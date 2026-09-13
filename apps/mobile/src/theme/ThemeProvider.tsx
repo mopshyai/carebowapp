@@ -8,40 +8,25 @@ import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useColorScheme, StatusBar } from 'react-native';
 import { useProfileStore } from '../store/useProfileStore';
 
-// =============================================================================
-// LIGHT MODE COLORS
-// =============================================================================
-
 export const lightColors = {
-  // Backgrounds
   background: '#FFFFFF',
   surface: '#FFFFFF',
   surface2: '#F8FAFC',
   surfaceElevated: '#FFFFFF',
-
-  // Text
   textPrimary: '#0F172A',
   textSecondary: '#475569',
   textTertiary: '#94A3B8',
   textInverse: '#FFFFFF',
-
-  // Primary brand - Teal (trust, calm, healthcare)
   accent: '#0D9488',
   accentDark: '#0F766E',
   accentLight: '#14B8A6',
   accentSoft: '#CCFBF1',
   accentMuted: '#F0FDFA',
-
-  // Secondary - Warm coral (approachable)
   secondary: '#F97316',
   secondarySoft: '#FFEDD5',
-
-  // Borders
   border: '#E2E8F0',
   borderLight: '#F1F5F9',
   borderFocus: '#0D9488',
-
-  // Status colors
   success: '#16A34A',
   successSoft: '#DCFCE7',
   warning: '#D97706',
@@ -50,8 +35,6 @@ export const lightColors = {
   errorSoft: '#FEE2E2',
   info: '#2563EB',
   infoSoft: '#DBEAFE',
-
-  // Category accents
   medical: '#0D9488',
   medicalSoft: '#CCFBF1',
   lab: '#2563EB',
@@ -62,51 +45,32 @@ export const lightColors = {
   equipmentSoft: '#EDE9FE',
   packages: '#EA580C',
   packagesSoft: '#FFEDD5',
-
-  // Utility
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
   overlay: 'rgba(15, 23, 42, 0.5)',
-
-  // Card shadow colors
   shadowColor: '#0F172A',
 };
 
-// =============================================================================
-// DARK MODE COLORS
-// =============================================================================
-
 export const darkColors = {
-  // Backgrounds
   background: '#0F172A',
   surface: '#1E293B',
   surface2: '#1E293B',
   surfaceElevated: '#334155',
-
-  // Text
   textPrimary: '#F8FAFC',
   textSecondary: '#CBD5E1',
   textTertiary: '#64748B',
   textInverse: '#0F172A',
-
-  // Primary brand - Teal (adjusted for dark mode)
   accent: '#14B8A6',
   accentDark: '#0D9488',
   accentLight: '#2DD4BF',
   accentSoft: '#134E4A',
   accentMuted: '#0F2E2D',
-
-  // Secondary - Warm coral (adjusted for dark mode)
   secondary: '#FB923C',
   secondarySoft: '#431407',
-
-  // Borders
   border: '#334155',
   borderLight: '#1E293B',
   borderFocus: '#14B8A6',
-
-  // Status colors (adjusted for dark mode contrast)
   success: '#22C55E',
   successSoft: '#14532D',
   warning: '#F59E0B',
@@ -115,8 +79,6 @@ export const darkColors = {
   errorSoft: '#450A0A',
   info: '#3B82F6',
   infoSoft: '#1E3A5F',
-
-  // Category accents (adjusted for dark mode)
   medical: '#14B8A6',
   medicalSoft: '#134E4A',
   lab: '#3B82F6',
@@ -127,20 +89,12 @@ export const darkColors = {
   equipmentSoft: '#2E1065',
   packages: '#F97316',
   packagesSoft: '#431407',
-
-  // Utility
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
   overlay: 'rgba(0, 0, 0, 0.7)',
-
-  // Card shadow colors
   shadowColor: '#000000',
 };
-
-// =============================================================================
-// THEME CONTEXT TYPES
-// =============================================================================
 
 export type ThemeMode = 'light' | 'dark';
 export type ThemeColors = typeof lightColors;
@@ -151,19 +105,11 @@ interface ThemeContextValue {
   isDark: boolean;
 }
 
-// =============================================================================
-// THEME CONTEXT
-// =============================================================================
-
 const ThemeContext = createContext<ThemeContextValue>({
   mode: 'light',
   colors: lightColors,
   isDark: false,
 });
-
-// =============================================================================
-// THEME PROVIDER COMPONENT
-// =============================================================================
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -174,13 +120,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const appSettings = useProfileStore((state) => state.appSettings);
 
   const themeValue = useMemo<ThemeContextValue>(() => {
-    let mode: ThemeMode;
-
-    if (appSettings.theme === 'system') {
-      mode = systemColorScheme === 'dark' ? 'dark' : 'light';
-    } else {
-      mode = appSettings.theme;
-    }
+    const mode: ThemeMode =
+      appSettings.theme === 'system'
+        ? systemColorScheme === 'dark'
+          ? 'dark'
+          : 'light'
+        : appSettings.theme;
 
     return {
       mode,
@@ -191,18 +136,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   return (
     <ThemeContext.Provider value={themeValue}>
-      <StatusBar
-        barStyle={themeValue.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={themeValue.colors.background}
-      />
+      <StatusBar barStyle={themeValue.isDark ? 'light-content' : 'dark-content'} />
       {children}
     </ThemeContext.Provider>
   );
 }
-
-// =============================================================================
-// USE THEME HOOK
-// =============================================================================
 
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
@@ -212,36 +150,16 @@ export function useTheme(): ThemeContextValue {
   return context;
 }
 
-// =============================================================================
-// USE THEMED STYLES HOOK
-// =============================================================================
-
-/**
- * Hook to create styles that respond to theme changes
- * Usage:
- * const styles = useThemedStyles((colors) => ({
- *   container: { backgroundColor: colors.background }
- * }));
- */
 export function useThemedStyles<T>(createStyles: (colors: ThemeColors, isDark: boolean) => T): T {
   const { colors, isDark } = useTheme();
   return useMemo(() => createStyles(colors, isDark), [colors, isDark, createStyles]);
 }
 
-// =============================================================================
-// COMMON THEMED STYLES HOOK
-// =============================================================================
-
-/**
- * Pre-built themed styles for common screen patterns
- * Usage: const { containerStyle, headerStyle, cardStyle } = useCommonThemedStyles();
- */
 export function useCommonThemedStyles() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return useMemo(
     () => ({
-      // Screen containers
       containerStyle: {
         flex: 1,
         backgroundColor: colors.surface2,
@@ -250,8 +168,6 @@ export function useCommonThemedStyles() {
         flex: 1,
         backgroundColor: colors.background,
       },
-
-      // Headers
       headerStyle: {
         backgroundColor: colors.surface,
         borderBottomWidth: 1,
@@ -260,8 +176,6 @@ export function useCommonThemedStyles() {
       headerTitleStyle: {
         color: colors.textPrimary,
       },
-
-      // Cards
       cardStyle: {
         backgroundColor: colors.surface,
         borderColor: colors.border,
@@ -272,13 +186,9 @@ export function useCommonThemedStyles() {
         borderColor: colors.border,
         shadowColor: colors.shadowColor,
       },
-
-      // Text
       textPrimaryStyle: { color: colors.textPrimary },
       textSecondaryStyle: { color: colors.textSecondary },
       textTertiaryStyle: { color: colors.textTertiary },
-
-      // Inputs
       inputStyle: {
         backgroundColor: colors.surface2,
         borderColor: colors.border,
@@ -287,8 +197,6 @@ export function useCommonThemedStyles() {
       inputFocusedStyle: {
         borderColor: colors.borderFocus,
       },
-
-      // Buttons
       primaryButtonStyle: {
         backgroundColor: colors.accent,
       },
@@ -296,37 +204,25 @@ export function useCommonThemedStyles() {
         backgroundColor: colors.surface,
         borderColor: colors.border,
       },
-
-      // Dividers
       dividerStyle: {
         backgroundColor: colors.border,
       },
       dividerLightStyle: {
         backgroundColor: colors.borderLight,
       },
-
-      // Icons
       iconPrimaryColor: colors.textPrimary,
       iconSecondaryColor: colors.textSecondary,
       iconAccentColor: colors.accent,
-
-      // Status
       successStyle: { backgroundColor: colors.successSoft, color: colors.success },
       warningStyle: { backgroundColor: colors.warningSoft, color: colors.warning },
       errorStyle: { backgroundColor: colors.errorSoft, color: colors.error },
       infoStyle: { backgroundColor: colors.infoSoft, color: colors.info },
-
-      // Overlay
       overlayStyle: {
         backgroundColor: colors.overlay,
       },
     }),
-    [colors, isDark]
+    [colors]
   );
 }
-
-// =============================================================================
-// DEFAULT EXPORT
-// =============================================================================
 
 export default ThemeProvider;

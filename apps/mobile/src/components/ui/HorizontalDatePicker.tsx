@@ -3,17 +3,16 @@
  * Horizontal scrollable date selector showing 14 days
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 
 interface HorizontalDatePickerProps {
-  selectedDate: string | null; // ISO date string (YYYY-MM-DD)
+  selectedDate: string | null;
   onSelectDate: (date: string) => void;
   daysToShow?: number;
 }
 
-// Helper to format date parts
 const formatDate = (date: Date) => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = [
@@ -39,7 +38,6 @@ const formatDate = (date: Date) => {
   };
 };
 
-// Generate array of dates starting from today
 const generateDates = (daysToShow: number): ReturnType<typeof formatDate>[] => {
   const dates: ReturnType<typeof formatDate>[] = [];
   const today = new Date();
@@ -58,23 +56,24 @@ export function HorizontalDatePicker({
   onSelectDate,
   daysToShow = 14,
 }: HorizontalDatePickerProps) {
-  const scrollViewRef = useRef<ScrollView>(null);
-  const dates = generateDates(daysToShow);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const dates = useMemo(() => generateDates(daysToShow), [daysToShow]);
 
-  // Scroll to selected date on mount
   useEffect(() => {
-    if (selectedDate && scrollViewRef.current) {
-      const selectedIndex = dates.findIndex((d) => d.isoDate === selectedDate);
-      if (selectedIndex > 0) {
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({
-            x: selectedIndex * 70,
-            animated: true,
-          });
-        }, 100);
-      }
-    }
-  }, []);
+    if (!selectedDate || !scrollViewRef.current) return;
+
+    const selectedIndex = dates.findIndex((date) => date.isoDate === selectedDate);
+    if (selectedIndex <= 0) return;
+
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        x: selectedIndex * 70,
+        animated: true,
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [dates, selectedDate]);
 
   return (
     <ScrollView

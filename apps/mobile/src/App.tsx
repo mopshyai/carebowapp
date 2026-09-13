@@ -109,7 +109,7 @@ const linking = {
           ProfileIndex: 'profile',
           PersonalInfo: 'profile/personal',
           FamilyMembers: 'profile/family',
-          MemberDetails: 'profile/family/:memberId?',
+          MemberDetails: 'profile/family/:memberId',
           Addresses: 'profile/addresses',
           CareHistory: 'profile/history',
           HealthRecords: 'profile/records',

@@ -39,7 +39,13 @@ export function normalizeDateOfBirth(value?: string): string {
     throw new Error('Please add the patient date of birth before continuing.');
   }
 
-  const datePart = value.slice(0, 10);
+  const trimmed = value.trim();
+  let datePart = trimmed.slice(0, 10);
+  const usDate = trimmed.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
+  if (usDate) {
+    datePart = `${usDate[3]}-${usDate[1].padStart(2, '0')}-${usDate[2].padStart(2, '0')}`;
+  }
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
     throw new Error('Date of birth must use YYYY-MM-DD.');
   }

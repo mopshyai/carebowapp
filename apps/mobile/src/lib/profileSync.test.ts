@@ -53,6 +53,11 @@ describe('profileSync patient identity integrity', () => {
     expect(normalizeDateOfBirth('1958-04-12')).toBe('1958-04-12T00:00:00.000Z');
   });
 
+  it('accepts US calendar dates without guessing a different day', () => {
+    expect(normalizeDateOfBirth('4/12/1958')).toBe('1958-04-12T00:00:00.000Z');
+    expect(normalizeDateOfBirth('04/12/1958')).toBe('1958-04-12T00:00:00.000Z');
+  });
+
   it('sends the latest local safety context with the backend profile', () => {
     const healthInfo = createEmptyMemberHealthInfo();
     healthInfo.bloodType = 'O+';

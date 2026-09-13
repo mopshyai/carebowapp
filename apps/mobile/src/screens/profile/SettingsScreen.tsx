@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import type { AppNavigationProp } from '../../navigation/types';
 import { useTranslation, type SupportedLanguage } from '../../localization';
 import { createLogger } from '../../utils/logger';
 
@@ -18,7 +19,7 @@ const logger = createLogger('Settings');
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
   const { t, language, setLanguage, languages } = useTranslation();
 
   const appSettings = useProfileStore((state) => state.appSettings);
@@ -85,7 +86,7 @@ export default function SettingsScreen() {
   const handleUpgrade = () => {
     // Route into the real Care Plans flow (Ask CareBow premium, $20/mo) instead
     // of a dead "coming soon" alert. PlanDetails handles plan selection → checkout.
-    navigation.navigate('PlanDetails' as never, { id: 'ask_carebow' } as never);
+    navigation.navigate('PlanDetails', { id: 'ask_carebow' });
   };
 
   const handleLogout = () => {
@@ -96,7 +97,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: () => {
           logout();
-          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' as never }] });
+          navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
         },
       },
     ]);
@@ -237,7 +238,7 @@ export default function SettingsScreen() {
           <View style={styles.sectionCard}>
             <TouchableOpacity
               style={styles.settingItem}
-              onPress={() => navigation.navigate('PersonalInfo' as never)}
+              onPress={() => navigation.navigate('PersonalInfo')}
             >
               <View style={styles.settingIcon}>
                 <Icon name="person-outline" size={20} color={colors.accent} />
@@ -253,7 +254,7 @@ export default function SettingsScreen() {
 
             <TouchableOpacity
               style={styles.settingItem}
-              onPress={() => navigation.navigate('Privacy' as never)}
+              onPress={() => navigation.navigate('Privacy')}
             >
               <View style={styles.settingIcon}>
                 <Icon name="lock-closed-outline" size={20} color={colors.accent} />

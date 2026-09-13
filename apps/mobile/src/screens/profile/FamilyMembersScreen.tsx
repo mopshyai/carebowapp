@@ -19,11 +19,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { profilesApi } from '../../services/api/endpoints/profiles';
+import type { ProfileStackParamList } from '../../navigation/types';
 import {
   mapGender,
   normalizeDateOfBirth,
@@ -60,7 +62,7 @@ const GENDER_OPTIONS: Array<{ value: Exclude<Gender, 'prefer_not_to_say'>; label
 
 export default function FamilyMembersScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const userId = useAuthStore((state) => state.user?.id);
 
   const members = useProfileStore((state) => state.members);
@@ -288,9 +290,7 @@ export default function FamilyMembersScreen() {
               <Pressable
                 key={member.id}
                 style={({ pressed }) => [styles.memberCard, pressed && styles.pressed]}
-                onPress={() =>
-                  navigation.navigate('MemberDetails' as never, { id: member.id } as never)
-                }
+                onPress={() => navigation.navigate('MemberDetails', { id: member.id })}
               >
                 <View style={styles.memberHeader}>
                   <View style={styles.memberAvatar}>

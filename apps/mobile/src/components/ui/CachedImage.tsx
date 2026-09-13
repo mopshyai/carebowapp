@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   loaderContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.surface2,

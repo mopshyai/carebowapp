@@ -27,6 +27,8 @@ import type { AuthStackParamList } from '@/navigation/types';
 type VerifyEmailScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'VerifyEmail'>;
 type VerifyEmailScreenRouteProp = RouteProp<AuthStackParamList, 'VerifyEmail'>;
 
+type TextInputInstance = React.ElementRef<typeof TextInput>;
+
 const CODE_LENGTH = 6;
 
 export default function VerifyEmailScreen() {
@@ -40,7 +42,7 @@ export default function VerifyEmailScreen() {
 
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [resendCooldown, setResendCooldown] = useState(0);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<(TextInputInstance | null)[]>([]);
 
   // Deep link path: the emailed verification link opened the app with ?token=...
   // Verify it immediately — no manual input needed.
@@ -214,7 +216,9 @@ export default function VerifyEmailScreen() {
             {code.map((digit, index) => (
               <TextInput
                 key={index}
-                ref={(ref) => (inputRefs.current[index] = ref)}
+                ref={(ref) => {
+                  inputRefs.current[index] = ref;
+                }}
                 style={[
                   styles.codeInput,
                   digit && styles.codeInputFilled,

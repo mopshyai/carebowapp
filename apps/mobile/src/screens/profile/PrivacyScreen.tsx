@@ -280,7 +280,9 @@ export default function PrivacyScreen() {
         visible={deleteModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => !deleting && setDeleteModalVisible(false)}
+        onRequestClose={() => {
+          if (!deleting) setDeleteModalVisible(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>

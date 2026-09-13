@@ -26,7 +26,7 @@
     "ios": "pnpm --filter @carebow/mobile ios",
     "android": "pnpm --filter @carebow/mobile android",
     "pod-install": "pnpm --filter @carebow/mobile pod-install",
-    "prepare": "husky install",
+    "prepare": "node scripts/patch-react-native-splash-screen.mjs && node scripts/patch-react-native-tts.mjs && node scripts/patch-react-native-voice.mjs && husky install",
     "precommit": "lint-staged",
     "release": "standard-version",
     "release:minor": "standard-version --release-as minor",
@@ -85,6 +85,6 @@
   },
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0 <23"
   }
 }

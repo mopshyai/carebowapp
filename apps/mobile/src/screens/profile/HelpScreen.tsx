@@ -91,7 +91,7 @@ export default function HelpScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const faqSectionY = useRef(0);
 
   const toggleFaq = (id: string) => {
