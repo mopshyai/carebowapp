@@ -10,6 +10,7 @@
 		00E356F31AD99517003FC87E /* CareBowTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* CareBowTests.m */; };
 		125C689F3D874F0EF1FF8A7E /* Swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40BBFD00840ADF72B229469B /* Swift.swift */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
+		A76F27A01B2C3D4E5F607182 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A76F27A11B2C3D4E5F607182 /* SceneDelegate.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
 		1CB66F0F0BF54779A34FF8B0 /* AntDesign.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 292F7BE0D8394224ABD104FF /* AntDesign.ttf */; };
@@ -86,6 +87,7 @@
 		13B07F961A680F5B00A75B9A /* CareBow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CareBow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FAF1A68108700A75B9A /* AppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AppDelegate.h; path = CareBow/AppDelegate.h; sourceTree = "<group>"; };
 		13B07FB01A68108700A75B9A /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = AppDelegate.mm; path = CareBow/AppDelegate.mm; sourceTree = "<group>"; };
+		A76F27A11B2C3D4E5F607182 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = CareBow/SceneDelegate.swift; sourceTree = "<group>"; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = CareBow/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = CareBow/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = CareBow/main.m; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 			children = (
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
+				A76F27A11B2C3D4E5F607182 /* SceneDelegate.swift */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -563,6 +566,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
+				A76F27A01B2C3D4E5F607182 /* SceneDelegate.swift in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 				D93F22D6DC515D395472E63B /* Swift.swift in Sources */,
 				A9C0908027CE620969B51484 /* Swift.swift in Sources */,

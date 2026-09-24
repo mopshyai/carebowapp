@@ -1,55 +1,13 @@
 #import "AppDelegate.h"
 
-#import <React/RCTBundleURLProvider.h>
-#import <React/RCTLinkingManager.h>
-#import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
-
 @implementation AppDelegate
 
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
-{
-  self.moduleName = @"CareBow";
-  // React Native's Objective-C++ app delegate requires the dependency provider
-  // so autolinked/native component dependencies are registered at runtime.
-  self.dependencyProvider = [RCTAppDependencyProvider new];
-  // You can add your custom initial props in the dictionary below.
-  // They will be passed down to the ViewController used by React Native.
-  self.initialProps = @{};
-
-  return [super application:application didFinishLaunchingWithOptions:launchOptions];
-}
-
-// Deep links: carebow:// custom scheme
 - (BOOL)application:(UIApplication *)application
-            openURL:(NSURL *)url
-            options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options
+    didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-  return [RCTLinkingManager application:application openURL:url options:options];
-}
-
-// Universal Links (https://www.carebow.com/...) — requires the associated-domains
-// entitlement plus apple-app-site-association on the server to activate.
-- (BOOL)application:(UIApplication *)application
-    continueUserActivity:(NSUserActivity *)userActivity
-      restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *))restorationHandler
-{
-  return [RCTLinkingManager application:application
-                   continueUserActivity:userActivity
-                     restorationHandler:restorationHandler];
-}
-
-- (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
-{
-  return [self bundleURL];
-}
-
-- (NSURL *)bundleURL
-{
-#if DEBUG
-  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
-#else
-  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
-#endif
+  // iOS 27 requires the UIScene lifecycle for apps built with the latest SDK.
+  // React Native window creation is owned by SceneDelegate.
+  return YES;
 }
 
 @end
