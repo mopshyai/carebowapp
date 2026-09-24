@@ -201,6 +201,45 @@ describe('AuthStore Login', () => {
     expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
   });
 
+  it('does not leak onboarding completion from Account A to Account B across logout', async () => {
+    // 1. Account A logs in with server onboardingCompleted = true
+    const loginA = await useAuthStore.getState().login('onboarded@example.com', 'password123');
+    expect(loginA).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+
+    // 2. Logout occurs
+    await useAuthStore.getState().logout();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+
+    // 3. Account B (not onboarded) logs in
+    const loginB = await useAuthStore.getState().login('newuser@example.com', 'password123');
+    expect(loginB).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+  });
+
+  it('resets onboarding state when secure tokens are missing on hydration and enforces Account B onboarding', async () => {
+    // Simulate Account A was onboarded and stored
+    await useAuthStore.getState().login('onboarded@example.com', 'password123');
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+
+    // Secure storage tokens are cleared / lost (e.g. Android restore / credential reset)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { SecureStorage } = require('@/services/storage/secureStorage');
+    await SecureStorage.clearAuthTokens();
+
+    // Hydration runs and detects missing tokens
+    await useAuthStore.getState().hydrateTokensFromSecureStorage();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+
+    // Account B logs in without server onboardingCompleted
+    const loginB = await useAuthStore.getState().login('newuser@example.com', 'password123');
+    expect(loginB).toBe(true);
+    // Account B must see onboarding (hasCompletedOnboarding is false)
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+  });
+
   it('maps org_member onto the provider dashboard instead of customer', async () => {
     const result = await useAuthStore.getState().login('org@example.com', 'password123');
 

@@ -282,8 +282,7 @@ export const useAuthStore = create<AuthStore>()(
             // a stale persisted type (would show e.g. a provider dashboard to a
             // customer); default to 'customer' if the field is somehow absent.
             userType: extractUserType(envelope) ?? 'customer',
-            hasCompletedOnboarding:
-              get().hasCompletedOnboarding || extractOnboardingCompleted(envelope),
+            hasCompletedOnboarding: extractOnboardingCompleted(envelope),
             accessToken: tokens?.accessToken ?? null,
             refreshToken: tokens?.refreshToken ?? null,
             isLoading: false,
@@ -363,8 +362,7 @@ export const useAuthStore = create<AuthStore>()(
               user: su,
               isAuthenticated: true,
               userType: extractUserType(envelope) ?? get().userType,
-              hasCompletedOnboarding:
-                get().hasCompletedOnboarding || extractOnboardingCompleted(envelope),
+              hasCompletedOnboarding: extractOnboardingCompleted(envelope),
               accessToken: tokens.accessToken,
               refreshToken: tokens.refreshToken,
               pendingVerificationEmail: null,
@@ -489,9 +487,7 @@ export const useAuthStore = create<AuthStore>()(
               user: vu,
               isAuthenticated: true,
               userType: extractUserType({ user: user ?? undefined }) ?? get().userType,
-              hasCompletedOnboarding:
-                get().hasCompletedOnboarding ||
-                extractOnboardingCompleted({ user: user ?? undefined }),
+              hasCompletedOnboarding: extractOnboardingCompleted({ user: user ?? undefined }),
               accessToken: tokens.accessToken,
               refreshToken: tokens.refreshToken,
               pendingVerificationEmail: null,
@@ -569,6 +565,8 @@ export const useAuthStore = create<AuthStore>()(
           set({
             user: normalizeUser(user, pendingEmail),
             isAuthenticated: true,
+            userType: extractUserType(envelope) ?? get().userType,
+            hasCompletedOnboarding: extractOnboardingCompleted(envelope),
             accessToken: tokens?.accessToken ?? null,
             refreshToken: tokens?.refreshToken ?? null,
             pendingVerificationEmail: null,
@@ -760,7 +758,7 @@ export const useAuthStore = create<AuthStore>()(
             if (__DEV__) {
               console.log('[AuthStore] Tokens hydrated from secure storage');
             }
-          } else if (get().isAuthenticated) {
+          } else if (get().isAuthenticated || get().hasCompletedOnboarding || get().user) {
             // User data exists but no tokens - need to re-authenticate
             if (__DEV__) {
               console.log('[AuthStore] No tokens found - clearing auth state');
@@ -770,6 +768,9 @@ export const useAuthStore = create<AuthStore>()(
               user: null,
               accessToken: null,
               refreshToken: null,
+              hasCompletedOnboarding: false,
+              userRole: null,
+              currentOnboardingStep: 'slides',
             });
           }
         } catch (error) {
