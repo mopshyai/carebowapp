@@ -76,12 +76,13 @@ export default function RootNavigator() {
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !userId || isProviderUserType(userType)) return;
 
+    let isCancelled = false;
     const expectedUserId = userId;
     void hydrateOwnedProfilesFromServer(expectedUserId, {
-      shouldApply: () => useAuthStore.getState().user?.id === expectedUserId,
+      shouldApply: () => !isCancelled && useAuthStore.getState().user?.id === expectedUserId,
     })
       .then((applied) => {
-        if (!applied) return;
+        if (isCancelled || !applied) return;
         if (useAuthStore.getState().user?.id !== expectedUserId) return;
 
         const hasServerPatient = useProfileStore
@@ -92,8 +93,14 @@ export default function RootNavigator() {
         }
       })
       .catch((error) => {
-        console.warn('[RootNavigator] Patient profile hydration failed', error);
+        if (!isCancelled) {
+          console.warn('[RootNavigator] Patient profile hydration failed', error);
+        }
       });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [hasHydrated, isAuthenticated, userId, userType]);
 
   if (!hasHydrated) {

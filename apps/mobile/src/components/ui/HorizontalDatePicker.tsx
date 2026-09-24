@@ -128,6 +128,16 @@ export function HorizontalDatePicker({
     return generateDates(daysToShow, base);
   }, [daysToShow, effectiveDayKey, baseDate]);
 
+  // If the currently selected date is no longer within the refreshed allowed dates
+  // (e.g. overnight app rollover removed yesterday), clear the selection in the parent.
+  useEffect(() => {
+    if (!selectedDate) return;
+    const isAllowed = dates.some((d) => d.isoDate === selectedDate);
+    if (!isAllowed) {
+      onSelectDate('');
+    }
+  }, [dates, selectedDate, onSelectDate]);
+
   useEffect(() => {
     if (!selectedDate || !scrollViewRef.current) return;
 

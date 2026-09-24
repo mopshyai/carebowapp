@@ -108,4 +108,73 @@ describe('HorizontalDatePicker', () => {
     expect(getByText('25')).toBeTruthy();
     expect(getByText('27')).toBeTruthy();
   });
+
+  it('clears selection when refreshed date window rolls over and excludes the selected date', () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((event, listener) => {
+      if (event === 'change') {
+        appStateListener = listener as (state: AppStateStatus) => void;
+      }
+      return { remove: jest.fn() } as never;
+    });
+
+    const mockToday = new Date('2026-09-24T22:00:00');
+    jest.useFakeTimers();
+    jest.setSystemTime(mockToday);
+
+    const onSelectDate = jest.fn();
+    const { getByText, queryByText } = render(
+      <HorizontalDatePicker selectedDate="2026-09-24" onSelectDate={onSelectDate} daysToShow={3} />
+    );
+
+    expect(getByText('24')).toBeTruthy();
+    expect(onSelectDate).not.toHaveBeenCalled();
+
+    // Advance to next day past midnight
+    jest.setSystemTime(new Date('2026-09-25T07:00:00'));
+    act(() => {
+      appStateListener?.('active');
+    });
+
+    // Yesterday is excluded from the new window; parent draft must be cleared
+    expect(queryByText('24')).toBeNull();
+    expect(onSelectDate).toHaveBeenCalledWith('');
+
+    jest.useRealTimers();
+  });
+
+  it('preserves selection when selected date is still within the refreshed window', () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((event, listener) => {
+      if (event === 'change') {
+        appStateListener = listener as (state: AppStateStatus) => void;
+      }
+      return { remove: jest.fn() } as never;
+    });
+
+    const mockToday = new Date('2026-09-24T22:00:00');
+    jest.useFakeTimers();
+    jest.setSystemTime(mockToday);
+
+    const onSelectDate = jest.fn();
+    // User selected 2 days ahead (2026-09-26)
+    const { getByText } = render(
+      <HorizontalDatePicker selectedDate="2026-09-26" onSelectDate={onSelectDate} daysToShow={5} />
+    );
+
+    expect(getByText('26')).toBeTruthy();
+    expect(onSelectDate).not.toHaveBeenCalled();
+
+    // Advance to next day (2026-09-25)
+    jest.setSystemTime(new Date('2026-09-25T07:00:00'));
+    act(() => {
+      appStateListener?.('active');
+    });
+
+    // 2026-09-26 is still in the 5-day window; onSelectDate must NOT be called with ''
+    expect(getByText('26')).toBeTruthy();
+    expect(onSelectDate).not.toHaveBeenCalledWith('');
+
+    jest.useRealTimers();
+  });
 });
