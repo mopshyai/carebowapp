@@ -37,6 +37,21 @@ export interface V1ProfileShareResponse {
   message?: string;
 }
 
+export interface V1ProfileShareGrant {
+  userId: string;
+  name?: string | null;
+  email?: string | null;
+  accessLevel: 'READ_ONLY' | 'FULL';
+  relationshipToProfile?: string | null;
+  createdAt: string;
+}
+
+export interface V1ProfileShareListResponse {
+  success: boolean;
+  error?: string;
+  grants?: V1ProfileShareGrant[];
+}
+
 export interface V1ProfileDeleteResponse {
   success: boolean;
   error?: string;
@@ -92,6 +107,16 @@ export const profilesApi = {
     return response.data;
   },
 
+  getProfileShares: async (profileId: string): Promise<V1ProfileShareGrant[]> => {
+    const response = await ApiClient.get<V1ProfileShareListResponse>(
+      `/v1/profiles/${profileId}/share`
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Unable to load profile access');
+    }
+    return response.data.grants ?? [];
+  },
+
   shareProfile: async (
     profileId: string,
     data: { email: string; accessLevel?: 'READ_ONLY' | 'FULL' }
@@ -99,6 +124,17 @@ export const profilesApi = {
     const response = await ApiClient.post<V1ProfileShareResponse>(
       `/v1/profiles/${profileId}/share`,
       data
+    );
+    return response.data;
+  },
+
+  revokeProfileShare: async (
+    profileId: string,
+    userId: string
+  ): Promise<V1ProfileShareResponse> => {
+    const response = await ApiClient.delete<V1ProfileShareResponse>(
+      `/v1/profiles/${profileId}/share`,
+      { params: { userId } }
     );
     return response.data;
   },

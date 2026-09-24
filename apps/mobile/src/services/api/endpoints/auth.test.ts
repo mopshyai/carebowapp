@@ -64,3 +64,19 @@ it('still clears local tokens when server logout fails', async () => {
   await expect(authApi.logout()).resolves.toBeUndefined();
   expect(mockClearTokens).toHaveBeenCalledTimes(1);
 });
+
+it('OAuth first-step deleteAccount does NOT clear tokens when success is false and confirmationRequired is true', async () => {
+  mockPost.mockResolvedValue({ data: { success: false, confirmationRequired: true } });
+
+  await authApi.deleteAccount();
+
+  expect(mockClearTokens).not.toHaveBeenCalled();
+});
+
+it('deleteAccount with password clears tokens exactly once on success', async () => {
+  mockPost.mockResolvedValue({ data: { success: true } });
+
+  await authApi.deleteAccount({ password: 'Hunter2!' });
+
+  expect(mockClearTokens).toHaveBeenCalledTimes(1);
+});
