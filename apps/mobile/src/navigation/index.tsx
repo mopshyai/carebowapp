@@ -76,8 +76,14 @@ export default function RootNavigator() {
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !userId || isProviderUserType(userType)) return;
 
-    void hydrateOwnedProfilesFromServer(userId)
-      .then(() => {
+    const expectedUserId = userId;
+    void hydrateOwnedProfilesFromServer(expectedUserId, {
+      shouldApply: () => useAuthStore.getState().user?.id === expectedUserId,
+    })
+      .then((applied) => {
+        if (!applied) return;
+        if (useAuthStore.getState().user?.id !== expectedUserId) return;
+
         const hasServerPatient = useProfileStore
           .getState()
           .members.some((member) => Boolean(member.backendId));

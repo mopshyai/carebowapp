@@ -26,11 +26,7 @@ import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { profilesApi } from '../../services/api/endpoints/profiles';
 import type { ProfileStackParamList } from '../../navigation/types';
-import {
-  mapGender,
-  normalizeDateOfBirth,
-  relationshipForBackend,
-} from '../../lib/profileSync';
+import { mapGender, normalizeDateOfBirth, relationshipForBackend } from '../../lib/profileSync';
 import { hydrateOwnedProfilesFromServer } from '../../lib/profileRepository';
 import {
   FamilyMember,
@@ -86,7 +82,10 @@ export default function FamilyMembersScreen() {
       if (showSpinner) setIsRefreshing(true);
 
       try {
-        await hydrateOwnedProfilesFromServer(userId);
+        const expectedUserId = userId;
+        await hydrateOwnedProfilesFromServer(expectedUserId, {
+          shouldApply: () => useAuthStore.getState().user?.id === expectedUserId,
+        });
         setSyncError(null);
       } catch (error) {
         setSyncError(
@@ -257,10 +256,7 @@ export default function FamilyMembersScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void refreshProfiles(true)}
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => void refreshProfiles(true)} />
         }
       >
         {/* Info Card */}
@@ -278,7 +274,8 @@ export default function FamilyMembersScreen() {
           <View style={styles.syncWarning}>
             <Icon name="cloud-offline-outline" size={20} color={colors.warning} />
             <Text style={styles.syncWarningText}>
-              Account refresh failed. Showing the last data saved on this device. Pull down to retry.
+              Account refresh failed. Showing the last data saved on this device. Pull down to
+              retry.
             </Text>
           </View>
         )}

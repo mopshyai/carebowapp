@@ -112,6 +112,7 @@ jest.mock('@/services/api/endpoints/auth', () => {
 
 import { useAuthStore } from './useAuthStore';
 import { ApiClient } from '@/services/api/ApiClient';
+import { SecureStorage } from '@/services/storage/SecureStorage';
 
 // Unit tests must never wait on the production logout endpoint. `logout()`
 // intentionally attempts best-effort refresh-token revocation when a token is
@@ -224,8 +225,6 @@ describe('AuthStore Login', () => {
     expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
 
     // Secure storage tokens are cleared / lost (e.g. Android restore / credential reset)
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { SecureStorage } = require('@/services/storage/secureStorage');
     await SecureStorage.clearAuthTokens();
 
     // Hydration runs and detects missing tokens
