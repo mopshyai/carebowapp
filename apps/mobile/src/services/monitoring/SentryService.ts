@@ -18,6 +18,7 @@
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
 import { SENTRY_DSN as ENV_SENTRY_DSN } from '@env';
+import { redactSentryBreadcrumb, redactSentryFreeText } from './sentryPrivacy';
 
 // ============================================
 // TYPES
@@ -151,15 +152,16 @@ class SentryServiceClass {
             }));
           }
 
-          return event;
+          // Message fields are also arbitrary free text. They can contain
+          // symptoms, names, addresses, or booking notes even when PII defaults
+          // and structured extras are disabled. Keep stack/type metadata while
+          // replacing free text with fixed operational placeholders.
+          return redactSentryFreeText(event);
         },
 
-        // Strip breadcrumb payloads before they are attached to any event. Keep
-        // category/message/level so crash chronology remains useful.
-        beforeBreadcrumb: (breadcrumb) => ({
-          ...breadcrumb,
-          data: undefined,
-        }),
+        // Strip breadcrumb payloads and arbitrary message text before they are
+        // attached to any event. Category/level/timestamp remain useful.
+        beforeBreadcrumb: (breadcrumb) => redactSentryBreadcrumb(breadcrumb),
 
         // Add default tags
         integrations: [Sentry.reactNativeTracingIntegration()],

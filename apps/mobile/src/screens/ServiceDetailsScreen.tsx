@@ -22,7 +22,7 @@ import type { AppNavigationProp } from '../navigation/types';
 import { colors, spacing, radius, typography, shadows, layout } from '../theme';
 import { AppIcon, IconContainer, IconName, getIconColors } from '../components/icons';
 import { PackageSelectorList } from '../components/ui/PackageSelectorList';
-import { HorizontalDatePicker } from '../components/ui/HorizontalDatePicker';
+import { HorizontalDatePicker, getCalendarDayKey } from '../components/ui/HorizontalDatePicker';
 import { MemberPicker } from '../components/ui/MemberPicker';
 import { RequestTextArea } from '../components/ui/RequestTextArea';
 import { StickyCheckoutBar } from '../components/ui/StickyCheckoutBar';
@@ -203,7 +203,7 @@ export default function ServiceDetailsScreen() {
   // Handle date selection
   const handleSelectDate = useCallback(
     (date: string) => {
-      updateBookingDraft({ date });
+      updateBookingDraft({ date: date || null });
     },
     [updateBookingDraft]
   );
@@ -244,7 +244,11 @@ export default function ServiceDetailsScreen() {
   const isValid = useMemo(() => {
     if (!service || !bookingDraft) return false;
     if (service.booking.requiresMember && !bookingDraft.memberId) return false;
-    if (service.booking.requiresDate && !bookingDraft.date) return false;
+    if (service.booking.requiresDate) {
+      if (!bookingDraft.date) return false;
+      const todayKey = getCalendarDayKey();
+      if (bookingDraft.date < todayKey) return false;
+    }
     if (service.booking.requiresTime && !bookingDraft.startTime) return false;
     if (service.pricing.type === 'packages' && !bookingDraft.selectedPackageId) return false;
     if (service.pricing.type === 'hourly' && !bookingDraft.hours) return false;
@@ -257,6 +261,19 @@ export default function ServiceDetailsScreen() {
   const handleCheckout = async () => {
     if (!service || !bookingDraft || !isValid) {
       Alert.alert('Missing Information', 'Please complete all required fields to continue.');
+      return;
+    }
+
+    if (
+      service.booking.requiresDate &&
+      bookingDraft.date &&
+      bookingDraft.date < getCalendarDayKey()
+    ) {
+      Alert.alert(
+        'Invalid Date',
+        'The selected appointment date is no longer available. Please choose a new date.'
+      );
+      updateBookingDraft({ date: null });
       return;
     }
 

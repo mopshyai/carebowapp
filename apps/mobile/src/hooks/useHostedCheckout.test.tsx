@@ -6,7 +6,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { AppState, AppStateStatus, Linking } from 'react-native';
 import { useHostedCheckout } from './useHostedCheckout';
 import { paymentsApi } from '../services/api/endpoints/payments';
 
@@ -16,14 +16,7 @@ jest.mock('../services/api/endpoints/payments', () => ({
 
 const status = paymentsApi.getPaymentStatus as jest.Mock;
 
-let appStateListener: ((state: string) => void) | null = null;
-
-jest.mock('react-native/Libraries/AppState/AppState', () => ({
-  addEventListener: (_event: string, handler: (state: string) => void) => {
-    appStateListener = handler;
-    return { remove: jest.fn() };
-  },
-}));
+let appStateListener: ((state: AppStateStatus) => void) | null = null;
 
 const resume = async () => {
   await act(async () => {
@@ -34,6 +27,12 @@ const resume = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   appStateListener = null;
+  jest.spyOn(AppState, 'addEventListener').mockImplementation(
+    ((_type: string, handler: (state: AppStateStatus) => void) => {
+      appStateListener = handler;
+      return { remove: jest.fn() };
+    }) as typeof AppState.addEventListener
+  );
   jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
   jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
 });

@@ -6,7 +6,7 @@ This repository contains the CareBow React Native mobile application and shared 
 
 Use the toolchain declared by the repository rather than installing arbitrary newer majors:
 
-- Node.js 20 or newer compatible release (`package.json` currently requires `>=20`)
+- Node.js 22.22.0 (`.nvmrc`; supported engine range `>=22.13.0 <23`)
 - pnpm 10.20.0 via the root `packageManager` declaration
 - JDK 17 for Android builds
 - Android Studio / Android SDK for Android development

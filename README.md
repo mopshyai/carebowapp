@@ -81,7 +81,7 @@ for one product is how they drift apart unnoticed. Do backend work in
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.22.0 (see `.nvmrc`)
 - pnpm 8+ (`npm install -g pnpm`)
 - Xcode 15+ (for iOS)
 - Android Studio (for Android)

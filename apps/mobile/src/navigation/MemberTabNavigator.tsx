@@ -26,10 +26,18 @@ const WORK_TAB: Record<string, { variant: MemberListVariant; label: string; icon
   service_partner: { variant: 'tests', label: 'Orders', icon: 'flask-outline' },
 };
 
+// Must be a stable module-level component. An inline `() => <MemberListScreen />`
+// inside the navigator remounts on every parent render and crashes RN 0.87
+// Fabric on Android back (`Unable to find view for viewState`, layout-only tag).
+function MemberWorkScreen() {
+  const userType = useAuthStore((s) => s.userType);
+  const work = WORK_TAB[userType] ?? WORK_TAB.service_provider;
+  return <MemberListScreen variant={work.variant} />;
+}
+
 export default function MemberTabNavigator() {
   const userType = useAuthStore((s) => s.userType);
   const work = WORK_TAB[userType] ?? WORK_TAB.service_provider;
-  const WorkScreen = () => <MemberListScreen variant={work.variant} />;
 
   return (
     <Tab.Navigator
@@ -44,22 +52,36 @@ export default function MemberTabNavigator() {
       <Tab.Screen
         name="Home"
         component={MemberHomeScreen}
-        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color, size }) => <Icon name="home-outline" size={size} color={color} /> }}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size }) => <Icon name="home-outline" size={size} color={color} />,
+        }}
       />
       <Tab.Screen
         name="Work"
-        component={WorkScreen}
-        options={{ tabBarLabel: work.label, tabBarIcon: ({ color, size }) => <Icon name={work.icon} size={size} color={color} /> }}
+        component={MemberWorkScreen}
+        options={{
+          tabBarLabel: work.label,
+          tabBarIcon: ({ color, size }) => <Icon name={work.icon} size={size} color={color} />,
+        }}
       />
       <Tab.Screen
         name="Messages"
         component={MessagesScreen}
-        options={{ tabBarLabel: 'Messages', tabBarIcon: ({ color, size }) => <Icon name="chatbubbles-outline" size={size} color={color} /> }}
+        options={{
+          tabBarLabel: 'Messages',
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="chatbubbles-outline" size={size} color={color} />
+          ),
+        }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
-        options={{ tabBarLabel: 'Profile', tabBarIcon: ({ color, size }) => <Icon name="person-outline" size={size} color={color} /> }}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <Icon name="person-outline" size={size} color={color} />,
+        }}
       />
     </Tab.Navigator>
   );

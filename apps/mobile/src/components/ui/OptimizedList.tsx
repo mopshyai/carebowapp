@@ -209,7 +209,7 @@ export function OptimizedFlatList<T>({
       ListEmptyComponent={renderEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
       ListFooterComponent={
-        ListFooterComponent || (isLoading && data?.length ? <ListFooterLoader /> : null)
+        ListFooterComponent || (isLoading && data?.length ? <ListFooterLoader /> : undefined)
       }
       ItemSeparatorComponent={ItemSeparatorComponent}
       getItemLayout={getItemLayout}

@@ -183,6 +183,13 @@ export function ensureLocalSelfPatientProfileFromUser(user: UserProfile): Family
     return useProfileStore.getState().getMemberById(existing.id) ?? snapshot;
   }
 
+  // Do not create a local self patient without the demographics Ask CareBow
+  // needs. That empty row later tries to POST a second server profile and
+  // traps 1-profile family accounts behind PROFILE_LIMIT_REACHED.
+  if (!snapshot.dateOfBirth || !snapshot.gender) {
+    return snapshot;
+  }
+
   return state.addMember({
     backendId: snapshot.backendId,
     firstName: snapshot.firstName,
@@ -266,8 +273,20 @@ export async function persistMemberSnapshot(member: FamilyMember): Promise<strin
  * still exist. Local legacy members with no backendId are preserved so the user
  * can repair/sync them instead of losing data during an upgrade.
  */
-export async function hydrateOwnedProfilesFromServer(userId: string): Promise<void> {
+export interface HydrateProfilesOptions {
+  shouldApply?: () => boolean;
+}
+
+export async function hydrateOwnedProfilesFromServer(
+  userId: string,
+  options?: HydrateProfilesOptions
+): Promise<boolean> {
   const profiles = await profilesApi.getProfiles();
+
+  if (options?.shouldApply && !options.shouldApply()) {
+    return false;
+  }
+
   const ownedProfiles = profiles.filter((profile) => profile.userId === userId);
   const serverIds = new Set(ownedProfiles.map((profile) => profile.id));
 
@@ -294,4 +313,6 @@ export async function hydrateOwnedProfilesFromServer(userId: string): Promise<vo
       afterHydration.deleteMember(member.id);
     }
   }
+
+  return true;
 }

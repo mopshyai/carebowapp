@@ -19,16 +19,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows, components } from '../../theme';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { profilesApi } from '../../services/api/endpoints/profiles';
-import {
-  mapGender,
-  normalizeDateOfBirth,
-  relationshipForBackend,
-} from '../../lib/profileSync';
+import type { ProfileStackParamList } from '../../navigation/types';
+import { mapGender, normalizeDateOfBirth, relationshipForBackend } from '../../lib/profileSync';
 import { hydrateOwnedProfilesFromServer } from '../../lib/profileRepository';
 import {
   FamilyMember,
@@ -60,7 +58,7 @@ const GENDER_OPTIONS: Array<{ value: Exclude<Gender, 'prefer_not_to_say'>; label
 
 export default function FamilyMembersScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const userId = useAuthStore((state) => state.user?.id);
 
   const members = useProfileStore((state) => state.members);
@@ -84,7 +82,10 @@ export default function FamilyMembersScreen() {
       if (showSpinner) setIsRefreshing(true);
 
       try {
-        await hydrateOwnedProfilesFromServer(userId);
+        const expectedUserId = userId;
+        await hydrateOwnedProfilesFromServer(expectedUserId, {
+          shouldApply: () => useAuthStore.getState().user?.id === expectedUserId,
+        });
         setSyncError(null);
       } catch (error) {
         setSyncError(
@@ -255,10 +256,7 @@ export default function FamilyMembersScreen() {
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + insets.bottom }]}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void refreshProfiles(true)}
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => void refreshProfiles(true)} />
         }
       >
         {/* Info Card */}
@@ -276,7 +274,8 @@ export default function FamilyMembersScreen() {
           <View style={styles.syncWarning}>
             <Icon name="cloud-offline-outline" size={20} color={colors.warning} />
             <Text style={styles.syncWarningText}>
-              Account refresh failed. Showing the last data saved on this device. Pull down to retry.
+              Account refresh failed. Showing the last data saved on this device. Pull down to
+              retry.
             </Text>
           </View>
         )}
@@ -288,9 +287,7 @@ export default function FamilyMembersScreen() {
               <Pressable
                 key={member.id}
                 style={({ pressed }) => [styles.memberCard, pressed && styles.pressed]}
-                onPress={() =>
-                  navigation.navigate('MemberDetails' as never, { id: member.id } as never)
-                }
+                onPress={() => navigation.navigate('MemberDetails', { id: member.id })}
               >
                 <View style={styles.memberHeader}>
                   <View style={styles.memberAvatar}>

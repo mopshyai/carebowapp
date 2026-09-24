@@ -85,7 +85,7 @@ export default function ConversationScreen() {
   const route = useRoute();
   const params = (route.params as Record<string, string>) || {};
   const conversationContext = params.context === 'family' ? 'family' : 'me';
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [triageLevel, setTriageLevel] = useState<TriageLevel | null>(null);

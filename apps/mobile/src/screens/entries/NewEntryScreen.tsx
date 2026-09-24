@@ -23,6 +23,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, spacing, radius, typography, shadows } from '@/theme';
 import { useProfileStore } from '@/store/useProfileStore';
 import { useSymptomEntryStore } from '@/store/symptomEntryStore';
+import type { AppNavigationProp } from '@/navigation/types';
 import {
   type SymptomDuration,
   type SymptomSeverity,
@@ -38,7 +39,7 @@ const MAX_DESCRIPTION_LENGTH = 2000;
 
 export default function NewEntryScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as AppNavigationProp;
 
   // Store hooks
   const members = useProfileStore((state) => state.members);
@@ -95,7 +96,7 @@ export default function NewEntryScreen() {
       );
 
       // Navigate to assessment result
-      navigation.navigate('AssessmentResult' as never, { entryId: entry.id } as never);
+      navigation.navigate('AssessmentResult', { entryId: entry.id });
     } catch (error) {
       Alert.alert('Error', 'Failed to save entry. Please try again.');
     } finally {

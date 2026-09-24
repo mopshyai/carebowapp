@@ -16,42 +16,23 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import { colors, typography, spacing, radius } from '@/theme';
 
-// ============================================
-// TYPES
-// ============================================
-
 export type InputType = 'text' | 'email' | 'password' | 'phone' | 'number';
 
 export interface InputProps extends Omit<TextInputProps, 'style'> {
-  /** Input label */
   label?: string;
-  /** Error message */
   error?: string;
-  /** Helper text shown below input */
   helper?: string;
-  /** Input type for keyboard and behavior */
   type?: InputType;
-  /** Left icon (Feather icon name) */
   leftIcon?: string;
-  /** Right icon (Feather icon name) */
   rightIcon?: string;
-  /** Right icon press handler */
   onRightIconPress?: () => void;
-  /** Disable input */
   disabled?: boolean;
-  /** Required field indicator */
   required?: boolean;
-  /** Container style */
   containerStyle?: ViewStyle;
-  /** Input container style */
   inputContainerStyle?: ViewStyle;
 }
 
-// ============================================
-// COMPONENT
-// ============================================
-
-export const Input = forwardRef<TextInput, InputProps>(
+export const Input = forwardRef<React.ElementRef<typeof TextInput>, InputProps>(
   (
     {
       label,
@@ -81,7 +62,6 @@ export const Input = forwardRef<TextInput, InputProps>(
     const isPassword = type === 'password';
     const showPassword = isPassword && isPasswordVisible;
 
-    // Determine keyboard type based on input type
     const getKeyboardType = (): TextInputProps['keyboardType'] => {
       switch (type) {
         case 'email':
@@ -95,7 +75,6 @@ export const Input = forwardRef<TextInput, InputProps>(
       }
     };
 
-    // Determine auto-capitalize based on input type
     const getAutoCapitalize = (): TextInputProps['autoCapitalize'] => {
       switch (type) {
         case 'email':
@@ -106,19 +85,11 @@ export const Input = forwardRef<TextInput, InputProps>(
       }
     };
 
-    const handleFocus = () => setIsFocused(true);
-    const handleBlur = () => setIsFocused(false);
-
-    const togglePasswordVisibility = () => {
-      setIsPasswordVisible(!isPasswordVisible);
-    };
-
     const hasError = !!error;
     const showHelper = !hasError && !!helper;
 
     return (
       <View style={[styles.container, containerStyle]}>
-        {/* Label */}
         {label && (
           <View style={styles.labelContainer}>
             <Text style={styles.label}>{label}</Text>
@@ -126,7 +97,6 @@ export const Input = forwardRef<TextInput, InputProps>(
           </View>
         )}
 
-        {/* Input Container */}
         <View
           style={[
             styles.inputContainer,
@@ -137,7 +107,6 @@ export const Input = forwardRef<TextInput, InputProps>(
             inputContainerStyle,
           ]}
         >
-          {/* Left Icon */}
           {leftIcon && (
             <Icon
               name={leftIcon}
@@ -147,7 +116,6 @@ export const Input = forwardRef<TextInput, InputProps>(
             />
           )}
 
-          {/* Text Input */}
           <TextInput
             ref={ref}
             style={[
@@ -167,21 +135,22 @@ export const Input = forwardRef<TextInput, InputProps>(
             multiline={multiline}
             numberOfLines={numberOfLines}
             maxLength={maxLength}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             accessible={true}
-            accessibilityLabel={label ? `${label}${required ? ', required' : ''}${hasError ? `, error: ${error}` : ''}` : placeholder}
+            accessibilityLabel={
+              label
+                ? `${label}${required ? ', required' : ''}${hasError ? `, error: ${error}` : ''}`
+                : placeholder
+            }
             accessibilityHint={helper}
-            accessibilityState={{
-              disabled,
-            }}
+            accessibilityState={{ disabled }}
             {...restProps}
           />
 
-          {/* Right Icon / Password Toggle */}
           {isPassword ? (
             <Pressable
-              onPress={togglePasswordVisibility}
+              onPress={() => setIsPasswordVisible((visible) => !visible)}
               hitSlop={8}
               style={styles.rightIconButton}
               accessible={true}
@@ -204,23 +173,17 @@ export const Input = forwardRef<TextInput, InputProps>(
               accessible={!!onRightIconPress}
               accessibilityRole="button"
             >
-              <Icon
-                name={rightIcon}
-                size={20}
-                color={colors.textTertiary}
-              />
+              <Icon name={rightIcon} size={20} color={colors.textTertiary} />
             </Pressable>
           ) : null}
         </View>
 
-        {/* Character Count for multiline */}
         {multiline && maxLength && (
           <Text style={styles.charCount}>
             {value?.length || 0}/{maxLength}
           </Text>
         )}
 
-        {/* Error Message */}
         {hasError && (
           <View style={styles.errorContainer}>
             <Icon name="alert-circle" size={14} color={colors.error} />
@@ -228,7 +191,6 @@ export const Input = forwardRef<TextInput, InputProps>(
           </View>
         )}
 
-        {/* Helper Text */}
         {showHelper && <Text style={styles.helperText}>{helper}</Text>}
       </View>
     );
@@ -237,27 +199,11 @@ export const Input = forwardRef<TextInput, InputProps>(
 
 Input.displayName = 'Input';
 
-// ============================================
-// STYLES
-// ============================================
-
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.md,
-  },
-  labelContainer: {
-    flexDirection: 'row',
-    marginBottom: spacing.xs,
-  },
-  label: {
-    ...typography.label,
-    color: colors.textPrimary,
-  },
-  required: {
-    ...typography.label,
-    color: colors.error,
-    marginLeft: spacing.xxs,
-  },
+  container: { marginBottom: spacing.md },
+  labelContainer: { flexDirection: 'row', marginBottom: spacing.xs },
+  label: { ...typography.label, color: colors.textPrimary },
+  required: { ...typography.label, color: colors.error, marginLeft: spacing.xxs },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,38 +220,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: spacing.sm,
   },
-  inputContainerFocused: {
-    borderColor: colors.accent,
-    borderWidth: 2,
-  },
-  inputContainerError: {
-    borderColor: colors.error,
-    borderWidth: 2,
-  },
-  inputContainerDisabled: {
-    backgroundColor: colors.borderLight,
-    opacity: 0.7,
-  },
-  input: {
-    flex: 1,
-    ...typography.body,
-    color: colors.textPrimary,
-    paddingVertical: 0,
-  },
-  inputMultiline: {
-    textAlignVertical: 'top',
-    paddingTop: 0,
-  },
-  inputDisabled: {
-    color: colors.textTertiary,
-  },
-  leftIcon: {
-    marginRight: spacing.sm,
-  },
-  rightIconButton: {
-    marginLeft: spacing.sm,
-    padding: spacing.xxs,
-  },
+  inputContainerFocused: { borderColor: colors.accent, borderWidth: 2 },
+  inputContainerError: { borderColor: colors.error, borderWidth: 2 },
+  inputContainerDisabled: { backgroundColor: colors.borderLight, opacity: 0.7 },
+  input: { flex: 1, ...typography.body, color: colors.textPrimary, paddingVertical: 0 },
+  inputMultiline: { textAlignVertical: 'top', paddingTop: 0 },
+  inputDisabled: { color: colors.textTertiary },
+  leftIcon: { marginRight: spacing.sm },
+  rightIconButton: { marginLeft: spacing.sm, padding: spacing.xxs },
   charCount: {
     ...typography.caption,
     color: colors.textTertiary,
@@ -318,16 +240,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     gap: spacing.xxs,
   },
-  errorText: {
-    ...typography.caption,
-    color: colors.error,
-    flex: 1,
-  },
-  helperText: {
-    ...typography.caption,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
-  },
+  errorText: { ...typography.caption, color: colors.error, flex: 1 },
+  helperText: { ...typography.caption, color: colors.textTertiary, marginTop: spacing.xs },
 });
 
 export default Input;

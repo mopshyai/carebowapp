@@ -3,6 +3,7 @@ import {
   localRelationshipFromBackend,
   memberInputFromBackend,
   selfMemberSnapshotFromUser,
+  hydrateOwnedProfilesFromServer,
 } from './profileRepository';
 import {
   createEmptyCarePreferences,
@@ -10,6 +11,17 @@ import {
   type FamilyMember,
 } from '../types/profile';
 import type { V1Profile } from '../services/api/endpoints/profiles';
+import { profilesApi } from '../services/api/endpoints/profiles';
+import { useProfileStore } from '../store/useProfileStore';
+
+jest.mock('../services/api/endpoints/profiles', () => ({
+  profilesApi: {
+    getProfiles: jest.fn(),
+    createProfile: jest.fn(),
+    updateProfile: jest.fn(),
+    deleteProfile: jest.fn(),
+  },
+}));
 
 function serverProfile(overrides: Partial<V1Profile> = {}): V1Profile {
   return {
@@ -145,5 +157,88 @@ describe('profileRepository backend mapping', () => {
     expect(snapshot.backendId).toBe(existing.backendId);
     expect(snapshot.healthInfo.height).toBe(160);
     expect(snapshot.dateOfBirth).toBe('1960-01-02');
+  });
+});
+
+describe('hydrateOwnedProfilesFromServer', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useProfileStore.getState().logout();
+  });
+
+  it('hydrates server profiles for the matching user into profile store', async () => {
+    (profilesApi.getProfiles as jest.Mock).mockResolvedValueOnce([
+      serverProfile({ id: 'profile-user1', userId: 'user-1', name: 'Maya Kumar' }),
+      serverProfile({ id: 'profile-other', userId: 'user-other', name: 'Other Person' }),
+    ]);
+
+    const applied = await hydrateOwnedProfilesFromServer('user-1');
+
+    expect(applied).toBe(true);
+    const members = useProfileStore.getState().members;
+    expect(members).toHaveLength(1);
+    expect(members[0].backendId).toBe('profile-user1');
+    expect(members[0].firstName).toBe('Maya');
+  });
+
+  it('aborts hydration and does not alter store if shouldApply returns false', async () => {
+    (profilesApi.getProfiles as jest.Mock).mockResolvedValueOnce([
+      serverProfile({ id: 'profile-user1', userId: 'user-1', name: 'Maya Kumar' }),
+    ]);
+
+    const applied = await hydrateOwnedProfilesFromServer('user-1', {
+      shouldApply: () => false,
+    });
+
+    expect(applied).toBe(false);
+    expect(useProfileStore.getState().members).toHaveLength(0);
+  });
+
+  it('guards against stale Account A profile hydration race when Account B logs in before response', async () => {
+    let currentUser = 'user-A';
+    let resolveProfiles: (profiles: V1Profile[]) => void = () => {};
+    const deferredPromise = new Promise<V1Profile[]>((resolve) => {
+      resolveProfiles = resolve;
+    });
+
+    (profilesApi.getProfiles as jest.Mock).mockReturnValueOnce(deferredPromise);
+
+    // 1. Account A initiates hydration
+    const hydrationPromiseA = hydrateOwnedProfilesFromServer('user-A', {
+      shouldApply: () => currentUser === 'user-A',
+    });
+
+    // 2. Account A logs out before network returns; store is cleared
+    useProfileStore.getState().logout();
+    expect(useProfileStore.getState().members).toHaveLength(0);
+
+    // 3. Account B logs in
+    currentUser = 'user-B';
+
+    // 4. Account A's network call finally resolves
+    resolveProfiles([
+      serverProfile({ id: 'profile-A', userId: 'user-A', name: 'Account A Member' }),
+    ]);
+
+    const appliedA = await hydrationPromiseA;
+
+    // 5. Account A's hydration must be discarded
+    expect(appliedA).toBe(false);
+    expect(useProfileStore.getState().members).toHaveLength(0);
+
+    // 6. Account B now hydrates their own profile
+    (profilesApi.getProfiles as jest.Mock).mockResolvedValueOnce([
+      serverProfile({ id: 'profile-B', userId: 'user-B', name: 'Account B Member' }),
+    ]);
+
+    const appliedB = await hydrateOwnedProfilesFromServer('user-B', {
+      shouldApply: () => currentUser === 'user-B',
+    });
+
+    expect(appliedB).toBe(true);
+    const finalMembers = useProfileStore.getState().members;
+    expect(finalMembers).toHaveLength(1);
+    expect(finalMembers[0].backendId).toBe('profile-B');
+    expect(finalMembers[0].firstName).toBe('Account');
   });
 });

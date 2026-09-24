@@ -142,7 +142,7 @@ export function SplashScreen({
       style={[styles.container, { opacity: containerOpacity }]}
       pointerEvents={isFadingOut ? 'none' : 'auto'}
     >
-      <StatusBar barStyle="light-content" backgroundColor={colors.accent} />
+      <StatusBar barStyle="light-content" />
 
       {/* Background gradient effect */}
       <View style={styles.backgroundGradient} />
@@ -171,7 +171,7 @@ export function SplashScreen({
       </Animated.Text>
 
       {/* Loading indicator */}
-      <Animated.View style={[styles.loadingContainer, { opacity: taglineOpacity }]}>
+      <Animated.View style={[styles.loadingContainer, { opacity: taglineOpacity }]}> 
         <View style={styles.loadingDot} />
         <View style={[styles.loadingDot, styles.loadingDotMiddle]} />
         <View style={styles.loadingDot} />
@@ -208,16 +208,24 @@ export function useSplashScreen() {
 // STYLES
 // ============================================
 
+const absoluteFill = {
+  position: 'absolute' as const,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+};
+
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
   backgroundGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     backgroundColor: colors.accent,
     // In production, this could be a LinearGradient
   },

@@ -15,7 +15,13 @@ import {
   ActivityIndicator,
   ViewStyle,
 } from 'react-native';
-import DocumentPicker, { DocumentPickerResponse, types } from 'react-native-document-picker';
+import {
+  pick,
+  types,
+  errorCodes,
+  isErrorWithCode,
+  type DocumentPickerResponse,
+} from '@react-native-documents/picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { colors, typography, spacing, radius, shadows } from '@/theme';
 import { createLogger } from '@/utils/logger';
@@ -201,7 +207,11 @@ export function FileUpload({
           pickerTypes.push(types.pdf, types.doc, types.docx, types.plainText);
           break;
         case 'spreadsheet':
-          pickerTypes.push(types.xls, types.xlsx, types.csv);
+          pickerTypes.push(
+            types.xls,
+            types.xlsx,
+            ...(Array.isArray(types.csv) ? types.csv : [types.csv])
+          );
           break;
         case 'all':
         default:
@@ -225,10 +235,9 @@ export function FileUpload({
       const pickerTypes = getDocumentPickerTypes();
       const remainingSlots = multiple ? maxFiles - files.length : 1;
 
-      const results: DocumentPickerResponse[] = await DocumentPicker.pick({
+      const results: DocumentPickerResponse[] = await pick({
         type: pickerTypes,
         allowMultiSelection: multiple && remainingSlots > 1,
-        copyTo: 'cachesDirectory',
       });
 
       // Convert results to SelectedFile format
@@ -237,7 +246,7 @@ export function FileUpload({
 
       for (const result of results.slice(0, remainingSlots)) {
         const selectedFile: SelectedFile = {
-          uri: result.fileCopyUri || result.uri,
+          uri: result.uri,
           name: result.name || 'Unknown File',
           size: result.size || 0,
           type: result.type || 'application/octet-stream',
@@ -266,7 +275,7 @@ export function FileUpload({
       }
     } catch (err: unknown) {
       // Handle cancellation
-      if (DocumentPicker.isCancel(err)) {
+      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
         // User cancelled, do nothing
         return;
       }

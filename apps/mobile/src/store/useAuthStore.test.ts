@@ -25,6 +25,8 @@ jest.mock('@/services/api/endpoints/auth', () => {
     if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
       return { success: false, error: 'Invalid email or password' };
     }
+    const onboarded = data.email.startsWith('onboarded@');
+    const orgMember = data.email.startsWith('org@');
     return {
       success: true,
       tokens: mockTokens,
@@ -35,6 +37,9 @@ jest.mock('@/services/api/endpoints/auth', () => {
         lastName: 'User',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(orgMember ? { userTypeSlug: 'org_member' as never } : {}),
+        ...(data.userTypeSlug ? { userTypeSlug: data.userTypeSlug } : {}),
+        ...(onboarded ? { onboardingCompleted: true } : {}),
       },
     };
   });
@@ -107,6 +112,7 @@ jest.mock('@/services/api/endpoints/auth', () => {
 
 import { useAuthStore } from './useAuthStore';
 import { ApiClient } from '@/services/api/ApiClient';
+import { SecureStorage } from '@/services/storage/SecureStorage';
 
 // Unit tests must never wait on the production logout endpoint. `logout()`
 // intentionally attempts best-effort refresh-token revocation when a token is
@@ -187,6 +193,57 @@ describe('AuthStore Login', () => {
     expect(state.refreshToken).toBe('mock_refresh_token');
     expect(state.isLoading).toBe(false);
     expect(ApiClient.getAccessToken()).toBe('mock_access_token');
+  });
+
+  it('honors server onboardingCompleted so existing accounts skip create-profile', async () => {
+    const result = await useAuthStore.getState().login('onboarded@example.com', 'password123');
+
+    expect(result).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+  });
+
+  it('does not leak onboarding completion from Account A to Account B across logout', async () => {
+    // 1. Account A logs in with server onboardingCompleted = true
+    const loginA = await useAuthStore.getState().login('onboarded@example.com', 'password123');
+    expect(loginA).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+
+    // 2. Logout occurs
+    await useAuthStore.getState().logout();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+
+    // 3. Account B (not onboarded) logs in
+    const loginB = await useAuthStore.getState().login('newuser@example.com', 'password123');
+    expect(loginB).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+  });
+
+  it('resets onboarding state when secure tokens are missing on hydration and enforces Account B onboarding', async () => {
+    // Simulate Account A was onboarded and stored
+    await useAuthStore.getState().login('onboarded@example.com', 'password123');
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+
+    // Secure storage tokens are cleared / lost (e.g. Android restore / credential reset)
+    await SecureStorage.clearAuthTokens();
+
+    // Hydration runs and detects missing tokens
+    await useAuthStore.getState().hydrateTokensFromSecureStorage();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+
+    // Account B logs in without server onboardingCompleted
+    const loginB = await useAuthStore.getState().login('newuser@example.com', 'password123');
+    expect(loginB).toBe(true);
+    // Account B must see onboarding (hasCompletedOnboarding is false)
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(false);
+  });
+
+  it('maps org_member onto the provider dashboard instead of customer', async () => {
+    const result = await useAuthStore.getState().login('org@example.com', 'password123');
+
+    expect(result).toBe(true);
+    expect(useAuthStore.getState().userType).toBe('service_provider');
   });
 
   it('failed login sets error', async () => {

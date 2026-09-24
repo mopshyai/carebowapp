@@ -11,6 +11,7 @@ import { SecureStorage } from '@/services/storage/SecureStorage';
 import { authApi, extractTokens, extractUser } from '@/services/api/endpoints/auth';
 import { ApiClient } from '@/services/api/ApiClient';
 import { AccessProfileSummary, ApiError, UserTypeSlug } from '@/services/api/types';
+import { extractMobileUserType, extractOnboardingCompleted } from '@/lib/mobileUserType';
 
 // ============================================
 // TYPES
@@ -178,25 +179,8 @@ const normalizeUser = (raw: Record<string, unknown> | null, fallbackEmail: strin
   };
 };
 
-const VALID_USER_TYPES: UserTypeSlug[] = [
-  'customer',
-  'healthcare_provider',
-  'service_provider',
-  'service_partner',
-];
-
-/** Pull a valid userTypeSlug out of the auth response user object. */
-const extractUserType = (
-  payload:
-    | { user?: Record<string, unknown>; data?: { user?: Record<string, unknown> } }
-    | null
-    | undefined
-): UserTypeSlug | null => {
-  const raw = payload?.user?.userTypeSlug ?? payload?.data?.user?.userTypeSlug;
-  return typeof raw === 'string' && (VALID_USER_TYPES as string[]).includes(raw)
-    ? (raw as UserTypeSlug)
-    : null;
-};
+/** Pull a mobile app user type out of the auth response user object. */
+const extractUserType = extractMobileUserType;
 
 /**
  * Mirror the authenticated account into the profile store so Profile/Settings
@@ -298,6 +282,7 @@ export const useAuthStore = create<AuthStore>()(
             // a stale persisted type (would show e.g. a provider dashboard to a
             // customer); default to 'customer' if the field is somehow absent.
             userType: extractUserType(envelope) ?? 'customer',
+            hasCompletedOnboarding: extractOnboardingCompleted(envelope),
             accessToken: tokens?.accessToken ?? null,
             refreshToken: tokens?.refreshToken ?? null,
             isLoading: false,
@@ -377,6 +362,7 @@ export const useAuthStore = create<AuthStore>()(
               user: su,
               isAuthenticated: true,
               userType: extractUserType(envelope) ?? get().userType,
+              hasCompletedOnboarding: extractOnboardingCompleted(envelope),
               accessToken: tokens.accessToken,
               refreshToken: tokens.refreshToken,
               pendingVerificationEmail: null,
@@ -501,6 +487,7 @@ export const useAuthStore = create<AuthStore>()(
               user: vu,
               isAuthenticated: true,
               userType: extractUserType({ user: user ?? undefined }) ?? get().userType,
+              hasCompletedOnboarding: extractOnboardingCompleted({ user: user ?? undefined }),
               accessToken: tokens.accessToken,
               refreshToken: tokens.refreshToken,
               pendingVerificationEmail: null,
@@ -578,6 +565,8 @@ export const useAuthStore = create<AuthStore>()(
           set({
             user: normalizeUser(user, pendingEmail),
             isAuthenticated: true,
+            userType: extractUserType(envelope) ?? get().userType,
+            hasCompletedOnboarding: extractOnboardingCompleted(envelope),
             accessToken: tokens?.accessToken ?? null,
             refreshToken: tokens?.refreshToken ?? null,
             pendingVerificationEmail: null,
@@ -769,7 +758,7 @@ export const useAuthStore = create<AuthStore>()(
             if (__DEV__) {
               console.log('[AuthStore] Tokens hydrated from secure storage');
             }
-          } else if (get().isAuthenticated) {
+          } else if (get().isAuthenticated || get().hasCompletedOnboarding || get().user) {
             // User data exists but no tokens - need to re-authenticate
             if (__DEV__) {
               console.log('[AuthStore] No tokens found - clearing auth state');
@@ -779,6 +768,9 @@ export const useAuthStore = create<AuthStore>()(
               user: null,
               accessToken: null,
               refreshToken: null,
+              hasCompletedOnboarding: false,
+              userRole: null,
+              currentOnboardingStep: 'slides',
             });
           }
         } catch (error) {
