@@ -33,6 +33,15 @@ target 'CareBow' do
       :mac_catalyst_enabled => false
     )
 
+    # Enforce minimum iOS deployment target across all pods
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.1
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        end
+      end
+    end
+
     # Enable Swift for the main app to fix Swift runtime linking
     main_project = installer.aggregate_targets.first.user_project
     main_project.targets.each do |target|
@@ -45,9 +54,9 @@ target 'CareBow' do
 
         # Add Swift.swift file to the project if not already added
         swift_file_path = 'CareBow/Swift.swift'
-        swift_file_ref = main_project.main_group.find_subpath('CareBow').files.find { |f| f.path == 'Swift.swift' }
+        group = main_project.main_group.find_subpath('CareBow')
+        swift_file_ref = group.files.find { |f| f.path == 'Swift.swift' || f.path == 'CareBow/Swift.swift' || f.name == 'Swift.swift' }
         if swift_file_ref.nil?
-          group = main_project.main_group.find_subpath('CareBow')
           file_ref = group.new_file(swift_file_path)
           target.source_build_phase.add_file_reference(file_ref)
         end
