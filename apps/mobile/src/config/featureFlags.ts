@@ -7,7 +7,7 @@
  * touching the call sites that check it.
  */
 
-// Gates ConversationScreen's symptom-help path: when true, that branch calls
-// the mobile-auth'd orchestrator (E5/E7) instead of the rewrite-only endpoint,
-// falling back to the rewrite-only behavior on any error.
+// Gates ConversationScreen's Ask CareBow send path. When true, mobile talks
+// only to the canonical CareBow chat backend. Local rewrite/engine output is
+// not conversation truth.
 export const ASK_CAREBOW_ORCHESTRATOR_ENABLED = true;

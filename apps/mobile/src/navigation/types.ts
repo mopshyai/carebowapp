@@ -54,6 +54,8 @@ export type RootStackParamList = {
         memberId?: string;
         caregiverPresent?: string;
         attachedImages?: string;
+        backendSessionId?: string;
+        episodeId?: string;
       }
     | undefined;
   Assessment: undefined;
