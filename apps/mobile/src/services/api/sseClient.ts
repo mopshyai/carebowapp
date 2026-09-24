@@ -33,6 +33,8 @@ export function parseSSEEventFrame(frame: string): unknown | null {
   }
 }
 
+import { ApiError } from './types';
+
 export function postSSE(
   url: string,
   body: unknown,
@@ -63,10 +65,20 @@ export function postSSE(
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
-        reject(new Error(`SSE request failed with status ${xhr.status}`));
+        let errorData: unknown;
+        try {
+          errorData = JSON.parse(xhr.responseText);
+        } catch {
+          errorData = {
+            message: xhr.responseText || `SSE request failed with status ${xhr.status}`,
+          };
+        }
+        reject(ApiError.fromResponse(xhr.status, errorData));
       }
     };
-    xhr.onerror = () => reject(new Error('SSE request failed'));
+    xhr.onerror = () => {
+      reject(new ApiError({ code: 'NETWORK_ERROR', message: 'SSE request failed', status: 0 }));
+    };
 
     xhr.send(JSON.stringify(body));
   });

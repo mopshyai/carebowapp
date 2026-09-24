@@ -25,6 +25,8 @@ jest.mock('@/services/api/endpoints/auth', () => {
     if (!data.password || data.password.length < MIN_PASSWORD_LENGTH) {
       return { success: false, error: 'Invalid email or password' };
     }
+    const onboarded = data.email.startsWith('onboarded@');
+    const orgMember = data.email.startsWith('org@');
     return {
       success: true,
       tokens: mockTokens,
@@ -35,6 +37,9 @@ jest.mock('@/services/api/endpoints/auth', () => {
         lastName: 'User',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(orgMember ? { userTypeSlug: 'org_member' as never } : {}),
+        ...(data.userTypeSlug ? { userTypeSlug: data.userTypeSlug } : {}),
+        ...(onboarded ? { onboardingCompleted: true } : {}),
       },
     };
   });
@@ -187,6 +192,20 @@ describe('AuthStore Login', () => {
     expect(state.refreshToken).toBe('mock_refresh_token');
     expect(state.isLoading).toBe(false);
     expect(ApiClient.getAccessToken()).toBe('mock_access_token');
+  });
+
+  it('honors server onboardingCompleted so existing accounts skip create-profile', async () => {
+    const result = await useAuthStore.getState().login('onboarded@example.com', 'password123');
+
+    expect(result).toBe(true);
+    expect(useAuthStore.getState().hasCompletedOnboarding).toBe(true);
+  });
+
+  it('maps org_member onto the provider dashboard instead of customer', async () => {
+    const result = await useAuthStore.getState().login('org@example.com', 'password123');
+
+    expect(result).toBe(true);
+    expect(useAuthStore.getState().userType).toBe('service_provider');
   });
 
   it('failed login sets error', async () => {

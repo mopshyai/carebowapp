@@ -217,6 +217,101 @@ describe('askCarebowStore', () => {
 
       expect(result.current.currentSession).toBeNull();
     });
+
+    it('hydrateServerMessages preserves pending local user turns when server history is empty', () => {
+      const { result } = renderHook(() => useAskCarebowStore());
+
+      act(() => {
+        result.current.startNewSession('user-1', 'member-1');
+      });
+
+      act(() => {
+        result.current.addUserMessage('Pending optimistic question');
+      });
+
+      // Server history is empty (e.g. POST was lost or still processing)
+      act(() => {
+        result.current.hydrateServerMessages([]);
+      });
+
+      const messages = result.current.currentSession?.messages || [];
+      expect(
+        messages.some((m) => m.role === 'user' && m.text === 'Pending optimistic question')
+      ).toBe(true);
+    });
+
+    it('hydrateServerMessages reconciles acknowledged messages without duplicating user turn', () => {
+      const { result } = renderHook(() => useAskCarebowStore());
+
+      act(() => {
+        result.current.startNewSession('user-1', 'member-1');
+      });
+
+      act(() => {
+        result.current.addUserMessage('Headache since yesterday');
+      });
+
+      // Server acknowledges turn with canonical user + assistant response
+      act(() => {
+        result.current.hydrateServerMessages([
+          {
+            id: 'srv_msg_1',
+            role: 'user',
+            text: 'Headache since yesterday',
+            contentType: 'text',
+            timestamp: '2026-09-24T12:00:00Z',
+          },
+          {
+            id: 'srv_msg_2',
+            role: 'assistant',
+            text: 'Is the pain throbbing or dull?',
+            contentType: 'text',
+            timestamp: '2026-09-24T12:00:05Z',
+          },
+        ]);
+      });
+
+      const messages = result.current.currentSession?.messages || [];
+      expect(messages).toHaveLength(2);
+      expect(messages[0].id).toBe('srv_msg_1');
+      expect(messages[0].text).toBe('Headache since yesterday');
+      expect(messages[1].id).toBe('srv_msg_2');
+      expect(messages[1].text).toBe('Is the pain throbbing or dull?');
+    });
+
+    it('hydrateServerMessages never preserves fabricated assistant messages not confirmed by server', () => {
+      const { result } = renderHook(() => useAskCarebowStore());
+
+      act(() => {
+        result.current.startNewSession('user-1', 'member-1');
+      });
+
+      act(() => {
+        result.current.addAssistantMessage({
+          role: 'assistant',
+          text: 'Fabricated unconfirmed assistant guidance',
+          contentType: 'text',
+        });
+      });
+
+      // Server returns canonical message history omitting the fabricated assistant message
+      act(() => {
+        result.current.hydrateServerMessages([
+          {
+            id: 'srv_1',
+            role: 'assistant',
+            text: 'Canonical assistant reply from server',
+            contentType: 'text',
+            timestamp: '2026-09-24T12:00:00Z',
+          },
+        ]);
+      });
+
+      const messages = result.current.currentSession?.messages || [];
+      expect(messages).toHaveLength(1);
+      expect(messages[0].text).toBe('Canonical assistant reply from server');
+      expect(messages.some((m) => m.text?.includes('Fabricated'))).toBe(false);
+    });
   });
 
   describe('Conversation State', () => {

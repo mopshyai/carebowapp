@@ -63,10 +63,21 @@ type AskCarebowActions = {
   startNewSession: (userId: string, memberId: string, memberName?: string) => AskCarebowSession;
   endSession: () => void;
   resumeSession: (sessionId: string) => void;
+  populateCanonicalSessions: (
+    serverSessions: Array<{
+      id: string;
+      title?: string | null;
+      createdAt?: string;
+      updatedAt?: string;
+    }>,
+    context: { userId: string; memberId: string; memberName?: string }
+  ) => void;
+  attachCanonicalSessionId: (exactId: string) => void;
 
   // Message handling
   addUserMessage: (text: string) => void;
   addAssistantMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
+  hydrateServerMessages: (messages: Message[]) => void;
 
   // Conversation state
   updateConversationPhase: (phase: ConversationPhase) => void;
@@ -248,6 +259,90 @@ export const useAskCarebowStore = create<AskCarebowState & AskCarebowActions>()(
           return {
             currentSession: updatedSession,
             sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
+          };
+        });
+      },
+
+      hydrateServerMessages: (serverMessages) => {
+        set((state) => {
+          if (!state.currentSession) return state;
+
+          const acknowledgedServerUserTexts = new Set(
+            serverMessages.filter((m) => m.role === 'user' && m.text).map((m) => m.text!.trim())
+          );
+          const acknowledgedServerIds = new Set(serverMessages.map((m) => m.id));
+
+          // Preserve pending local user turns not represented by the server
+          // NEVER preserve fabricated assistant content
+          const pendingLocalUserTurns = state.currentSession.messages.filter((localMsg) => {
+            if (localMsg.role !== 'user') return false;
+            if (acknowledgedServerIds.has(localMsg.id)) return false;
+            if (localMsg.text && acknowledgedServerUserTexts.has(localMsg.text.trim()))
+              return false;
+            return true;
+          });
+
+          const reconciledMessages = [...serverMessages, ...pendingLocalUserTurns];
+
+          const updatedSession = {
+            ...state.currentSession,
+            messages: reconciledMessages,
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            currentSession: updatedSession,
+            sessions: state.sessions.map((s) => (s.id === updatedSession.id ? updatedSession : s)),
+          };
+        });
+      },
+
+      populateCanonicalSessions: (serverSessions, context) => {
+        set((state) => {
+          const existingIds = new Set(state.sessions.map((s) => s.id));
+          const newSessions: AskCarebowSession[] = [];
+
+          for (const s of serverSessions) {
+            if (!existingIds.has(s.id)) {
+              newSessions.push({
+                id: s.id,
+                userId: context.userId,
+                memberId: context.memberId,
+                memberName: context.memberName,
+                messages: [],
+                conversationState: createInitialConversationState(),
+                healthContext: createEmptyHealthContext(),
+                recommendedServices: [],
+                createdAt: s.createdAt || new Date().toISOString(),
+                updatedAt: s.updatedAt || new Date().toISOString(),
+                isActive: false,
+                detectedSymptoms: [],
+                suggestedActions: [],
+              });
+              existingIds.add(s.id);
+            }
+          }
+
+          if (newSessions.length === 0) return state;
+
+          return {
+            sessions: [...state.sessions, ...newSessions],
+          };
+        });
+      },
+
+      attachCanonicalSessionId: (exactId) => {
+        set((state) => {
+          if (!state.currentSession || state.currentSession.id === exactId) return state;
+          const oldId = state.currentSession.id;
+          const updatedSession = {
+            ...state.currentSession,
+            id: exactId,
+            updatedAt: new Date().toISOString(),
+          };
+          return {
+            currentSession: updatedSession,
+            sessions: state.sessions.map((s) => (s.id === oldId ? updatedSession : s)),
           };
         });
       },
