@@ -122,6 +122,8 @@ export default function ConversationScreen() {
     addUserMessage,
     addAssistantMessage,
     hydrateServerMessages,
+    populateCanonicalSessions,
+    attachCanonicalSessionId,
     updateHealthContext,
     setUrgencyLevel,
     setIsTyping,
@@ -193,14 +195,22 @@ export default function ConversationScreen() {
         const requestedId = params.backendSessionId;
         const cachedId = await getCachedBackendSessionId(currentSession.id);
         const sessions = await listCanonicalSessions(backendProfileId);
+
+        if (sessions && sessions.length > 0) {
+          populateCanonicalSessions(sessions, {
+            userId: authUserId ?? '',
+            memberId: currentSession.memberId,
+            memberName: params.memberName as string | undefined,
+          });
+        }
+
         const exactId =
-          requestedId && sessions.some((session) => session.id === requestedId)
-            ? requestedId
-            : cachedId && sessions.some((session) => session.id === cachedId)
-              ? cachedId
-              : null;
+          requestedId || cachedId || (sessions && sessions.length > 0 ? sessions[0].id : null);
+
         if (!exactId || cancelled) return;
         await attachCanonicalSession(currentSession.id, exactId);
+        attachCanonicalSessionId(exactId);
+
         const detail = await loadCanonicalSession(exactId);
         const rows = detail.session.messages ?? [];
         if (cancelled) return;
@@ -227,7 +237,11 @@ export default function ConversationScreen() {
     currentSession?.id,
     currentSession?.memberId,
     hydrateServerMessages,
+    populateCanonicalSessions,
+    attachCanonicalSessionId,
     params.backendSessionId,
+    authUserId,
+    params.memberName,
   ]);
 
   useEffect(() => {

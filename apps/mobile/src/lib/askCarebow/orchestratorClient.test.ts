@@ -7,6 +7,7 @@ import {
 import { askCarebowOrchestratorApi } from '@/services/api/endpoints/askCarebowOrchestrator';
 import { ApiClient } from '@/services/api/ApiClient';
 import { postSSE } from '@/services/api/sseClient';
+import { ApiError } from '@/services/api/types';
 
 jest.mock('@/services/api/endpoints/askCarebowOrchestrator', () => ({
   askCarebowOrchestratorApi: {
@@ -97,8 +98,8 @@ describe('getOrchestratorReply', () => {
     expect(mockedSendMessage).toHaveBeenNthCalledWith(2, 'session-1', 'second', 'ask_second_123');
   });
 
-  it('returns null when session creation fails', async () => {
-    mockedCreateSession.mockRejectedValueOnce(new Error('unauthorized'));
+  it('returns null when session creation fails with a transport error', async () => {
+    mockedCreateSession.mockRejectedValueOnce(new Error('network error'));
 
     const result = await getOrchestratorReply({
       localSessionId: 'local-2',
@@ -279,8 +280,8 @@ describe('streamOrchestratorReply', () => {
     });
   });
 
-  it('returns null when session creation fails', async () => {
-    mockedCreateSession.mockRejectedValueOnce(new Error('unauthorized'));
+  it('returns null when session creation fails with a transport error', async () => {
+    mockedCreateSession.mockRejectedValueOnce(new Error('network connection timed out'));
 
     const result = await streamOrchestratorReply({
       localSessionId: 'local-5',
@@ -292,5 +293,49 @@ describe('streamOrchestratorReply', () => {
 
     expect(result).toBeNull();
     expect(mockedPostSSE).not.toHaveBeenCalled();
+  });
+
+  it('rethrows 409 IDEMPOTENCY_MISMATCH without routing to turn recovery', async () => {
+    mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
+    const conflictError = new ApiError({
+      code: 'CONFLICT',
+      message: 'IDEMPOTENCY_MISMATCH',
+      status: 409,
+    });
+    mockedPostSSE.mockRejectedValueOnce(conflictError);
+
+    await expect(
+      streamOrchestratorReply({
+        localSessionId: 'local-6',
+        profileId: 'profile-1',
+        text: 'hello',
+        requestId: REQUEST_ID,
+        onTextDelta: () => {},
+      })
+    ).rejects.toThrow(conflictError);
+
+    expect(mockedGetTurn).not.toHaveBeenCalled();
+  });
+
+  it('rethrows 402 payment/entitlement error without routing to turn recovery', async () => {
+    mockedCreateSession.mockResolvedValueOnce({ id: 'session-1' });
+    const paymentError = new ApiError({
+      code: 'FORBIDDEN',
+      message: 'PAYMENT_REQUIRED',
+      status: 402,
+    });
+    mockedPostSSE.mockRejectedValueOnce(paymentError);
+
+    await expect(
+      streamOrchestratorReply({
+        localSessionId: 'local-7',
+        profileId: 'profile-1',
+        text: 'hello',
+        requestId: REQUEST_ID,
+        onTextDelta: () => {},
+      })
+    ).rejects.toThrow(paymentError);
+
+    expect(mockedGetTurn).not.toHaveBeenCalled();
   });
 });
