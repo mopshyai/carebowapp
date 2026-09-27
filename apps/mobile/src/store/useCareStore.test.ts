@@ -196,7 +196,7 @@ describe('useCareStore', () => {
       expect(activeEp).toBeUndefined();
 
       const ep = useCareStore.getState().episodes.find((e) => e.id === episode.id);
-      expect(ep?.status).toBe('completed');
+      expect(ep?.status).toBe('COMPLETED');
       expect(ep?.completedAt).toBeDefined();
     });
   });
@@ -240,12 +240,12 @@ describe('useCareStore', () => {
         task = await useCareStore.getState().createTask({
           personId: 'person_mom',
           title: 'Log Blood Pressure',
-          taskType: 'vital_check',
-          ownerType: 'care_recipient',
+          taskType: 'VITALS',
+          ownerType: 'CARE_RECIPIENT',
           ownerName: 'Mom',
           dueAt: new Date().toISOString(),
-          status: 'pending',
-          priority: 'medium',
+          status: 'PENDING',
+          priority: 'MEDIUM',
           source: 'caregiver_manual',
         });
       });
@@ -277,33 +277,33 @@ describe('useCareStore', () => {
         await useCareStore.getState().createTask({
           personId: 'person_mom',
           title: 'Task Due Today',
-          taskType: 'care_action',
-          ownerType: 'caregiver',
+          taskType: 'GENERAL',
+          ownerType: 'CAREGIVER',
           dueAt: `${todayStr}T10:00:00.000Z`,
-          status: 'pending',
-          priority: 'medium',
+          status: 'PENDING',
+          priority: 'MEDIUM',
           source: 'care_plan',
         });
 
         await useCareStore.getState().createTask({
           personId: 'person_mom',
           title: 'Task Overdue',
-          taskType: 'appointment',
-          ownerType: 'caregiver',
+          taskType: 'APPOINTMENT',
+          ownerType: 'CAREGIVER',
           dueAt: `${yesterdayStr}T10:00:00.000Z`,
-          status: 'pending',
-          priority: 'high',
+          status: 'PENDING',
+          priority: 'HIGH',
           source: 'care_plan',
         });
 
         await useCareStore.getState().createTask({
           personId: 'person_mom',
           title: 'Task Tomorrow',
-          taskType: 'care_action',
-          ownerType: 'caregiver',
+          taskType: 'GENERAL',
+          ownerType: 'CAREGIVER',
           dueAt: `${tomorrowStr}T10:00:00.000Z`,
-          status: 'pending',
-          priority: 'low',
+          status: 'PENDING',
+          priority: 'LOW',
           source: 'care_plan',
         });
       });
@@ -355,19 +355,19 @@ describe('useCareStore', () => {
       expect(req.id).toBeDefined();
       expect(req.status).toBe('REQUESTED');
 
-      // Update to matching
+      // Update to matching (maps to canonical WAITING_PROVIDER)
       act(() => {
         useCareStore
           .getState()
           .updateServiceRequestStatus(
             req.id,
-            'matching',
+            'WAITING_PROVIDER',
             'Searching for certified PTs near your location'
           );
       });
 
       let current = useCareStore.getState().serviceRequests.find((r) => r.id === req.id);
-      expect(current?.status).toBe('matching');
+      expect(current?.status).toBe('WAITING_PROVIDER');
       expect(current?.statusMessage).toContain('Searching');
 
       // Update to scheduled with provider
@@ -376,14 +376,14 @@ describe('useCareStore', () => {
           .getState()
           .updateServiceRequestStatus(
             req.id,
-            'scheduled',
+            'SCHEDULED',
             'Physical therapist confirmed for Tuesday 10am',
             'Dr. Sarah Jenkins, PT'
           );
       });
 
       current = useCareStore.getState().serviceRequests.find((r) => r.id === req.id);
-      expect(current?.status).toBe('scheduled');
+      expect(current?.status).toBe('SCHEDULED');
       expect(current?.providerName).toBe('Dr. Sarah Jenkins, PT');
     });
   });

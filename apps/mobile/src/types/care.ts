@@ -592,3 +592,42 @@ export function toCanonicalWorkflowStatus(w: string): WorkflowStatus {
   if (upper === 'EPISODE_COMPLETE' || upper === 'COMPLETED') return 'EPISODE_COMPLETE';
   return 'RECOVERY_ONGOING';
 }
+
+export function toCanonicalEpisodeType(t: string): EpisodeType {
+  const upper = t.toUpperCase();
+  if (upper === 'HOSPITAL_DISCHARGE') return 'HOSPITAL_DISCHARGE';
+  if (upper === 'SURGERY_RECOVERY') return 'SURGERY_RECOVERY';
+  if (upper === 'NEW_DIAGNOSIS') return 'NEW_DIAGNOSIS';
+  if (upper === 'FALL' || upper === 'FALL_RECOVERY') return 'FALL';
+  if (upper === 'MEDICATION_TRANSITION') return 'MEDICATION_TRANSITION';
+  if (upper === 'HOME_CARE_SETUP' || upper === 'HOME_CARE') return 'HOME_CARE_SETUP';
+  if (upper === 'CHRONIC_CONDITION' || upper === 'CHRONIC_MANAGEMENT') return 'CHRONIC_CONDITION';
+  return 'OTHER';
+}
+
+export function toCanonicalEpisodeStatus(s: string): EpisodeStatus {
+  const upper = s.toUpperCase();
+  if (upper === 'ACTIVE') return 'ACTIVE';
+  if (upper === 'COMPLETED') return 'COMPLETED';
+  if (upper === 'PAUSED') return 'PAUSED';
+  if (upper === 'CANCELLED') return 'CANCELLED';
+  return 'ACTIVE';
+}
+
+export function toCanonicalServiceRequestStatus(s: string): ServiceRequestStatus {
+  const upper = s.toUpperCase();
+  if (upper === 'REQUESTED') return 'REQUESTED';
+  if (
+    upper === 'WAITING_PROVIDER' ||
+    upper === 'MATCHING' ||
+    upper === 'AWAITING_INFORMATION' ||
+    upper === 'REVIEWING'
+  )
+    return 'WAITING_PROVIDER';
+  if (upper === 'SCHEDULED') return 'SCHEDULED';
+  if (upper === 'IN_PROGRESS') return 'IN_PROGRESS';
+  if (upper === 'COMPLETED') return 'COMPLETED';
+  if (upper === 'CANCELLED') return 'CANCELLED';
+  if (upper === 'UNABLE_TO_FULFILL') return 'UNABLE_TO_FULFILL';
+  return 'REQUESTED';
+}

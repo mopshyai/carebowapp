@@ -64,13 +64,13 @@ export function AskCareActionCard({
       episodeId,
       title: `Follow up: ${lastMessageSnippet.slice(0, 45) || 'Care review'}`,
       description: `Action item created from CareBow conversation: "${lastMessageSnippet.slice(0, 120)}"`,
-      taskType: 'care_action',
-      ownerType: 'caregiver',
+      taskType: 'GENERAL',
+      ownerType: 'CAREGIVER',
       ownerName: 'Primary Caregiver',
       dueAt: due,
-      status: 'pending',
-      priority: 'high',
-      source: 'ask_carebow',
+      status: 'PENDING',
+      priority: 'HIGH',
+      source: 'ASK_CAREBOW',
     });
 
     setCommittedActions((prev) => ({ ...prev, task: true }));

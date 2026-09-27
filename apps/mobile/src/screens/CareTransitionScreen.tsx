@@ -37,12 +37,12 @@ import type {
 
 type HelpingOption = 'parent' | 'spouse' | 'self' | 'other';
 type CareReason =
-  | 'hospital_discharge'
-  | 'surgery_recovery'
-  | 'new_diagnosis'
-  | 'chronic_management'
-  | 'medication_transition'
-  | 'home_care';
+  | 'HOSPITAL_DISCHARGE'
+  | 'SURGERY_RECOVERY'
+  | 'NEW_DIAGNOSIS'
+  | 'CHRONIC_CONDITION'
+  | 'MEDICATION_TRANSITION'
+  | 'HOME_CARE_SETUP';
 
 export default function CareTransitionScreen() {
   const insets = useSafeAreaInsets();
@@ -61,7 +61,7 @@ export default function CareTransitionScreen() {
   const [recipientName, setRecipientName] = useState('Mom');
 
   // Step 2: What brought you here
-  const [reason, setReason] = useState<CareReason>(route.params?.reason || 'hospital_discharge');
+  const [reason, setReason] = useState<CareReason>(route.params?.reason || 'HOSPITAL_DISCHARGE');
 
   // Step 3: Discharge notes - starts empty (ZERO fabricated text)
   const [dischargeNotes, setDischargeNotes] = useState('');
@@ -155,9 +155,9 @@ export default function CareTransitionScreen() {
 
     // 2. Prepare Episode details
     const episodeTitle =
-      reason === 'hospital_discharge'
+      reason === 'HOSPITAL_DISCHARGE'
         ? `Hospital Discharge Recovery — ${recipientName}`
-        : reason === 'surgery_recovery'
+        : reason === 'SURGERY_RECOVERY'
           ? `Post-Surgical Recovery — ${recipientName}`
           : `Care Plan — ${recipientName}`;
 
@@ -224,24 +224,24 @@ export default function CareTransitionScreen() {
           title: ct.title,
           description: ct.description,
           taskType: (ct.category === 'MEDICATION'
-            ? 'medication'
+            ? 'MEDICATION'
             : ct.category === 'APPOINTMENT'
-              ? 'appointment'
+              ? 'APPOINTMENT'
               : ct.category === 'SERVICE'
-                ? 'service'
-                : 'other') as CareTaskType,
+                ? 'HOME_CARE'
+                : 'GENERAL') as CareTaskType,
           ownerType:
             ct.ownerType === 'CAREBOW' || (ct.ownerType as string) === 'CARE_COORDINATOR'
-              ? 'carebow'
-              : 'caregiver',
+              ? 'CAREBOW'
+              : 'CAREGIVER',
           ownerName:
             ct.ownerType === 'CAREBOW' || (ct.ownerType as string) === 'CARE_COORDINATOR'
               ? 'CareBow Coordination'
               : 'Primary Caregiver',
           dueAt: due,
-          status: 'pending',
-          priority: ct.priority.toLowerCase() as CareTaskPriority,
-          source: 'discharge_instructions',
+          status: 'PENDING',
+          priority: ct.priority ? (ct.priority.toUpperCase() as CareTaskPriority) : 'MEDIUM',
+          source: 'DISCHARGE_SUMMARY',
         });
       }
 
@@ -380,28 +380,28 @@ export default function CareTransitionScreen() {
             <View style={styles.optionsList}>
               {[
                 {
-                  id: 'hospital_discharge',
+                  id: 'HOSPITAL_DISCHARGE',
                   title: 'Coming Home from the Hospital',
                   desc: 'Coordinate follow-ups, medications, home care, and warning signs',
                   recommended: true,
                 },
                 {
-                  id: 'surgery_recovery',
+                  id: 'SURGERY_RECOVERY',
                   title: 'Post-Surgical Recovery',
                   desc: 'Track incision care, rehab exercises, physical therapy',
                 },
                 {
-                  id: 'chronic_management',
+                  id: 'CHRONIC_CONDITION',
                   title: 'Managing an Ongoing Condition',
                   desc: 'Heart condition, diabetes, hypertension, memory care',
                 },
                 {
-                  id: 'medication_transition',
+                  id: 'MEDICATION_TRANSITION',
                   title: 'Medication Transition / Change',
                   desc: 'Reconcile new prescriptions and monitor reactions',
                 },
                 {
-                  id: 'home_care',
+                  id: 'HOME_CARE_SETUP',
                   title: 'Organizing Daily Home Care',
                   desc: 'Caregiver shifts, bathing, mobility, daily routines',
                 },

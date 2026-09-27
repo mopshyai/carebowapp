@@ -30,6 +30,9 @@ import {
   toCanonicalPriority,
   toCanonicalTaskOwner,
   toCanonicalTaskType,
+  toCanonicalEpisodeType,
+  toCanonicalEpisodeStatus,
+  toCanonicalServiceRequestStatus,
 } from '../types/care';
 import { generateId } from '../types/profile';
 import { careApi } from '../services/api/endpoints/care';
@@ -318,7 +321,8 @@ export const useCareStore = create<CareState & CareActions>()(
         const clientEpisode: CareEpisode = {
           id: generateId(),
           ...data,
-          status: 'active',
+          episodeType: toCanonicalEpisodeType(data.episodeType || 'OTHER'),
+          status: data.status ? toCanonicalEpisodeStatus(data.status) : 'ACTIVE',
           workflowStatus: toCanonicalWorkflowStatus(data.workflowStatus || 'RECOVERY_ONGOING'),
           createdAt: now,
           updatedAt: now,
@@ -344,7 +348,7 @@ export const useCareStore = create<CareState & CareActions>()(
           const serverEpisode = await careApi.createEpisode({
             profileId: data.personId,
             title: data.title,
-            episodeType: data.episodeType as any,
+            episodeType: toCanonicalEpisodeType(data.episodeType || 'OTHER') as any,
             workflowStatus: toCanonicalWorkflowStatus(
               data.workflowStatus || 'RECOVERY_ONGOING'
             ) as any,
@@ -433,7 +437,7 @@ export const useCareStore = create<CareState & CareActions>()(
             e.id === id
               ? {
                   ...e,
-                  status: 'completed',
+                  status: 'COMPLETED',
                   workflowStatus: 'EPISODE_COMPLETE',
                   completedAt: now,
                   updatedAt: now,
@@ -754,7 +758,7 @@ export const useCareStore = create<CareState & CareActions>()(
           requestedAt: now,
           updatedAt: now,
           ...data,
-          status: (data.status?.toUpperCase() as CareServiceRequestStatus) || 'REQUESTED',
+          status: toCanonicalServiceRequestStatus(data.status || 'REQUESTED'),
         };
 
         set((state) => ({
@@ -812,7 +816,7 @@ export const useCareStore = create<CareState & CareActions>()(
             r.id === id
               ? {
                   ...r,
-                  status,
+                  status: toCanonicalServiceRequestStatus(status),
                   statusMessage,
                   providerName: providerName || r.providerName,
                   updatedAt: new Date().toISOString(),

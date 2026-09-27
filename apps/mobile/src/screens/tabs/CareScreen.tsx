@@ -77,7 +77,7 @@ export default function CareScreen() {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDesc, setNewTaskDesc] = useState('');
-  const [newTaskType] = useState<CareTaskType>('care_action');
+  const [newTaskType] = useState<CareTaskType>('GENERAL');
   const [newTaskOwner, setNewTaskOwner] = useState<CareTaskOwnerType>('caregiver');
   const [newTaskPriority, setNewTaskPriority] = useState<CareTaskPriority>('medium');
 

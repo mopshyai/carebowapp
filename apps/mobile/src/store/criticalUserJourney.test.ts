@@ -268,13 +268,13 @@ describe('Critical User Journey: Family Care Intelligence & Execution', () => {
         episodeId: episode.id,
         title: 'Check blood pressure & report dizziness',
         description: 'Verify if pressure is too low after Lasix dose.',
-        taskType: 'vital_check',
-        ownerType: 'caregiver',
+        taskType: 'VITALS',
+        ownerType: 'CAREGIVER',
         ownerName: 'Manvendra',
         dueAt: `${todayStr}T12:00:00.000Z`,
-        status: 'pending',
-        priority: 'urgent',
-        source: 'ask_carebow',
+        status: 'PENDING',
+        priority: 'URGENT',
+        source: 'ASK_CAREBOW',
       });
     });
 
@@ -282,7 +282,7 @@ describe('Critical User Journey: Family Care Intelligence & Execution', () => {
     const momTasks = useCareStore.getState().getTasksForPerson(mom.id);
     const bpTask = momTasks.find((t) => t.title.includes('blood pressure'));
     expect(bpTask).toBeDefined();
-    expect(bpTask?.source).toBe('ask_carebow');
+    expect(bpTask?.source).toBe('ASK_CAREBOW');
 
     // 13. Verify corresponding timeline events generated
     const timeline = useCareStore.getState().getTimelineForPerson(mom.id);
@@ -317,11 +317,11 @@ describe('Critical User Journey: Family Care Intelligence & Execution', () => {
         episodeId: episode.id,
         serviceCategory: 'physio',
         serviceTitle: 'In-Home Physical Therapy Assessment',
-        status: 'matching',
+        status: 'WAITING_PROVIDER',
         statusMessage: 'Matching licensed physical therapists nearby',
       });
     });
-    expect(serviceReq.status).toBe('MATCHING');
+    expect(serviceReq.status).toBe('WAITING_PROVIDER');
     expect(serviceReq.statusMessage).toBe('Matching licensed physical therapists nearby');
 
     // Update with real scheduled provider
@@ -330,18 +330,18 @@ describe('Critical User Journey: Family Care Intelligence & Execution', () => {
         .getState()
         .updateServiceRequestStatus(
           serviceReq.id,
-          'scheduled',
+          'SCHEDULED',
           'Appointment confirmed for Tuesday 10:00 AM',
           'Dr. Emily Watson, PT'
         );
     });
     const updatedReq = useCareStore.getState().serviceRequests.find((r) => r.id === serviceReq.id);
-    expect(updatedReq?.status).toBe('scheduled');
+    expect(updatedReq?.status).toBe('SCHEDULED');
     expect(updatedReq?.providerName).toBe('Dr. Emily Watson, PT');
 
     // 17. Emergency safety boundary test: ensure clinical boundary
     await act(async () => {
-      await useCareStore.getState().setWorkflowStatus(episode.id, 'needs_attention');
+      await useCareStore.getState().setWorkflowStatus(episode.id, 'NEEDS_ATTENTION');
     });
     const currentEpisode = useCareStore.getState().getActiveEpisodeForPerson(mom.id);
     expect(currentEpisode?.workflowStatus).toBe('NEEDS_ATTENTION');
