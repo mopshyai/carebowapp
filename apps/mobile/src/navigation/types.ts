@@ -77,12 +77,28 @@ export type RootStackParamList = {
   EpisodeSummary: { episodeId: string };
   TelemedicineBooking: { doctorId?: string } | undefined;
   VideoCall: { appointmentId: string; doctorName: string; doctorSpecialty?: string };
+  CareTransition: { personId?: string; reason?: string } | undefined;
 };
 
 export type MainTabParamList = {
-  Home: undefined;
-  Ask: undefined;
-  Messages: undefined;
+  Today: undefined;
+  Care:
+    | {
+        initialSection?:
+          | 'overview'
+          | 'tasks'
+          | 'timeline'
+          | 'medications'
+          | 'appointments'
+          | 'services'
+          | 'documents';
+      }
+    | undefined;
+  Ask: { initialContext?: string; actionType?: string } | undefined;
+  Family: undefined;
+  // Backward compatibility routes
+  Home?: undefined;
+  Messages?: undefined;
 };
 
 export type ProfileStackParamList = {

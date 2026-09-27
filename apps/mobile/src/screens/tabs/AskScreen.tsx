@@ -4,8 +4,9 @@
  */
 
 import Voice from '@react-native-voice/voice';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSelectedPersonContext } from '../../hooks/useSelectedPersonContext';
 import {
   Alert,
   PermissionsAndroid,
@@ -73,6 +74,28 @@ export default function AskCareBowScreen() {
   const symptomInputRef = useRef(symptomInput);
   const baseTextRef = useRef('');
   const inputModeRef = useRef(inputMode);
+
+  const route = useRoute<any>();
+  const { selectedPerson, displayName, activeEpisode } = useSelectedPersonContext();
+
+  useEffect(() => {
+    if (route.params?.initialContext) {
+      setSymptomInput(route.params.initialContext);
+    }
+  }, [route.params?.initialContext]);
+
+  useEffect(() => {
+    if (selectedPerson) {
+      if (selectedPerson.relationship === 'self') {
+        setContextType('me');
+        setSelectedFamilyMemberId('');
+      } else {
+        setContextType('family');
+        setSelectedFamilyMemberId(selectedPerson.id);
+        setFamilyRelation(selectedPerson.relationship);
+      }
+    }
+  }, [selectedPerson]);
 
   const members = useProfileStore((state) => state.members);
   const profileUser = useProfileStore((state) => state.user);
@@ -314,6 +337,7 @@ export default function AskCareBowScreen() {
       memberId,
       caregiverPresent: contextType === 'family' ? String(caregiverPresent) : undefined,
       attachedImages: JSON.stringify(attachedImages),
+      episodeId: activeEpisode?.id,
     });
   };
 
@@ -364,6 +388,24 @@ export default function AskCareBowScreen() {
 
         <View style={styles.accessSection}>
           <AskAccessStatusCard />
+        </View>
+
+        {/* SELECTED PERSON & EPISODE CONTEXT */}
+        <View style={styles.personCareContextBanner}>
+          <View style={styles.contextBadgeRow}>
+            <View style={styles.contextPill}>
+              <Text style={styles.contextPillLabel}>HELPING</Text>
+              <Text style={styles.contextPillValue}>{displayName}</Text>
+            </View>
+            {activeEpisode ? (
+              <View style={[styles.contextPill, styles.contextPillEpisode]}>
+                <Text style={styles.contextPillLabel}>ACTIVE CARE</Text>
+                <Text style={styles.contextPillValue} numberOfLines={1}>
+                  {activeEpisode.title}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -1290,5 +1332,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
+  },
+  personCareContextBanner: {
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  contextBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  contextPill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  contextPillEpisode: {
+    flex: 1,
+  },
+  contextPillLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.accent,
+    letterSpacing: 0.5,
+  },
+  contextPillValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
 });

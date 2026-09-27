@@ -107,7 +107,8 @@ class SecureStorageService {
       }
       return value;
     } catch (error) {
-      if (__DEV__) console.log(`[SecureStorage] Development fallback read failed for ${key}:`, error);
+      if (__DEV__)
+        console.log(`[SecureStorage] Development fallback read failed for ${key}:`, error);
       return null;
     }
   }
@@ -241,7 +242,10 @@ class SecureStorageService {
         return credentials.password;
       }
 
-      return this.getFallback(key);
+      if (canUseInsecureFallback()) {
+        return this.getFallback(key);
+      }
+      return null;
     } catch (error) {
       const errorMessage = String(error);
       if (errorMessage.includes('null') || errorMessage.includes('undefined')) {
