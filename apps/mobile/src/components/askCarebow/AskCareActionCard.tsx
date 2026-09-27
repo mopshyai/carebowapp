@@ -22,6 +22,7 @@ export interface AskCareActionCardProps {
   episodeId?: string;
   lastMessageSnippet?: string;
   isEmergency?: boolean;
+  suggestedDueAt?: string | null;
 }
 
 export function AskCareActionCard({
@@ -30,6 +31,7 @@ export function AskCareActionCard({
   episodeId,
   lastMessageSnippet = '',
   isEmergency = false,
+  suggestedDueAt = null,
 }: AskCareActionCardProps) {
   const navigation = useNavigation<any>();
   const createTask = useCareStore((state) => state.createTask);
@@ -38,44 +40,62 @@ export function AskCareActionCard({
   const [committedActions, setCommittedActions] = useState<Record<string, boolean>>({});
 
   // 1. Log Care Update
-  const handleLogUpdate = useCallback(() => {
+  const handleLogUpdate = useCallback(async () => {
     Haptics.trigger('notificationSuccess');
-    addCareUpdate({
-      personId,
-      authorId: 'caregiver',
-      authorName: 'Primary Caregiver',
-      note: lastMessageSnippet.slice(0, 180) || `Consultation note logged for ${personName}`,
-      category: 'symptom',
-    });
+    try {
+      const result = await addCareUpdate({
+        personId,
+        authorId: 'caregiver',
+        authorName: 'Primary Caregiver',
+        note: lastMessageSnippet.slice(0, 180) || `Consultation note logged for ${personName}`,
+        category: 'symptom',
+      });
 
-    setCommittedActions((prev) => ({ ...prev, update: true }));
-    Alert.alert(
-      'Update Logged',
-      `Logged to ${personName}'s care timeline so the entire care team can see it.`
-    );
+      if (result.syncStatus === 'SERVER_CONFIRMED') {
+        setCommittedActions((prev) => ({ ...prev, update: true }));
+        Alert.alert('Update Logged', 'Update logged.');
+      } else if (result.syncStatus === 'PENDING_SYNC') {
+        setCommittedActions((prev) => ({ ...prev, update: true }));
+        Alert.alert('Saved Offline', "Saved on this device. It will sync when you're back online.");
+      } else {
+        Alert.alert('Save Failed', "Couldn't save this update.");
+      }
+    } catch {
+      Alert.alert('Save Failed', "Couldn't save this update.");
+    }
   }, [personId, personName, lastMessageSnippet, addCareUpdate]);
 
   // 2. Create Care Task
-  const handleCreateTask = useCallback(() => {
+  const handleCreateTask = useCallback(async () => {
     Haptics.trigger('notificationSuccess');
-    const due = new Date(Date.now() + 86400000).toISOString();
-    createTask({
-      personId,
-      episodeId,
-      title: `Follow up: ${lastMessageSnippet.slice(0, 45) || 'Care review'}`,
-      description: `Action item created from CareBow conversation: "${lastMessageSnippet.slice(0, 120)}"`,
-      taskType: 'GENERAL',
-      ownerType: 'CAREGIVER',
-      ownerName: 'Primary Caregiver',
-      dueAt: due,
-      status: 'PENDING',
-      priority: 'HIGH',
-      source: 'ASK_CAREBOW',
-    });
+    try {
+      const result = await createTask({
+        personId,
+        episodeId,
+        title: `Follow up: ${lastMessageSnippet.slice(0, 45) || 'Care review'}`,
+        description: `Action item created from CareBow conversation: "${lastMessageSnippet.slice(0, 120)}"`,
+        taskType: 'GENERAL',
+        ownerType: 'CAREGIVER',
+        ownerName: 'Primary Caregiver',
+        dueAt: suggestedDueAt ?? null,
+        status: 'PENDING',
+        priority: 'HIGH',
+        source: 'ASK_CAREBOW',
+      });
 
-    setCommittedActions((prev) => ({ ...prev, task: true }));
-    Alert.alert('Task Created', `Added to ${personName}'s task list for review.`);
-  }, [personId, episodeId, personName, lastMessageSnippet, createTask]);
+      if (result.syncStatus === 'SERVER_CONFIRMED') {
+        setCommittedActions((prev) => ({ ...prev, task: true }));
+        Alert.alert('Task Created', 'Task created.');
+      } else if (result.syncStatus === 'PENDING_SYNC') {
+        setCommittedActions((prev) => ({ ...prev, task: true }));
+        Alert.alert('Saved Offline', "Saved on this device. It will sync when you're back online.");
+      } else {
+        Alert.alert('Save Failed', "Couldn't save this task.");
+      }
+    } catch {
+      Alert.alert('Save Failed', "Couldn't save this task.");
+    }
+  }, [personId, episodeId, personName, lastMessageSnippet, suggestedDueAt, createTask]);
 
   // 3. Request Professional Care
   const handleFindService = useCallback(() => {

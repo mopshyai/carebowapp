@@ -13,6 +13,13 @@ import { useCareStore } from './useCareStore';
 import { useAuthStore } from './useAuthStore';
 import { useProfileStore } from './useProfileStore';
 import { careApi } from '../services/api/endpoints/care';
+import { profilesApi } from '../services/api/endpoints/profiles';
+
+jest.mock('../services/api/endpoints/profiles', () => ({
+  profilesApi: {
+    getProfiles: jest.fn().mockResolvedValue([]),
+  },
+}));
 
 jest.mock('../services/api/endpoints/care', () => ({
   careApi: {
@@ -515,11 +522,11 @@ describe('CareBow Security & Isolation Certification Suite', () => {
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
     });
 
-    it('purges cached data, offline queue, and resets selectedMemberId on backend 404 (P0-5)', async () => {
+    it('purges cached data, offline queue, and resets selectedMemberId on backend 404 with authoritative profile revalidation (P0-5)', async () => {
       const MOM_ID = 'person_mom_001';
       const USER_B_OWN_ID = 'user_B_profile';
 
-      // 1. Setup User B with Mom as a profile member
+      // 1. Setup User B with BOTH Mom and Bob in local useProfileStore.members
       useAuthStore.setState({
         user: {
           id: 'user_B',
@@ -541,11 +548,20 @@ describe('CareBow Security & Isolation Certification Suite', () => {
             relationship: 'self',
             isDefault: true,
           } as any,
+          {
+            id: MOM_ID,
+            name: 'Mom Jones',
+            relationship: 'parent',
+            isDefault: false,
+          } as any,
         ],
         selectedMemberId: MOM_ID,
       });
 
-      // 2. Populate store with cached data and an offline mutation for Mom
+      // Assert test PRECONDITION: useProfileStore.members STILL CONTAINS Mom!
+      expect(useProfileStore.getState().members.some((m) => m.id === MOM_ID)).toBe(true);
+
+      // 2. Populate care store with cached data, collaborators, updates, timeline, service requests, and offline queue for Mom
       useCareStore.setState({
         episodes: [
           {
@@ -590,6 +606,49 @@ describe('CareBow Security & Isolation Certification Suite', () => {
             updatedAt: '2026-09-01T00:00:00.000Z',
           },
         ],
+        careUpdates: [
+          {
+            id: 'update_mom_1',
+            personId: MOM_ID,
+            authorId: 'caregiver',
+            authorName: 'Primary Caregiver',
+            note: 'Vitals stable',
+            category: 'vital',
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        timelineEvents: [
+          {
+            id: 'timeline_mom_1',
+            personId: MOM_ID,
+            eventType: 'NOTE',
+            title: 'Initial note',
+            timestamp: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        serviceRequests: [
+          {
+            id: 'service_mom_1',
+            personId: MOM_ID,
+            serviceCategory: 'nursing',
+            serviceTitle: 'Home Nurse',
+            status: 'REQUESTED',
+            requestedAt: '2026-09-01T00:00:00.000Z',
+            updatedAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        collaborators: [
+          {
+            id: 'collab_mom_1',
+            personId: MOM_ID,
+            name: 'Nurse Nancy',
+            role: 'caregiver',
+            relationship: 'other',
+            permissions: ['read_profile'],
+            status: 'active',
+            invitedAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
         offlineQueue: [
           {
             clientOpId: 'op_mom_offline',
@@ -603,7 +662,7 @@ describe('CareBow Security & Isolation Certification Suite', () => {
         ],
       });
 
-      // 3. Mock careApi to return 404 (Profile not found / access revoked fail-closed)
+      // 3. Mock careApi to return 404 (Fail-closed: Profile not found / access revoked)
       (careApi.getEpisodes as jest.Mock).mockImplementation((profileId: string) => {
         if (profileId === MOM_ID) {
           const notFoundError: any = new Error('Care profile not found');
@@ -613,30 +672,66 @@ describe('CareBow Security & Isolation Certification Suite', () => {
         return Promise.resolve([]);
       });
 
-      // 4. Trigger fetchCareForPerson for Mom
+      // 4. Mock profilesApi.getProfiles to return authoritative accessible list (MOM IS OMITTED)
+      (profilesApi.getProfiles as jest.Mock).mockResolvedValue([
+        {
+          id: USER_B_OWN_ID,
+          userId: 'user_B',
+          name: 'Bob Jones',
+          relationship: 'self',
+        },
+      ]);
+
+      // 5. Trigger loadCareData for Mom
       await act(async () => {
         await useCareStore.getState().loadCareData(MOM_ID);
       });
 
-      // 5. Assert: Mom's cache AND offlineQueue are purged, and selectedMemberId switched
+      // 6. Assert authoritative profile revalidation occurred and removed Mom from useProfileStore
+      expect(profilesApi.getProfiles).toHaveBeenCalled();
+      expect(useProfileStore.getState().members.some((m) => m.id === MOM_ID)).toBe(false);
+
+      // 7. Assert complete purge of all PHI, collaborators, and offline queue for MOM_ID
       const momEpisodes = useCareStore.getState().episodes.filter((e) => e.personId === MOM_ID);
       const momTasks = useCareStore.getState().tasks.filter((t) => t.personId === MOM_ID);
+      const momUpdates = useCareStore.getState().careUpdates.filter((u) => u.personId === MOM_ID);
+      const momTimeline = useCareStore
+        .getState()
+        .timelineEvents.filter((ev) => ev.personId === MOM_ID);
+      const momServices = useCareStore
+        .getState()
+        .serviceRequests.filter((s) => s.personId === MOM_ID);
+      const momCollabs = useCareStore.getState().collaborators.filter((c) => c.personId === MOM_ID);
       const momQueue = useCareStore
         .getState()
-        .offlineQueue.filter((op) => op.payload?.profileId === MOM_ID);
+        .offlineQueue.filter(
+          (op) => op.payload?.profileId === MOM_ID || op.payload?.personId === MOM_ID
+        );
 
       expect(momEpisodes).toHaveLength(0);
       expect(momTasks).toHaveLength(0);
+      expect(momUpdates).toHaveLength(0);
+      expect(momTimeline).toHaveLength(0);
+      expect(momServices).toHaveLength(0);
+      expect(momCollabs).toHaveLength(0);
       expect(momQueue).toHaveLength(0);
 
-      // Bob's own data is intact
+      // Derived queries for MOM_ID return empty / undefined
+      expect(useCareStore.getState().getTasksForPerson(MOM_ID)).toHaveLength(0);
+      expect(useCareStore.getState().getEpisodesForPerson(MOM_ID)).toHaveLength(0);
+      expect(useCareStore.getState().getTimelineForPerson(MOM_ID)).toHaveLength(0);
+      expect(useCareStore.getState().getUpdatesForPerson(MOM_ID)).toHaveLength(0);
+      expect(useCareStore.getState().getCollaboratorsForPerson(MOM_ID)).toHaveLength(0);
+      expect(useCareStore.getState().getActiveEpisodeForPerson(MOM_ID)).toBeUndefined();
+
+      // Selected member was switched away from revoked MOM_ID to Bob
+      expect(useProfileStore.getState().selectedMemberId).toBe(USER_B_OWN_ID);
+
+      // Bob's own non-revoked data remains completely intact
       const bobEpisodes = useCareStore
         .getState()
         .episodes.filter((e) => e.personId === USER_B_OWN_ID);
       expect(bobEpisodes).toHaveLength(1);
-
-      // Selected member was switched away from revoked MOM_ID
-      expect(useProfileStore.getState().selectedMemberId).toBe(USER_B_OWN_ID);
     });
   });
 });

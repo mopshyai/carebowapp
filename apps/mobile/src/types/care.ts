@@ -346,6 +346,8 @@ export interface DischargeDetails {
   documentUri?: string;
 }
 
+export type MutationSyncStatus = 'SERVER_CONFIRMED' | 'PENDING_SYNC' | 'FAILED';
+
 export interface CareEpisode {
   id: string;
   personId: string;
@@ -362,6 +364,7 @@ export interface CareEpisode {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  syncStatus?: MutationSyncStatus;
 }
 
 export interface CareTask {
@@ -387,6 +390,7 @@ export interface CareTask {
   };
   createdAt: string;
   updatedAt: string;
+  syncStatus?: MutationSyncStatus;
 }
 
 export interface CareTimelineEvent {
@@ -428,6 +432,7 @@ export interface CareUpdate {
     | 'OBSERVATION'
     | 'CLINICIAN_INSTRUCTION';
   createdAt: string;
+  syncStatus?: MutationSyncStatus;
 }
 
 export interface CareServiceRequest {
@@ -445,6 +450,7 @@ export interface CareServiceRequest {
   updatedAt: string;
   linkedBookingId?: string;
   linkedTaskId?: string;
+  syncStatus?: MutationSyncStatus;
 }
 
 // ============================================

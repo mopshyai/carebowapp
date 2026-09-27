@@ -41,6 +41,7 @@ import {
   CreateEpisodeInput,
   CreateServiceRequestInput,
 } from '../services/api/endpoints/care';
+import { profilesApi } from '../services/api/endpoints/profiles';
 import { useProfileStore } from './useProfileStore';
 
 // ============================================
@@ -295,17 +296,47 @@ export const useCareStore = create<CareState & CareActions>()(
             /not found/i.test(err?.message || '');
 
           if (isAccessRevoked || isNotFound) {
-            const profileState = useProfileStore.getState();
-            const memberExists = profileState.members?.some((m) => m.id === personId);
+            let shouldPurge = isAccessRevoked;
 
-            // Fail-closed: 403 always purges; 404 purges if profile is not among user's accessible members
-            if (isAccessRevoked || !memberExists) {
+            if (isNotFound) {
+              try {
+                // Authoritative profile-list revalidation from backend
+                const accessibleProfiles = await profilesApi.getProfiles();
+                const stillHasAccess = accessibleProfiles.some(
+                  (p: any) => p.id === personId || p.backendId === personId
+                );
+                if (!stillHasAccess) {
+                  shouldPurge = true;
+                  // Remove stale member from local useProfileStore
+                  const profileState = useProfileStore.getState();
+                  const localMember = profileState.members?.find(
+                    (m) => m.id === personId || m.backendId === personId
+                  );
+                  if (localMember) {
+                    profileState.deleteMember(localMember.id);
+                  }
+                }
+              } catch {
+                // If profile re-fetch fails, check if member exists in local store
+                const profileState = useProfileStore.getState();
+                const memberExists = profileState.members?.some(
+                  (m) => m.id === personId || m.backendId === personId
+                );
+                if (!memberExists) {
+                  shouldPurge = true;
+                }
+              }
+            }
+
+            // Fail-closed purge of all cached PHI, collaborators, and offline queue
+            if (shouldPurge) {
               set((state) => ({
                 episodes: state.episodes.filter((e) => e.personId !== personId),
                 tasks: state.tasks.filter((t) => t.personId !== personId),
                 careUpdates: state.careUpdates.filter((u) => u.personId !== personId),
                 timelineEvents: state.timelineEvents.filter((ev) => ev.personId !== personId),
                 serviceRequests: state.serviceRequests.filter((s) => s.personId !== personId),
+                collaborators: state.collaborators.filter((c) => c.personId !== personId),
                 offlineQueue: state.offlineQueue.filter(
                   (op) => op.payload?.profileId !== personId && op.payload?.personId !== personId
                 ),
@@ -315,10 +346,16 @@ export const useCareStore = create<CareState & CareActions>()(
                   : 'Care profile not found or access revoked',
               }));
 
+              const profileState = useProfileStore.getState();
               if (profileState.selectedMemberId === personId) {
-                const remaining = profileState.members?.filter((m) => m.id !== personId) || [];
+                const remaining =
+                  profileState.members?.filter(
+                    (m) => m.id !== personId && m.backendId !== personId
+                  ) || [];
                 if (remaining.length > 0) {
                   profileState.selectMember(remaining[0].id);
+                } else {
+                  profileState.selectMember(null);
                 }
               }
               return;
@@ -449,27 +486,36 @@ export const useCareStore = create<CareState & CareActions>()(
           // Replace client ID with canonical server ID
           set((state) => ({
             episodes: state.episodes.map((e) =>
-              e.id === clientEpisode.id ? { ...e, id: serverEpisode.id } : e
+              e.id === clientEpisode.id
+                ? { ...e, id: serverEpisode.id, syncStatus: 'SERVER_CONFIRMED' }
+                : e
             ),
           }));
-          return { ...clientEpisode, id: serverEpisode.id };
+          return { ...clientEpisode, id: serverEpisode.id, syncStatus: 'SERVER_CONFIRMED' };
         } catch {
           // Record to offline queue with SAME clientOpId and canonical payload
-          set((state) => ({
-            offlineQueue: [
-              ...state.offlineQueue,
-              {
-                clientOpId,
-                entityId: clientEpisode.id,
-                entityType: 'episode',
-                opType: 'create',
-                payload: apiPayload,
-                timestamp: now,
-                retryCount: 0,
-              },
-            ],
-          }));
-          return clientEpisode;
+          try {
+            set((state) => ({
+              episodes: state.episodes.map((e) =>
+                e.id === clientEpisode.id ? { ...e, syncStatus: 'PENDING_SYNC' } : e
+              ),
+              offlineQueue: [
+                ...state.offlineQueue,
+                {
+                  clientOpId,
+                  entityId: clientEpisode.id,
+                  entityType: 'episode',
+                  opType: 'create',
+                  payload: apiPayload,
+                  timestamp: now,
+                  retryCount: 0,
+                },
+              ],
+            }));
+            return { ...clientEpisode, syncStatus: 'PENDING_SYNC' };
+          } catch {
+            return { ...clientEpisode, syncStatus: 'FAILED' };
+          }
         }
       },
 
@@ -625,26 +671,35 @@ export const useCareStore = create<CareState & CareActions>()(
 
           set((state) => ({
             tasks: state.tasks.map((t) =>
-              t.id === clientTask.id ? { ...t, id: serverTask.id } : t
+              t.id === clientTask.id
+                ? { ...t, id: serverTask.id, syncStatus: 'SERVER_CONFIRMED' }
+                : t
             ),
           }));
-          return { ...clientTask, id: serverTask.id };
+          return { ...clientTask, id: serverTask.id, syncStatus: 'SERVER_CONFIRMED' };
         } catch {
-          set((state) => ({
-            offlineQueue: [
-              ...state.offlineQueue,
-              {
-                clientOpId,
-                entityId: clientTask.id,
-                entityType: 'task',
-                opType: 'create',
-                payload: apiPayload,
-                timestamp: now,
-                retryCount: 0,
-              },
-            ],
-          }));
-          return clientTask;
+          try {
+            set((state) => ({
+              tasks: state.tasks.map((t) =>
+                t.id === clientTask.id ? { ...t, syncStatus: 'PENDING_SYNC' } : t
+              ),
+              offlineQueue: [
+                ...state.offlineQueue,
+                {
+                  clientOpId,
+                  entityId: clientTask.id,
+                  entityType: 'task',
+                  opType: 'create',
+                  payload: apiPayload,
+                  timestamp: now,
+                  retryCount: 0,
+                },
+              ],
+            }));
+            return { ...clientTask, syncStatus: 'PENDING_SYNC' };
+          } catch {
+            return { ...clientTask, syncStatus: 'FAILED' };
+          }
         }
       },
 
@@ -878,26 +933,33 @@ export const useCareStore = create<CareState & CareActions>()(
           const serverUpdate = await careApi.addUpdate(apiPayload);
           set((state) => ({
             careUpdates: state.careUpdates.map((u) =>
-              u.id === update.id ? { ...u, id: serverUpdate.id } : u
+              u.id === update.id ? { ...u, id: serverUpdate.id, syncStatus: 'SERVER_CONFIRMED' } : u
             ),
           }));
-          return { ...update, id: serverUpdate.id };
+          return { ...update, id: serverUpdate.id, syncStatus: 'SERVER_CONFIRMED' };
         } catch {
-          set((state) => ({
-            offlineQueue: [
-              ...state.offlineQueue,
-              {
-                clientOpId,
-                entityId: update.id,
-                entityType: 'update',
-                opType: 'create',
-                payload: apiPayload,
-                timestamp: new Date().toISOString(),
-                retryCount: 0,
-              },
-            ],
-          }));
-          return update;
+          try {
+            set((state) => ({
+              careUpdates: state.careUpdates.map((u) =>
+                u.id === update.id ? { ...u, syncStatus: 'PENDING_SYNC' } : u
+              ),
+              offlineQueue: [
+                ...state.offlineQueue,
+                {
+                  clientOpId,
+                  entityId: update.id,
+                  entityType: 'update',
+                  opType: 'create',
+                  payload: apiPayload,
+                  timestamp: new Date().toISOString(),
+                  retryCount: 0,
+                },
+              ],
+            }));
+            return { ...update, syncStatus: 'PENDING_SYNC' };
+          } catch {
+            return { ...update, syncStatus: 'FAILED' };
+          }
         }
       },
 
@@ -950,26 +1012,33 @@ export const useCareStore = create<CareState & CareActions>()(
 
           set((state) => ({
             serviceRequests: state.serviceRequests.map((s) =>
-              s.id === request.id ? { ...s, id: serverReq.id } : s
+              s.id === request.id ? { ...s, id: serverReq.id, syncStatus: 'SERVER_CONFIRMED' } : s
             ),
           }));
-          return { ...request, id: serverReq.id };
+          return { ...request, id: serverReq.id, syncStatus: 'SERVER_CONFIRMED' };
         } catch {
-          set((state) => ({
-            offlineQueue: [
-              ...state.offlineQueue,
-              {
-                clientOpId,
-                entityId: request.id,
-                entityType: 'service_request',
-                opType: 'create',
-                payload: apiPayload,
-                timestamp: now,
-                retryCount: 0,
-              },
-            ],
-          }));
-          return request;
+          try {
+            set((state) => ({
+              serviceRequests: state.serviceRequests.map((s) =>
+                s.id === request.id ? { ...s, syncStatus: 'PENDING_SYNC' } : s
+              ),
+              offlineQueue: [
+                ...state.offlineQueue,
+                {
+                  clientOpId,
+                  entityId: request.id,
+                  entityType: 'service_request',
+                  opType: 'create',
+                  payload: apiPayload,
+                  timestamp: now,
+                  retryCount: 0,
+                },
+              ],
+            }));
+            return { ...request, syncStatus: 'PENDING_SYNC' };
+          } catch {
+            return { ...request, syncStatus: 'FAILED' };
+          }
         }
       },
 
