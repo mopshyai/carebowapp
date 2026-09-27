@@ -500,7 +500,9 @@ export default function CareScreen() {
 
                         {/* Due Date */}
                         <Text style={styles.taskDueDate}>
-                          Due {new Date(t.dueAt).toLocaleDateString()}
+                          {t.dueAt
+                            ? `Due ${new Date(t.dueAt).toLocaleDateString()}`
+                            : 'No due date'}
                         </Text>
 
                         {/* Priority Badge */}

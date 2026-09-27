@@ -132,6 +132,7 @@ export interface CreateEpisodeInput {
   facilityName?: string;
   admittingDiagnosis?: string;
   dischargeDiagnosis?: string;
+  clientOpId?: string | null;
 }
 
 export interface CreateTaskInput {
@@ -147,6 +148,7 @@ export interface CreateTaskInput {
   priority?: TaskPriority;
   status?: TaskStatus;
   source?: string;
+  clientOpId?: string | null;
 }
 
 export interface UpdateTaskInput {
@@ -171,6 +173,7 @@ export interface CreateServiceRequestInput {
   description?: string;
   assignedTo?: string;
   requestedDate?: string;
+  clientOpId?: string | null;
 }
 
 export interface ConfirmDischargeInput {
@@ -221,7 +224,8 @@ export const careApi = {
   createEpisode: async (data: CreateEpisodeInput): Promise<BackendCareEpisode> => {
     const res = await ApiClient.post<{ success: boolean; episode: BackendCareEpisode }>(
       '/v1/care/episodes',
-      data
+      data,
+      data.clientOpId ? { headers: { 'x-client-op-id': data.clientOpId } } : undefined
     );
     return res.data.episode;
   },
@@ -263,7 +267,8 @@ export const careApi = {
   createTask: async (data: CreateTaskInput): Promise<BackendCareTask> => {
     const res = await ApiClient.post<{ success: boolean; task: BackendCareTask }>(
       '/v1/care/tasks',
-      data
+      data,
+      data.clientOpId ? { headers: { 'x-client-op-id': data.clientOpId } } : undefined
     );
     return res.data.task;
   },
@@ -297,10 +302,12 @@ export const careApi = {
     episodeId?: string;
     text: string;
     category?: string;
+    clientOpId?: string | null;
   }): Promise<BackendCareUpdate> => {
     const res = await ApiClient.post<{ success: boolean; update: BackendCareUpdate }>(
       '/v1/care/updates',
-      data
+      data,
+      data.clientOpId ? { headers: { 'x-client-op-id': data.clientOpId } } : undefined
     );
     return res.data.update;
   },
@@ -341,7 +348,11 @@ export const careApi = {
     const res = await ApiClient.post<{
       success: boolean;
       serviceRequest: BackendCareServiceRequest;
-    }>('/v1/care/services', data);
+    }>(
+      '/v1/care/services',
+      data,
+      data.clientOpId ? { headers: { 'x-client-op-id': data.clientOpId } } : undefined
+    );
     return res.data.serviceRequest;
   },
 

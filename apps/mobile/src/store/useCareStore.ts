@@ -35,7 +35,13 @@ import {
   toCanonicalServiceRequestStatus,
 } from '../types/care';
 import { generateId } from '../types/profile';
-import { careApi } from '../services/api/endpoints/care';
+import {
+  careApi,
+  CreateTaskInput,
+  CreateEpisodeInput,
+  CreateServiceRequestInput,
+} from '../services/api/endpoints/care';
+import { useProfileStore } from './useProfileStore';
 
 // ============================================
 // OFFLINE MUTATION TYPES
@@ -210,9 +216,9 @@ export const useCareStore = create<CareState & CareActions>()(
             description: t.description || undefined,
             taskType: t.type,
             ownerType: t.ownerType,
-            ownerId: t.ownerId || undefined,
-            ownerName: t.ownerName || undefined,
-            dueAt: t.dueAt || new Date().toISOString(),
+            ownerId: t.ownerId ?? null,
+            ownerName: t.ownerName ?? null,
+            dueAt: t.dueAt ?? null,
             status: t.status,
             priority: t.priority,
             source: (t.source as any) || 'USER',
@@ -283,18 +289,40 @@ export const useCareStore = create<CareState & CareActions>()(
             err?.response?.status === 403 ||
             /forbidden|access revoked|not authorized/i.test(err?.message || '');
 
-          if (isAccessRevoked) {
-            // Purge cached data for this person immediately to prevent unauthorized viewing
-            set((state) => ({
-              episodes: state.episodes.filter((e) => e.personId !== personId),
-              tasks: state.tasks.filter((t) => t.personId !== personId),
-              careUpdates: state.careUpdates.filter((u) => u.personId !== personId),
-              timelineEvents: state.timelineEvents.filter((ev) => ev.personId !== personId),
-              serviceRequests: state.serviceRequests.filter((s) => s.personId !== personId),
-              isLoading: false,
-              error: 'Access to this care profile has been revoked',
-            }));
-            return;
+          const isNotFound =
+            err?.status === 404 ||
+            err?.response?.status === 404 ||
+            /not found/i.test(err?.message || '');
+
+          if (isAccessRevoked || isNotFound) {
+            const profileState = useProfileStore.getState();
+            const memberExists = profileState.members?.some((m) => m.id === personId);
+
+            // Fail-closed: 403 always purges; 404 purges if profile is not among user's accessible members
+            if (isAccessRevoked || !memberExists) {
+              set((state) => ({
+                episodes: state.episodes.filter((e) => e.personId !== personId),
+                tasks: state.tasks.filter((t) => t.personId !== personId),
+                careUpdates: state.careUpdates.filter((u) => u.personId !== personId),
+                timelineEvents: state.timelineEvents.filter((ev) => ev.personId !== personId),
+                serviceRequests: state.serviceRequests.filter((s) => s.personId !== personId),
+                offlineQueue: state.offlineQueue.filter(
+                  (op) => op.payload?.profileId !== personId && op.payload?.personId !== personId
+                ),
+                isLoading: false,
+                error: isAccessRevoked
+                  ? 'Access to this care profile has been revoked'
+                  : 'Care profile not found or access revoked',
+              }));
+
+              if (profileState.selectedMemberId === personId) {
+                const remaining = profileState.members?.filter((m) => m.id !== personId) || [];
+                if (remaining.length > 0) {
+                  profileState.selectMember(remaining[0].id);
+                }
+              }
+              return;
+            }
           }
 
           set({ isLoading: false, error: err.message || 'Sync failed' });
@@ -315,17 +343,49 @@ export const useCareStore = create<CareState & CareActions>()(
         for (const op of queue) {
           try {
             if (op.entityType === 'task' && op.opType === 'create') {
-              await careApi.createTask(op.payload as any);
+              const serverTask = await careApi.createTask({
+                ...(op.payload as any),
+                clientOpId: op.clientOpId,
+              });
+              set((state) => ({
+                tasks: state.tasks.map((t) =>
+                  t.id === op.entityId ? { ...t, id: serverTask.id } : t
+                ),
+              }));
             } else if (op.entityType === 'task' && op.opType === 'update') {
               await careApi.updateTask(op.entityId, op.payload);
             } else if (op.entityType === 'task' && op.opType === 'delete') {
               await careApi.deleteTask(op.entityId);
             } else if (op.entityType === 'update' && op.opType === 'create') {
-              await careApi.addUpdate(op.payload as any);
+              const serverUpdate = await careApi.addUpdate({
+                ...(op.payload as any),
+                clientOpId: op.clientOpId,
+              });
+              set((state) => ({
+                careUpdates: state.careUpdates.map((u) =>
+                  u.id === op.entityId ? { ...u, id: serverUpdate.id } : u
+                ),
+              }));
             } else if (op.entityType === 'episode' && op.opType === 'create') {
-              await careApi.createEpisode(op.payload as any);
+              const serverEpisode = await careApi.createEpisode({
+                ...(op.payload as any),
+                clientOpId: op.clientOpId,
+              });
+              set((state) => ({
+                episodes: state.episodes.map((e) =>
+                  e.id === op.entityId ? { ...e, id: serverEpisode.id } : e
+                ),
+              }));
             } else if (op.entityType === 'service_request' && op.opType === 'create') {
-              await careApi.createServiceRequest(op.payload as any);
+              const serverReq = await careApi.createServiceRequest({
+                ...(op.payload as any),
+                clientOpId: op.clientOpId,
+              });
+              set((state) => ({
+                serviceRequests: state.serviceRequests.map((s) =>
+                  s.id === op.entityId ? { ...s, id: serverReq.id } : s
+                ),
+              }));
             }
           } catch {
             // Keep in queue if failed
@@ -342,6 +402,7 @@ export const useCareStore = create<CareState & CareActions>()(
 
       createEpisode: async (data) => {
         const now = new Date().toISOString();
+        const clientOpId = generateId();
         const clientEpisode: CareEpisode = {
           id: generateId(),
           ...data,
@@ -367,22 +428,23 @@ export const useCareStore = create<CareState & CareActions>()(
           severity: 'normal',
         });
 
+        const apiPayload: CreateEpisodeInput = {
+          profileId: data.personId,
+          title: data.title,
+          episodeType: toCanonicalEpisodeType(data.episodeType || 'OTHER'),
+          workflowStatus: toCanonicalWorkflowStatus(data.workflowStatus || 'RECOVERY_ONGOING'),
+          startDate: data.startDate,
+          targetEndDate: data.targetEndDate,
+          goals: data.careGoals,
+          description: data.description,
+          facilityName: data.dischargeDetails?.hospitalName,
+          dischargeDiagnosis: data.dischargeDetails?.primaryDiagnosis,
+          clientOpId,
+        };
+
         // Async server dispatch
         try {
-          const serverEpisode = await careApi.createEpisode({
-            profileId: data.personId,
-            title: data.title,
-            episodeType: toCanonicalEpisodeType(data.episodeType || 'OTHER') as any,
-            workflowStatus: toCanonicalWorkflowStatus(
-              data.workflowStatus || 'RECOVERY_ONGOING'
-            ) as any,
-            startDate: data.startDate,
-            targetEndDate: data.targetEndDate,
-            goals: data.careGoals,
-            description: data.description,
-            facilityName: data.dischargeDetails?.hospitalName,
-            dischargeDiagnosis: data.dischargeDetails?.primaryDiagnosis,
-          });
+          const serverEpisode = await careApi.createEpisode(apiPayload);
 
           // Replace client ID with canonical server ID
           set((state) => ({
@@ -392,16 +454,16 @@ export const useCareStore = create<CareState & CareActions>()(
           }));
           return { ...clientEpisode, id: serverEpisode.id };
         } catch {
-          // Record to offline queue
+          // Record to offline queue with SAME clientOpId and canonical payload
           set((state) => ({
             offlineQueue: [
               ...state.offlineQueue,
               {
-                clientOpId: generateId(),
+                clientOpId,
                 entityId: clientEpisode.id,
                 entityType: 'episode',
                 opType: 'create',
-                payload: data,
+                payload: apiPayload,
                 timestamp: now,
                 retryCount: 0,
               },
@@ -412,6 +474,7 @@ export const useCareStore = create<CareState & CareActions>()(
       },
 
       updateEpisode: async (id, updates) => {
+        const previous = get().episodes.find((e) => e.id === id);
         set((state) => ({
           episodes: state.episodes.map((e) =>
             e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
@@ -421,13 +484,19 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.updateEpisode(id, updates as any);
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              episodes: state.episodes.map((e) => (e.id === id ? previous : e)),
+              error: 'Internet connection is required to update episode',
+            }));
+          }
         }
       },
 
       setWorkflowStatus: async (id, status) => {
+        const previous = get().episodes.find((e) => e.id === id);
         const canonicalStatus = toCanonicalWorkflowStatus(status);
-        const episode = get().episodes.find((e) => e.id === id);
+        const episode = previous || get().episodes.find((e) => e.id === id);
         set((state) => ({
           episodes: state.episodes.map((e) =>
             e.id === id
@@ -450,11 +519,17 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.updateEpisode(id, { workflowStatus: canonicalStatus as any });
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              episodes: state.episodes.map((e) => (e.id === id ? previous : e)),
+              error: 'Internet connection is required to update care status',
+            }));
+          }
         }
       },
 
       completeEpisode: async (id) => {
+        const previous = get().episodes.find((e) => e.id === id);
         const now = new Date().toISOString();
         set((state) => ({
           episodes: state.episodes.map((e) =>
@@ -476,7 +551,12 @@ export const useCareStore = create<CareState & CareActions>()(
             workflowStatus: 'EPISODE_COMPLETE',
           });
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              episodes: state.episodes.map((e) => (e.id === id ? previous : e)),
+              error: 'Internet connection is required to complete episode',
+            }));
+          }
         }
       },
 
@@ -496,6 +576,7 @@ export const useCareStore = create<CareState & CareActions>()(
 
       createTask: async (data) => {
         const now = new Date().toISOString();
+        const clientOpId = generateId();
         const clientTask: CareTask = {
           id: generateId(),
           ...data,
@@ -503,6 +584,7 @@ export const useCareStore = create<CareState & CareActions>()(
           ownerType: toCanonicalTaskOwner(data.ownerType),
           priority: toCanonicalPriority(data.priority),
           status: toCanonicalTaskStatus(data.status || 'PENDING'),
+          dueAt: data.dueAt ?? null,
           createdAt: now,
           updatedAt: now,
         };
@@ -522,21 +604,24 @@ export const useCareStore = create<CareState & CareActions>()(
             data.priority === 'urgent' || data.priority === 'URGENT' ? 'attention' : 'normal',
         });
 
+        const apiPayload: CreateTaskInput = {
+          profileId: data.personId,
+          episodeId: data.episodeId,
+          title: data.title,
+          description: data.description,
+          type: toCanonicalTaskType(data.taskType),
+          ownerType: toCanonicalTaskOwner(data.ownerType),
+          ownerId: data.ownerId,
+          ownerName: data.ownerName,
+          dueAt: data.dueAt ?? null,
+          priority: toCanonicalPriority(data.priority),
+          status: toCanonicalTaskStatus(data.status || 'PENDING'),
+          clientOpId,
+        };
+
         // Server dispatch
         try {
-          const serverTask = await careApi.createTask({
-            profileId: data.personId,
-            episodeId: data.episodeId,
-            title: data.title,
-            description: data.description,
-            type: toCanonicalTaskType(data.taskType),
-            ownerType: toCanonicalTaskOwner(data.ownerType),
-            ownerId: data.ownerId,
-            ownerName: data.ownerName,
-            dueAt: data.dueAt,
-            priority: toCanonicalPriority(data.priority),
-            status: toCanonicalTaskStatus(data.status || 'PENDING'),
-          });
+          const serverTask = await careApi.createTask(apiPayload);
 
           set((state) => ({
             tasks: state.tasks.map((t) =>
@@ -549,11 +634,11 @@ export const useCareStore = create<CareState & CareActions>()(
             offlineQueue: [
               ...state.offlineQueue,
               {
-                clientOpId: generateId(),
+                clientOpId,
                 entityId: clientTask.id,
                 entityType: 'task',
                 opType: 'create',
-                payload: data,
+                payload: apiPayload,
                 timestamp: now,
                 retryCount: 0,
               },
@@ -564,6 +649,7 @@ export const useCareStore = create<CareState & CareActions>()(
       },
 
       updateTask: async (id, updates) => {
+        const previous = get().tasks.find((t) => t.id === id);
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
@@ -573,11 +659,17 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.updateTask(id, updates as any);
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              tasks: state.tasks.map((t) => (t.id === id ? previous : t)),
+              error: 'Internet connection is required to update task',
+            }));
+          }
         }
       },
 
       assignTask: async (id, ownerType, ownerId, ownerName) => {
+        const previous = get().tasks.find((t) => t.id === id);
         const canonicalOwner = toCanonicalTaskOwner(ownerType);
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -600,13 +692,18 @@ export const useCareStore = create<CareState & CareActions>()(
             ownerName,
           });
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              tasks: state.tasks.map((t) => (t.id === id ? previous : t)),
+              error: 'Internet connection is required to assign task',
+            }));
+          }
         }
       },
 
       completeTask: async (id, notes) => {
+        const previous = get().tasks.find((t) => t.id === id);
         const now = new Date().toISOString();
-        const existing = get().tasks.find((t) => t.id === id);
 
         set((state) => ({
           tasks: state.tasks.map((t) =>
@@ -622,12 +719,12 @@ export const useCareStore = create<CareState & CareActions>()(
           ),
         }));
 
-        if (existing) {
+        if (previous) {
           get().addTimelineEvent({
-            personId: existing.personId,
-            episodeId: existing.episodeId,
+            personId: previous.personId,
+            episodeId: previous.episodeId,
             eventType: 'TASK_COMPLETED',
-            title: `Completed: ${existing.title}`,
+            title: `Completed: ${previous.title}`,
             description: notes,
             severity: 'normal',
           });
@@ -639,11 +736,17 @@ export const useCareStore = create<CareState & CareActions>()(
             completionNotes: notes,
           });
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              tasks: state.tasks.map((t) => (t.id === id ? previous : t)),
+              error: 'Internet connection is required to complete task',
+            }));
+          }
         }
       },
 
       reopenTask: async (id) => {
+        const previous = get().tasks.find((t) => t.id === id);
         set((state) => ({
           tasks: state.tasks.map((t) =>
             t.id === id
@@ -660,11 +763,17 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.updateTask(id, { status: 'PENDING' });
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              tasks: state.tasks.map((t) => (t.id === id ? previous : t)),
+              error: 'Internet connection is required to reopen task',
+            }));
+          }
         }
       },
 
       deleteTask: async (id) => {
+        const previous = get().tasks.find((t) => t.id === id);
         set((state) => ({
           tasks: state.tasks.filter((t) => t.id !== id),
         }));
@@ -672,7 +781,12 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.deleteTask(id);
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              tasks: [...state.tasks, previous],
+              error: 'Internet connection is required to delete task',
+            }));
+          }
         }
       },
 
@@ -686,7 +800,7 @@ export const useCareStore = create<CareState & CareActions>()(
           if (t.personId !== personId) return false;
           if (t.status === 'completed' || t.status === 'COMPLETED' || t.status === 'CANCELLED')
             return false;
-          if (!t.dueAt) return true;
+          if (!t.dueAt) return false;
           const dueDay = t.dueAt.split('T')[0];
           return dueDay === todayStr;
         });
@@ -733,6 +847,7 @@ export const useCareStore = create<CareState & CareActions>()(
       // ============================================
 
       addCareUpdate: async (data) => {
+        const clientOpId = generateId();
         const update: CareUpdate = {
           id: generateId(),
           createdAt: new Date().toISOString(),
@@ -752,17 +867,38 @@ export const useCareStore = create<CareState & CareActions>()(
           severity: data.category === 'symptom' ? 'attention' : 'normal',
         });
 
-        try {
-          await careApi.addUpdate({
-            profileId: data.personId,
-            text: data.note,
-            category: data.category,
-          });
-        } catch {
-          // offline queue
-        }
+        const apiPayload = {
+          profileId: data.personId,
+          text: data.note,
+          category: data.category,
+          clientOpId,
+        };
 
-        return update;
+        try {
+          const serverUpdate = await careApi.addUpdate(apiPayload);
+          set((state) => ({
+            careUpdates: state.careUpdates.map((u) =>
+              u.id === update.id ? { ...u, id: serverUpdate.id } : u
+            ),
+          }));
+          return { ...update, id: serverUpdate.id };
+        } catch {
+          set((state) => ({
+            offlineQueue: [
+              ...state.offlineQueue,
+              {
+                clientOpId,
+                entityId: update.id,
+                entityType: 'update',
+                opType: 'create',
+                payload: apiPayload,
+                timestamp: new Date().toISOString(),
+                retryCount: 0,
+              },
+            ],
+          }));
+          return update;
+        }
       },
 
       getUpdatesForPerson: (personId) => {
@@ -777,6 +913,7 @@ export const useCareStore = create<CareState & CareActions>()(
 
       createServiceRequest: async (data) => {
         const now = new Date().toISOString();
+        const clientOpId = generateId();
         const request: CareServiceRequest = {
           id: generateId(),
           requestedAt: now,
@@ -798,15 +935,18 @@ export const useCareStore = create<CareState & CareActions>()(
           severity: 'normal',
         });
 
+        const apiPayload: CreateServiceRequestInput = {
+          profileId: data.personId,
+          episodeId: data.episodeId,
+          taskId: data.linkedTaskId,
+          serviceType: data.serviceCategory,
+          title: data.serviceTitle,
+          description: data.notes,
+          clientOpId,
+        };
+
         try {
-          const serverReq = await careApi.createServiceRequest({
-            profileId: data.personId,
-            episodeId: data.episodeId,
-            taskId: data.linkedTaskId,
-            serviceType: data.serviceCategory,
-            title: data.serviceTitle,
-            description: data.notes,
-          });
+          const serverReq = await careApi.createServiceRequest(apiPayload);
 
           set((state) => ({
             serviceRequests: state.serviceRequests.map((s) =>
@@ -815,11 +955,26 @@ export const useCareStore = create<CareState & CareActions>()(
           }));
           return { ...request, id: serverReq.id };
         } catch {
+          set((state) => ({
+            offlineQueue: [
+              ...state.offlineQueue,
+              {
+                clientOpId,
+                entityId: request.id,
+                entityType: 'service_request',
+                opType: 'create',
+                payload: apiPayload,
+                timestamp: now,
+                retryCount: 0,
+              },
+            ],
+          }));
           return request;
         }
       },
 
       cancelServiceRequest: async (id) => {
+        const previous = get().serviceRequests.find((r) => r.id === id);
         set((state) => ({
           serviceRequests: state.serviceRequests.map((r) =>
             r.id === id ? { ...r, status: 'CANCELLED', updatedAt: new Date().toISOString() } : r
@@ -829,7 +984,12 @@ export const useCareStore = create<CareState & CareActions>()(
         try {
           await careApi.cancelServiceRequest(id);
         } catch {
-          // offline queue
+          if (previous) {
+            set((state) => ({
+              serviceRequests: state.serviceRequests.map((r) => (r.id === id ? previous : r)),
+              error: 'Internet connection is required to cancel service request',
+            }));
+          }
         }
       },
 

@@ -316,6 +316,57 @@ describe('useCareStore', () => {
       expect(overdue).toHaveLength(1);
       expect(overdue[0].title).toBe('Task Overdue');
     });
+
+    it('undated tasks (dueAt: null or undefined) are neither due today nor overdue', async () => {
+      await act(async () => {
+        await useCareStore.getState().createTask({
+          personId: 'person_mom',
+          title: 'Undated Task',
+          taskType: 'GENERAL',
+          ownerType: 'CAREGIVER',
+          dueAt: null,
+          status: 'PENDING',
+          priority: 'MEDIUM',
+          source: 'caregiver_manual',
+        });
+      });
+
+      const dueToday = useCareStore.getState().getTasksDueToday('person_mom');
+      const undatedToday = dueToday.find((t) => t.title === 'Undated Task');
+      expect(undatedToday).toBeUndefined();
+
+      const overdue = useCareStore.getState().getOverdueTasks('person_mom');
+      const undatedOverdue = overdue.find((t) => t.title === 'Undated Task');
+      expect(undatedOverdue).toBeUndefined();
+    });
+
+    it('generates clientOpId before dispatch and preserves it in offlineQueue with canonical payload', async () => {
+      (careApi.createTask as jest.Mock).mockRejectedValueOnce(new Error('Network disconnected'));
+
+      await act(async () => {
+        await useCareStore.getState().createTask({
+          personId: 'person_mom',
+          title: 'Offline Queue Task',
+          taskType: 'MEDICATION',
+          ownerType: 'CAREGIVER',
+          dueAt: null,
+          status: 'PENDING',
+          priority: 'HIGH',
+          source: 'caregiver_manual',
+        });
+      });
+
+      const queue = useCareStore.getState().offlineQueue;
+      expect(queue).toHaveLength(1);
+      const queuedOp = queue[0];
+      expect(queuedOp.entityType).toBe('task');
+      expect(queuedOp.clientOpId).toBeDefined();
+      expect(typeof queuedOp.clientOpId).toBe('string');
+      expect(queuedOp.payload.profileId).toBe('person_mom');
+      expect(queuedOp.payload.type).toBe('MEDICATION');
+      expect(queuedOp.payload.dueAt).toBeNull();
+      expect(queuedOp.payload.clientOpId).toBe(queuedOp.clientOpId);
+    });
   });
 
   describe('Care Updates & Timeline', () => {

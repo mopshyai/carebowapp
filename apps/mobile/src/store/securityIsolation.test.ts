@@ -514,5 +514,129 @@ describe('CareBow Security & Isolation Certification Suite', () => {
       // User B is STILL logged in
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
     });
+
+    it('purges cached data, offline queue, and resets selectedMemberId on backend 404 (P0-5)', async () => {
+      const MOM_ID = 'person_mom_001';
+      const USER_B_OWN_ID = 'user_B_profile';
+
+      // 1. Setup User B with Mom as a profile member
+      useAuthStore.setState({
+        user: {
+          id: 'user_B',
+          email: 'bob@example.com',
+          firstName: 'Bob',
+          lastName: 'Jones',
+          createdAt: '2026-09-26T00:00:00.000Z',
+          updatedAt: '2026-09-26T00:00:00.000Z',
+        },
+        isAuthenticated: true,
+        accessToken: 'token_bob_jwt',
+      });
+
+      useProfileStore.setState({
+        members: [
+          {
+            id: USER_B_OWN_ID,
+            name: 'Bob Jones',
+            relationship: 'self',
+            isDefault: true,
+          } as any,
+        ],
+        selectedMemberId: MOM_ID,
+      });
+
+      // 2. Populate store with cached data and an offline mutation for Mom
+      useCareStore.setState({
+        episodes: [
+          {
+            id: 'ep_mom_1',
+            personId: MOM_ID,
+            title: "Mom's Cardiac Care",
+            episodeType: 'CHRONIC_CONDITION',
+            status: 'ACTIVE',
+            workflowStatus: 'STABLE',
+            startDate: '2026-09-01T00:00:00.000Z',
+            careGoals: [],
+            source: 'CLINICIAN',
+            createdAt: '2026-09-01T00:00:00.000Z',
+            updatedAt: '2026-09-01T00:00:00.000Z',
+          },
+          {
+            id: 'ep_bob_1',
+            personId: USER_B_OWN_ID,
+            title: "Bob's Wellness Plan",
+            episodeType: 'OTHER',
+            status: 'ACTIVE',
+            workflowStatus: 'STABLE',
+            startDate: '2026-09-01T00:00:00.000Z',
+            careGoals: [],
+            source: 'USER',
+            createdAt: '2026-09-01T00:00:00.000Z',
+            updatedAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        tasks: [
+          {
+            id: 'task_mom_1',
+            personId: MOM_ID,
+            title: "Mom's BP Check",
+            taskType: 'VITALS',
+            ownerType: 'CAREGIVER',
+            status: 'PENDING',
+            priority: 'HIGH',
+            source: 'USER',
+            dueAt: new Date().toISOString(),
+            createdAt: '2026-09-01T00:00:00.000Z',
+            updatedAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        offlineQueue: [
+          {
+            clientOpId: 'op_mom_offline',
+            entityId: 'task_mom_offline',
+            entityType: 'task',
+            opType: 'create',
+            payload: { profileId: MOM_ID, title: 'Check pulse' },
+            timestamp: new Date().toISOString(),
+            retryCount: 0,
+          },
+        ],
+      });
+
+      // 3. Mock careApi to return 404 (Profile not found / access revoked fail-closed)
+      (careApi.getEpisodes as jest.Mock).mockImplementation((profileId: string) => {
+        if (profileId === MOM_ID) {
+          const notFoundError: any = new Error('Care profile not found');
+          notFoundError.status = 404;
+          return Promise.reject(notFoundError);
+        }
+        return Promise.resolve([]);
+      });
+
+      // 4. Trigger fetchCareForPerson for Mom
+      await act(async () => {
+        await useCareStore.getState().loadCareData(MOM_ID);
+      });
+
+      // 5. Assert: Mom's cache AND offlineQueue are purged, and selectedMemberId switched
+      const momEpisodes = useCareStore.getState().episodes.filter((e) => e.personId === MOM_ID);
+      const momTasks = useCareStore.getState().tasks.filter((t) => t.personId === MOM_ID);
+      const momQueue = useCareStore
+        .getState()
+        .offlineQueue.filter((op) => op.payload?.profileId === MOM_ID);
+
+      expect(momEpisodes).toHaveLength(0);
+      expect(momTasks).toHaveLength(0);
+      expect(momQueue).toHaveLength(0);
+
+      // Bob's own data is intact
+      const bobEpisodes = useCareStore
+        .getState()
+        .episodes.filter((e) => e.personId === USER_B_OWN_ID);
+      expect(bobEpisodes).toHaveLength(1);
+
+      // Selected member was switched away from revoked MOM_ID
+      expect(useProfileStore.getState().selectedMemberId).toBe(USER_B_OWN_ID);
+    });
   });
 });

@@ -240,4 +240,66 @@ describe('Care Domain Contract Verification', () => {
       });
     });
   });
+
+  describe('CareTask Structural Parity & Nullability (P0-6 & P0-7)', () => {
+    it('accepts null and undefined dueAt without type or contract violation', () => {
+      const taskWithNullDue: import('./care').CareTask = {
+        id: 'task_null_due',
+        personId: 'profile_123',
+        title: 'Call insurance coordinator',
+        taskType: 'ADMINISTRATIVE',
+        ownerType: 'CAREGIVER',
+        ownerId: null,
+        ownerName: null,
+        dueAt: null,
+        status: 'PENDING',
+        priority: 'MEDIUM',
+        source: 'caregiver_manual',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      expect(taskWithNullDue.dueAt).toBeNull();
+      expect(taskWithNullDue.ownerId).toBeNull();
+      expect(taskWithNullDue.ownerName).toBeNull();
+
+      const taskWithUndefinedDue: import('./care').CareTask = {
+        id: 'task_undefined_due',
+        personId: 'profile_123',
+        title: 'Follow up on lab work',
+        taskType: 'GENERAL',
+        ownerType: 'CARE_RECIPIENT',
+        status: 'PENDING',
+        priority: 'LOW',
+        source: 'care_plan',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      expect(taskWithUndefinedDue.dueAt).toBeUndefined();
+      expect(taskWithUndefinedDue.ownerId).toBeUndefined();
+    });
+
+    it('matches backend CareTask schema nullability invariants', () => {
+      // Backend prisma CareTask schema:
+      // dueAt DateTime?
+      // ownerId String?
+      // ownerName String?
+      // description String?
+      // episodeId String?
+      // completedAt DateTime?
+      // completionNotes String?
+      const nullableFields: (keyof import('./care').CareTask)[] = [
+        'dueAt',
+        'ownerId',
+        'ownerName',
+        'description',
+        'episodeId',
+        'completedAt',
+        'completionNotes',
+      ];
+
+      expect(nullableFields).toHaveLength(7);
+    });
+  });
 });

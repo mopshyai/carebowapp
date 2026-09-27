@@ -372,9 +372,9 @@ export interface CareTask {
   description?: string;
   taskType: CareTaskType;
   ownerType: CareTaskOwnerType;
-  ownerId?: string;
-  ownerName?: string;
-  dueAt: string;
+  ownerId?: string | null;
+  ownerName?: string | null;
+  dueAt?: string | null;
   status: CareTaskStatus;
   priority: CareTaskPriority;
   source: CareTaskSource;
