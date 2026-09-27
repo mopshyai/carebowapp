@@ -14,9 +14,10 @@ import { AppIcon } from '../components/icons/AppIcon';
 import type { IconName } from '../components/icons/iconMap';
 
 // Screen imports
-import HomeScreen from '../screens/tabs/HomeScreen';
+import TodayScreen from '../screens/tabs/TodayScreen';
+import CareScreen from '../screens/tabs/CareScreen';
 import AskScreen from '../screens/tabs/AskScreen';
-import MessagesScreen from '../screens/tabs/MessagesScreen';
+import FamilyScreen from '../screens/tabs/FamilyScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -30,21 +31,36 @@ const TAB_CONFIG: Record<
     isSpecial?: boolean;
   }
 > = {
-  Home: {
+  Today: {
     icon: 'home',
     iconFilled: 'home-filled',
-    label: 'Home',
+    label: 'Today',
+  },
+  Care: {
+    icon: 'heart',
+    iconFilled: 'heart-filled',
+    label: 'Care',
   },
   Ask: {
     icon: 'sparkles',
     iconFilled: 'sparkles',
-    label: 'Ask AI',
+    label: 'Ask',
     isSpecial: true,
   },
+  Family: {
+    icon: 'companionship',
+    iconFilled: 'companionship',
+    label: 'Family',
+  },
+  Home: {
+    icon: 'home',
+    iconFilled: 'home-filled',
+    label: 'Today',
+  },
   Messages: {
-    icon: 'messages',
-    iconFilled: 'messages-filled',
-    label: 'Messages',
+    icon: 'companionship',
+    iconFilled: 'companionship',
+    label: 'Family',
   },
 };
 
@@ -59,7 +75,7 @@ function TabButton({
   routeName: string;
 }) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
-  const config = TAB_CONFIG[routeName];
+  const config = TAB_CONFIG[routeName] || TAB_CONFIG.Today;
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -123,9 +139,13 @@ function TabButton({
   );
 }
 
+const VISIBLE_TABS = ['Today', 'Care', 'Ask', 'Family'];
+
 // Custom Tab Bar Component with platform-specific styling
 function CustomTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
+
+  const visibleRoutes = state.routes.filter((route: any) => VISIBLE_TABS.includes(route.name));
 
   return (
     <View
@@ -137,8 +157,11 @@ function CustomTabBar({ state, navigation }: any) {
       ]}
     >
       <View style={styles.tabBarInner}>
-        {state.routes.map((route: any, index: number) => {
-          const isFocused = state.index === index;
+        {visibleRoutes.map((route: any) => {
+          const isFocused =
+            state.routes[state.index]?.name === route.name ||
+            (state.routes[state.index]?.name === 'Home' && route.name === 'Today') ||
+            (state.routes[state.index]?.name === 'Messages' && route.name === 'Family');
 
           const onPress = () => {
             const event = navigation.emit({
@@ -174,9 +197,13 @@ export default function TabNavigator() {
         headerShown: false,
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
-      <Tab.Screen name="Ask" component={AskScreen} options={{ title: 'Ask AI' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
+      <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'Today' }} />
+      <Tab.Screen name="Care" component={CareScreen} options={{ title: 'Care' }} />
+      <Tab.Screen name="Ask" component={AskScreen} options={{ title: 'Ask' }} />
+      <Tab.Screen name="Family" component={FamilyScreen} options={{ title: 'Family' }} />
+      {/* Aliases for backward compatibility */}
+      <Tab.Screen name="Home" component={TodayScreen} options={{ title: 'Today' }} />
+      <Tab.Screen name="Messages" component={FamilyScreen} options={{ title: 'Family' }} />
     </Tab.Navigator>
   );
 }
@@ -202,9 +229,8 @@ const styles = StyleSheet.create({
   // Tab Bar Inner Container
   tabBarInner: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    gap: 36,
     paddingBottom: 6,
   },
 
@@ -212,9 +238,10 @@ const styles = StyleSheet.create({
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    minWidth: 64,
+    flex: 1,
+    minWidth: 60,
   },
 
   // Regular Icon Wrapper

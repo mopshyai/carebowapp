@@ -413,13 +413,21 @@ export const useAuthStore = create<AuthStore>()(
         // SECURITY: Clear tokens from secure storage and the API client
         await Promise.all([SecureStorage.clearAuthTokens(), ApiClient.clearTokens()]);
 
-        // Also clear the local profile store so no account data lingers.
+        // Also clear the local profile store and care store so no account data lingers.
         try {
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { useProfileStore } = require('@/store/useProfileStore');
           useProfileStore.getState().logout?.();
         } catch {
           // profile store unavailable — non-fatal
+        }
+
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { useCareStore } = require('@/store/useCareStore');
+          useCareStore.getState().resetCareStore?.();
+        } catch {
+          // care store unavailable — non-fatal
         }
 
         set({

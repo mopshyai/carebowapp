@@ -17,6 +17,7 @@ export { paymentsApi, selectionFromDraft } from './payments';
 export { preferencesApi } from './preferences';
 export { deviceTokenApi } from './deviceToken';
 export { remediesApi } from './remedies';
+export { careApi } from './care';
 
 export type {
   MemberOverview,

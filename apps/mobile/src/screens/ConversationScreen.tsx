@@ -63,6 +63,7 @@ import {
   FollowUpCheckIn,
   StillNeedCard,
 } from '../components/askCarebow';
+import { AskCareActionCard } from '../components/askCarebow/AskCareActionCard';
 import { MemoryCandidateCard } from '../components/askCarebow/MemoryCandidateCard';
 import { getTriageLevel, TriageLevel } from '../utils/triageCTAMapping';
 import { useEpisodeStore } from '../store/episodeStore';
@@ -470,7 +471,9 @@ export default function ConversationScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Ask CareBow</Text>
-            <Text style={styles.headerSubtitle}>AI Health Assistant</Text>
+            <Text style={styles.headerSubtitle}>
+              {params.memberName ? `Helping ${params.memberName}` : 'Care Intelligence'}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
@@ -530,6 +533,16 @@ export default function ConversationScreen() {
             onEdit={handleEditMemoryCandidate}
             onDismiss={dismissCandidate}
             onDismissAll={clearPendingCandidates}
+          />
+        )}
+
+        {((messages.length > 1 && !isTyping) || triageLevel === 'emergency') && (
+          <AskCareActionCard
+            personId={params.memberId || currentSession?.memberId || 'care_recipient'}
+            personName={params.memberName || 'Care Recipient'}
+            episodeId={currentEpisodeId || undefined}
+            lastMessageSnippet={messages[messages.length - 1]?.text}
+            isEmergency={triageLevel === 'emergency'}
           />
         )}
 

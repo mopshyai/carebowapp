@@ -4,7 +4,26 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Linking, Alert, Text as RNText, TextInput as RNTextInput } from 'react-native';
+import {
+  Linking,
+  Alert,
+  Text as RNText,
+  TextInput as RNTextInput,
+  Pressable,
+  Text,
+  View,
+  StyleSheet as AppStyleSheet,
+} from 'react-native';
+
+let DesignLabApp: React.ComponentType<{ onClose: () => void }> | null = null;
+if (__DEV__) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    DesignLabApp = require('./design-lab/DesignLabApp').default;
+  } catch {
+    DesignLabApp = null;
+  }
+}
 
 // Dynamic Type: honor the user's OS font-size preference but cap growth so very
 // large accessibility text can't break fixed layouts. Applied globally once.
@@ -170,6 +189,7 @@ function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
   const [splashAnimationComplete, setSplashAnimationComplete] = useState(false);
+  const [designLabOpen, setDesignLabOpen] = useState(false);
 
   const hydrateTokens = useAuthStore((state) => state.hydrateTokensFromSecureStorage);
 
@@ -250,12 +270,31 @@ function AppContent() {
     setSplashAnimationComplete(true);
   }, []);
 
+  if (__DEV__ && designLabOpen && DesignLabApp) {
+    return (
+      <View style={{ flex: 1 }}>
+        <DesignLabApp onClose={() => setDesignLabOpen(false)} />
+      </View>
+    );
+  }
+
   return (
     <>
       {/* Splash Screen */}
       {showSplash && (
         <SplashScreen onAnimationComplete={handleSplashComplete} isVisible={showSplash} />
       )}
+
+      {__DEV__ ? (
+        <Pressable
+          onPress={() => setDesignLabOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open CareBow design lab"
+          style={devLabStyles.fab}
+        >
+          <Text style={devLabStyles.fabText}>Lab</Text>
+        </Pressable>
+      ) : null}
 
       {/* Main App */}
       <NavigationContainer
@@ -298,3 +337,23 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+const devLabStyles = AppStyleSheet.create({
+  fab: {
+    position: 'absolute',
+    top: 56,
+    right: 12,
+    zIndex: 10000,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#155E63',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});

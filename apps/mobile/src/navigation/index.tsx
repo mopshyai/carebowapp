@@ -38,6 +38,7 @@ import HealthMemoryScreen from '../screens/HealthMemoryScreen';
 import EpisodeSummaryScreen from '../screens/EpisodeSummaryScreen';
 import TelemedicineBookingScreen from '../screens/TelemedicineBookingScreen';
 import VideoCallScreen from '../screens/VideoCallScreen';
+import CareTransitionScreen from '../screens/CareTransitionScreen';
 import MemberBookingDetailsScreen from '../screens/member/MemberBookingDetailsScreen';
 
 import NewEntryScreen from '../screens/entries/NewEntryScreen';
@@ -145,11 +146,7 @@ export default function RootNavigator() {
             component={ScheduleScreen}
             options={{ animation: 'default' }}
           />
-          <Stack.Screen
-            name="Thread"
-            component={ThreadScreen}
-            options={{ animation: 'default' }}
-          />
+          <Stack.Screen name="Thread" component={ThreadScreen} options={{ animation: 'default' }} />
 
           <Stack.Screen
             name="Services"
@@ -238,6 +235,11 @@ export default function RootNavigator() {
               gestureEnabled: false,
               presentation: 'fullScreenModal',
             }}
+          />
+          <Stack.Screen
+            name="CareTransition"
+            component={CareTransitionScreen}
+            options={{ animation: 'slide_from_bottom' }}
           />
         </>
       )}
