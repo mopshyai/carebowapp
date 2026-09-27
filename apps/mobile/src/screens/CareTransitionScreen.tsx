@@ -44,6 +44,16 @@ type CareReason =
   | 'MEDICATION_TRANSITION'
   | 'HOME_CARE_SETUP';
 
+function getProvenanceBadgeText(sourceType?: string): string {
+  if (sourceType === 'CAREBOW_SUGGESTION') return 'CareBow suggestion';
+  if (sourceType === 'CLINICIAN_DISCHARGE_ORDER' || sourceType === 'CLINICIAN_INSTRUCTION') {
+    return 'Clinician instruction';
+  }
+  if (sourceType === 'DOCUMENT_EXTRACTED') return 'From discharge document';
+  if (sourceType === 'USER_REQUEST' || sourceType === 'USER') return 'Entered by you';
+  return 'From discharge document';
+}
+
 export default function CareTransitionScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -547,7 +557,9 @@ export default function CareTransitionScreen() {
                             styles.sourceTypeBadge,
                             item.sourceType === 'CAREBOW_SUGGESTION'
                               ? styles.suggestionBadge
-                              : styles.clinicianBadge,
+                              : item.sourceType === 'CLINICIAN_DISCHARGE_ORDER'
+                                ? styles.clinicianBadge
+                                : styles.docBadge,
                           ]}
                         >
                           <Text
@@ -555,12 +567,12 @@ export default function CareTransitionScreen() {
                               styles.sourceTypeBadgeText,
                               item.sourceType === 'CAREBOW_SUGGESTION'
                                 ? styles.suggestionBadgeText
-                                : styles.clinicianBadgeText,
+                                : item.sourceType === 'CLINICIAN_DISCHARGE_ORDER'
+                                  ? styles.clinicianBadgeText
+                                  : styles.docBadgeText,
                             ]}
                           >
-                            {item.sourceType === 'CAREBOW_SUGGESTION'
-                              ? 'CAREBOW SUGGESTION'
-                              : 'CLINICIAN ORDER'}
+                            {getProvenanceBadgeText(item.sourceType)}
                           </Text>
                         </View>
                       </View>
@@ -955,6 +967,16 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '800',
     color: '#7E22CE',
+  },
+  docBadge: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  docBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#475569',
   },
   sourceTypeBadgeText: {
     fontSize: 8,

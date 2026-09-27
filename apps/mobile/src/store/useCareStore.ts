@@ -72,6 +72,7 @@ export interface CareState {
 export type CareActions = {
   // Synchronization with Canonical Backend
   fetchCareForPerson: (personId: string) => Promise<void>;
+  loadCareData: (personId: string) => Promise<void>;
   syncOfflineQueue: () => Promise<void>;
 
   // Episode operations
@@ -168,7 +169,7 @@ export const useCareStore = create<CareState & CareActions>()(
 
         try {
           const [episodes, tasks, updates, timeline, services] = await Promise.all([
-            careApi.getEpisodes(personId).catch(() => []),
+            careApi.getEpisodes(personId),
             careApi.getTasks(personId).catch(() => []),
             careApi.getUpdates(personId).catch(() => []),
             careApi.getTimeline(personId).catch(() => []),
@@ -277,8 +278,31 @@ export const useCareStore = create<CareState & CareActions>()(
             lastSyncedAt: new Date().toISOString(),
           }));
         } catch (err: any) {
+          const isAccessRevoked =
+            err?.status === 403 ||
+            err?.response?.status === 403 ||
+            /forbidden|access revoked|not authorized/i.test(err?.message || '');
+
+          if (isAccessRevoked) {
+            // Purge cached data for this person immediately to prevent unauthorized viewing
+            set((state) => ({
+              episodes: state.episodes.filter((e) => e.personId !== personId),
+              tasks: state.tasks.filter((t) => t.personId !== personId),
+              careUpdates: state.careUpdates.filter((u) => u.personId !== personId),
+              timelineEvents: state.timelineEvents.filter((ev) => ev.personId !== personId),
+              serviceRequests: state.serviceRequests.filter((s) => s.personId !== personId),
+              isLoading: false,
+              error: 'Access to this care profile has been revoked',
+            }));
+            return;
+          }
+
           set({ isLoading: false, error: err.message || 'Sync failed' });
         }
+      },
+
+      loadCareData: async (personId: string) => {
+        await get().fetchCareForPerson(personId);
       },
 
       syncOfflineQueue: async () => {

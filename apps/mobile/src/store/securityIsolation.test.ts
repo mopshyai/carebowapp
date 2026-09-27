@@ -19,6 +19,7 @@ jest.mock('../services/api/endpoints/care', () => ({
     getEpisodes: jest.fn().mockResolvedValue([]),
     getActiveEpisode: jest.fn().mockResolvedValue(null),
     getTasks: jest.fn().mockResolvedValue([]),
+    getUpdates: jest.fn().mockResolvedValue([]),
     getTimeline: jest.fn().mockResolvedValue([]),
     getServiceRequests: jest.fn().mockResolvedValue([]),
     createEpisode: jest.fn().mockImplementation((data) =>
@@ -366,6 +367,152 @@ describe('CareBow Security & Isolation Certification Suite', () => {
       // 3. Provenance source snippet MUST be preserved
       expect(medItem.sourceSnippet).toBe('Take Lisinopril 10mg daily');
       expect(medItem.sourceType).toBe('CLINICIAN_DISCHARGE_ORDER');
+    });
+  });
+
+  describe('Test 6: Revoked Access & Cache Revalidation While Logged In (P0-5)', () => {
+    it('purges cached healthcare data when server rejects access to a previously shared profile while user remains logged in', async () => {
+      const MOM_ID = 'profile_mom_shared';
+      const USER_B_OWN_ID = 'profile_user_b_self';
+
+      // 1. User B is logged in
+      act(() => {
+        useAuthStore.setState({
+          user: {
+            id: 'user_B',
+            email: 'bob@example.com',
+            firstName: 'Bob',
+            lastName: 'Sharma',
+            phone: '+15550002222',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          isAuthenticated: true,
+          accessToken: 'jwt_token_b',
+        });
+      });
+
+      // 2. Mock initial authorized access to Mom and Bob's own profile
+      (careApi.getEpisodes as jest.Mock).mockImplementation((profileId: string) => {
+        if (profileId === MOM_ID) {
+          return Promise.resolve([
+            {
+              id: 'ep_mom_1',
+              profileId: MOM_ID,
+              title: 'Mom CHF Recovery',
+              status: 'ACTIVE',
+              workflowStatus: 'STABLE',
+              startDate: '2026-09-01',
+              goals: ['Salt reduction'],
+              createdAt: '2026-09-01T00:00:00.000Z',
+              updatedAt: '2026-09-01T00:00:00.000Z',
+            },
+          ]);
+        }
+        if (profileId === USER_B_OWN_ID) {
+          return Promise.resolve([
+            {
+              id: 'ep_bob_1',
+              profileId: USER_B_OWN_ID,
+              title: 'Bob Wellness Plan',
+              status: 'ACTIVE',
+              workflowStatus: 'STABLE',
+              startDate: '2026-09-01',
+              goals: ['Exercise'],
+              createdAt: '2026-09-01T00:00:00.000Z',
+              updatedAt: '2026-09-01T00:00:00.000Z',
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (careApi.getTasks as jest.Mock).mockImplementation((profileId: string) => {
+        if (profileId === MOM_ID) {
+          return Promise.resolve([
+            {
+              id: 'task_mom_1',
+              profileId: MOM_ID,
+              title: 'Check Mom Blood Pressure',
+              type: 'VITALS',
+              ownerType: 'CAREGIVER',
+              priority: 'HIGH',
+              status: 'PENDING',
+              source: 'USER',
+              createdAt: '2026-09-01T00:00:00.000Z',
+              updatedAt: '2026-09-01T00:00:00.000Z',
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+
+      (careApi.getTimeline as jest.Mock).mockResolvedValue([]);
+      (careApi.getServiceRequests as jest.Mock).mockResolvedValue([]);
+
+      // User B loads Mom's care data into local store
+      await act(async () => {
+        await useCareStore.getState().loadCareData(MOM_ID);
+        await useCareStore.getState().loadCareData(USER_B_OWN_ID);
+      });
+
+      // Verify Mom's data and Bob's data are cached in User B's store
+      expect(useCareStore.getState().episodes.find((e) => e.personId === MOM_ID)).toBeDefined();
+      expect(useCareStore.getState().tasks.find((t) => t.personId === MOM_ID)).toBeDefined();
+      expect(
+        useCareStore.getState().episodes.find((e) => e.personId === USER_B_OWN_ID)
+      ).toBeDefined();
+
+      // 3. OWNER REVOKES USER B's ACCESS ON SERVER
+      // Subsequent server calls return 403 Forbidden
+      (careApi.getEpisodes as jest.Mock).mockImplementation((profileId: string) => {
+        if (profileId === MOM_ID) {
+          const forbiddenError: any = new Error(
+            'Forbidden: Access to this profile has been revoked'
+          );
+          forbiddenError.status = 403;
+          return Promise.reject(forbiddenError);
+        }
+        return Promise.resolve([]);
+      });
+
+      // 4. USER B REMAINS LOGGED IN — triggers refresh / sync on Mom's profile
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
+
+      await act(async () => {
+        await useCareStore.getState().loadCareData(MOM_ID);
+      });
+
+      // 5. CACHE PURGE VERIFICATION:
+      // Mom's healthcare data MUST be completely purged from User B's store
+      const momEpisodes = useCareStore.getState().episodes.filter((e) => e.personId === MOM_ID);
+      const momTasks = useCareStore.getState().tasks.filter((t) => t.personId === MOM_ID);
+      const momUpdates = useCareStore.getState().careUpdates.filter((u) => u.personId === MOM_ID);
+      const momTimeline = useCareStore
+        .getState()
+        .timelineEvents.filter((ev) => ev.personId === MOM_ID);
+      const momServices = useCareStore
+        .getState()
+        .serviceRequests.filter((s) => s.personId === MOM_ID);
+
+      expect(momEpisodes).toHaveLength(0);
+      expect(momTasks).toHaveLength(0);
+      expect(momUpdates).toHaveLength(0);
+      expect(momTimeline).toHaveLength(0);
+      expect(momServices).toHaveLength(0);
+
+      // Error message must truthfully indicate access revocation
+      expect(useCareStore.getState().error).toBe('Access to this care profile has been revoked');
+
+      // 6. ISOLATION: User B's own non-revoked data remains intact
+      const bobEpisodes = useCareStore
+        .getState()
+        .episodes.filter((e) => e.personId === USER_B_OWN_ID);
+      expect(bobEpisodes).toHaveLength(1);
+      expect(bobEpisodes[0].id).toBe('ep_bob_1');
+
+      // User B is STILL logged in
+      expect(useAuthStore.getState().isAuthenticated).toBe(true);
     });
   });
 });
